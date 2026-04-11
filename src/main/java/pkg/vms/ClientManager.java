@@ -1,4 +1,5 @@
 package pkg.vms;
+import pkg.vms.DAO.DBconnect;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -10,16 +11,11 @@ import java.util.List;
  */
 public class ClientManager {
 
-    // Configuration de la base de données
-    private static final String DB_URL = "jdbc:postgresql://localhost:5432/VMS_voucher";
-    private static final String DB_USER = "postgres";
-    private static final String DB_PASSWORD = "0003";
-
     /**
      * Obtenir une connexion à la base de données
      */
-    private Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+    private Connection getConnection() {
+        return DBconnect.getConnection();
     }
 
     /**

@@ -1,6 +1,7 @@
 package pkg.vms;
 
 import pkg.vms.DAO.DBconnect;
+import pkg.vms.DAO.VoucherDAO;
 
 import javax.swing.*;
 import javax.swing.table.*;
@@ -17,26 +18,26 @@ import java.util.List;
  */
 class GestionBons extends JPanel {
 
-    // ── Palette ─────────────────────────────────────────────────────────────
-    private static final Color BG_ROOT      = new Color(245, 246, 250);
-    private static final Color BG_CARD      = new Color(255, 255, 255);
-    private static final Color RED_PRIMARY  = new Color(210,  35,  45);
-    private static final Color RED_DARK     = new Color(170,  20,  28);
-    private static final Color RED_LIGHT    = new Color(255, 235, 236);
-    private static final Color BORDER_LIGHT = new Color(228, 230, 236);
-    private static final Color TEXT_PRIMARY = new Color( 22,  28,  45);
-    private static final Color TEXT_SECOND  = new Color( 90, 100, 120);
-    private static final Color TEXT_MUTED   = new Color(160, 168, 185);
-    private static final Color SUCCESS      = new Color( 22, 163,  74);
-    private static final Color WARNING      = new Color(217, 119,   6);
-    private static final Color DANGER       = new Color(220,  38,  38);
+    // ── Palette (Centralisée via VMSStyle) ──────────────────────────────────
+    private static final Color BG_ROOT      = VMSStyle.BG_ROOT;
+    private static final Color BG_CARD      = VMSStyle.BG_CARD;
+    private static final Color RED_PRIMARY  = VMSStyle.RED_PRIMARY;
+    private static final Color RED_DARK     = VMSStyle.RED_DARK;
+    private static final Color RED_LIGHT    = VMSStyle.RED_LIGHT;
+    private static final Color BORDER_LIGHT = VMSStyle.BORDER_LIGHT;
+    private static final Color TEXT_PRIMARY = VMSStyle.TEXT_PRIMARY;
+    private static final Color TEXT_SECOND  = VMSStyle.TEXT_SECONDARY;
+    private static final Color TEXT_MUTED   = VMSStyle.TEXT_MUTED;
+    private static final Color SUCCESS      = VMSStyle.SUCCESS;
+    private static final Color WARNING      = VMSStyle.WARNING;
+    private static final Color DANGER       = VMSStyle.RED_PRIMARY;
 
-    private static final Font FONT_TITLE  = new Font("Georgia",      Font.BOLD,  24);
-    private static final Font FONT_HDR    = new Font("Trebuchet MS", Font.BOLD,  12);
-    private static final Font FONT_CELL   = new Font("Trebuchet MS", Font.PLAIN, 12);
-    private static final Font FONT_BADGE  = new Font("Trebuchet MS", Font.BOLD,  10);
-    private static final Font FONT_BTN    = new Font("Trebuchet MS", Font.BOLD,  12);
-    private static final Font FONT_FILTER = new Font("Trebuchet MS", Font.PLAIN, 12);
+    private static final Font FONT_TITLE  = VMSStyle.FONT_BRAND.deriveFont(24f);
+    private static final Font FONT_HDR    = VMSStyle.FONT_BADGE.deriveFont(12f);
+    private static final Font FONT_CELL   = VMSStyle.FONT_NAV;
+    private static final Font FONT_BADGE  = VMSStyle.FONT_BADGE;
+    private static final Font FONT_BTN    = VMSStyle.FONT_BTN_MAIN.deriveFont(12f);
+    private static final Font FONT_FILTER = VMSStyle.FONT_NAV;
 
     // ── Colonnes ────────────────────────────────────────────────────────────
     private static final String[] COLS = {
@@ -302,7 +303,7 @@ class GestionBons extends JPanel {
                         "       d.valeur_unitaire, d.statuts, " +
                         "       d.date_creation, d.validite_jours " +
                         "FROM demande d " +
-                        "LEFT JOIN client c ON d.client_id = c.client_id " +
+                        "LEFT JOIN client c ON d.clientid = c.clientid " +
                         "ORDER BY d.date_creation DESC";
 
         try (Connection conn = DBconnect.getConnection();
@@ -378,7 +379,7 @@ class GestionBons extends JPanel {
         sorter.setRowFilter(filters.isEmpty() ? null : RowFilter.andFilter(filters));
 
         int visible = table.getRowCount();
-        lblTotal.setText(visible + " bon" + (visible > 1 ? "s" : "") + " affich\u00e9" + (visible > 1 ? "s" : ""));
+        lblTotal.setText(visible + " bon" + (visible > 1 ? "s" : "") + " affiche" + (visible > 1 ? "s" : ""));
     }
 
     // ── Renderer Statut ─────────────────────────────────────────────────────
@@ -475,8 +476,19 @@ class GestionBons extends JPanel {
     // ── Actions ─────────────────────────────────────────────────────────────
     private void ouvrirNouvelledemande() {
         Frame parent = (Frame) SwingUtilities.getWindowAncestor(this);
-        FormulaireCreationBon dlg = new FormulaireCreationBon((JFrame) parent, userId, "", role);
-        dlg.setVisible(true);
+
+        // Créer le panneau FormulaireCreationBon avec les paramètres attendus
+        FormulaireCreationBon panel = new FormulaireCreationBon(userId, role);
+
+        // Encapsuler dans un JDialog modal
+        JDialog dialog = new JDialog((JFrame) parent, "Nouvelle Demande de Bon", true);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setSize(650, 550);
+        dialog.setLocationRelativeTo(parent);
+        dialog.add(panel);
+        dialog.setVisible(true);
+
+        // Actualiser la liste après fermeture de la boîte de dialogue
         chargerBons();
     }
 

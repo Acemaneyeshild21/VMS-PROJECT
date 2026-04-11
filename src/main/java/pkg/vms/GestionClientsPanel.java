@@ -13,6 +13,25 @@ import java.util.List;
  */
 public class GestionClientsPanel extends JPanel {
 
+    // ── Palette (Centralisée via VMSStyle) ──────────────────────────────────
+    private static final Color BG_ROOT      = VMSStyle.BG_ROOT;
+    private static final Color BG_CARD      = VMSStyle.BG_CARD;
+    private static final Color RED_PRIMARY  = VMSStyle.RED_PRIMARY;
+    private static final Color RED_DARK     = VMSStyle.RED_DARK;
+    private static final Color RED_LIGHT    = VMSStyle.RED_LIGHT;
+    private static final Color BORDER_LIGHT = VMSStyle.BORDER_LIGHT;
+    private static final Color TEXT_PRIMARY = VMSStyle.TEXT_PRIMARY;
+    private static final Color TEXT_SECOND  = VMSStyle.TEXT_SECONDARY;
+    private static final Color TEXT_MUTED   = VMSStyle.TEXT_MUTED;
+    private static final Color SUCCESS      = VMSStyle.SUCCESS;
+    private static final Color WARNING      = VMSStyle.WARNING;
+
+    // ── Fonts (Centralisées via VMSStyle) ────────────────────────────────────
+    private static final Font FONT_TITLE    = VMSStyle.FONT_BRAND.deriveFont(24f);
+    private static final Font FONT_NAV      = VMSStyle.FONT_NAV;
+    private static final Font FONT_BTN      = VMSStyle.FONT_BTN_MAIN;
+    private static final Font FONT_TABLE    = VMSStyle.FONT_NAV;
+
     private ClientManager clientManager;
     private JTable tableClients;
     private DefaultTableModel tableModel;
@@ -53,8 +72,8 @@ public class GestionClientsPanel extends JPanel {
         leftPanel.setOpaque(false);
 
         JLabel titre = new JLabel("👥 Gestion des Clients");
-        titre.setFont(new Font("Arial", Font.BOLD, 32));
-        titre.setForeground(Color.WHITE);
+        titre.setFont(FONT_TITLE);
+        titre.setForeground(TEXT_PRIMARY);
         leftPanel.add(titre);
 
         // Barre de recherche et boutons à droite
@@ -90,15 +109,15 @@ public class GestionClientsPanel extends JPanel {
         searchPanel.add(txtRecherche, BorderLayout.CENTER);
 
         // Bouton Nouveau Client
-        JButton btnNouveau = createStyledButton("➕ Nouveau Client", new Color(46, 204, 113));
+        JButton btnNouveau = createStyledButton("➕ Nouveau Client", SUCCESS);
         btnNouveau.addActionListener(e -> ouvrirFormulaireNouveauClient());
 
         // Bouton Rafraîchir
-        JButton btnRefresh = createStyledButton("🔄 Actualiser", new Color(52, 152, 219));
+        JButton btnRefresh = createStyledButton("🔄 Actualiser", RED_PRIMARY);
         btnRefresh.addActionListener(e -> chargerClients());
 
         // ✅ NOUVEAU : Bouton Supprimer
-        JButton btnSupprimer = createStyledButton("🗑️ Supprimer", new Color(231, 76, 60));
+        JButton btnSupprimer = createStyledButton("🗑️ Supprimer", RED_PRIMARY);
         btnSupprimer.addActionListener(e -> supprimerClientSelectionne());
 
         rightPanel.add(searchPanel);
