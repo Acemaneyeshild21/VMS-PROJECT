@@ -1,14 +1,15 @@
 package pkg.vms;
 
-import pkg.vms.DAO.AuthDAO;
+import pkg.vms.DAO.UserDAO;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
 import java.sql.SQLException;
+import java.util.regex.Pattern;
 
-public class LoginForm extends JFrame {
+public class InscriptionForm extends JFrame {
 
     private static final Color BG         = VMSStyle.BG_ROOT;
     private static final Color RED        = VMSStyle.RED_PRIMARY;
@@ -19,17 +20,29 @@ public class LoginForm extends JFrame {
     private static final Color BORDER     = VMSStyle.BORDER_LIGHT;
     private static final Color SUCCESS    = VMSStyle.SUCCESS;
 
+    private static final Pattern EMAIL_RE = Pattern.compile(
+            "^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}$");
+
+    private static final String[] ROLES = {
+            "Collaborateur", "Comptable", "Approbateur",
+            "Manager", "Superviseur_Magasin", "Administrateur"
+    };
+
     private JTextField       txtUsername;
+    private JTextField       txtEmail;
     private JPasswordField   txtPassword;
+    private JPasswordField   txtConfirm;
+    private JComboBox<String> cboRole;
     private JLabel           lblError;
-    private JButton          btnLogin;
-    private boolean          showPassword = false;
+    private JButton          btnRegister;
+    private boolean          showPwd  = false;
+    private boolean          showConf = false;
 
     private int xOff, yOff;
 
-    public LoginForm() {
-        setTitle("Connexion \u2014 Intermart VMS");
-        setSize(960, 580);
+    public InscriptionForm() {
+        setTitle("Inscription \u2014 Intermart VMS");
+        setSize(960, 680);
         setUndecorated(true);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -46,7 +59,7 @@ public class LoginForm extends JFrame {
     }
 
     // =====================================================================
-    //  LEFT BRANDING PANEL
+    //  LEFT BRANDING PANEL  (identical to LoginForm for visual coherence)
     // =====================================================================
     private JPanel buildLeftBrand() {
         JPanel p = new JPanel() {
@@ -57,21 +70,18 @@ public class LoginForm extends JFrame {
                 g2.setPaint(gp);
                 g2.fillRect(0, 0, getWidth(), getHeight());
 
-                // Subtle pattern
                 g2.setColor(new Color(255, 255, 255, 6));
-                for (int i = 0; i < 30; i++) {
-                    int y = i * 28;
-                    g2.fillRect(0, y, getWidth(), 1);
+                for (int i = 0; i < 40; i++) {
+                    g2.fillRect(0, i * 28, getWidth(), 1);
                 }
 
-                // Decorative circles
                 g2.setColor(new Color(255, 255, 255, 8));
                 g2.fillOval(-60, getHeight() - 200, 260, 260);
                 g2.fillOval(getWidth() - 100, -80, 200, 200);
                 g2.dispose();
             }
         };
-        p.setPreferredSize(new Dimension(400, 0));
+        p.setPreferredSize(new Dimension(380, 0));
         p.setLayout(new BorderLayout());
         p.setBorder(BorderFactory.createEmptyBorder(60, 44, 48, 44));
 
@@ -79,7 +89,6 @@ public class LoginForm extends JFrame {
         content.setOpaque(false);
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
 
-        // Logo
         JLabel cartIcon = new JLabel("\uD83D\uDED2");
         cartIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 44));
         cartIcon.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -98,8 +107,8 @@ public class LoginForm extends JFrame {
         tagline.setAlignmentX(Component.LEFT_ALIGNMENT);
         content.add(tagline);
 
-        // Separator
         content.add(Box.createVerticalStrut(36));
+
         JPanel sep = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g;
@@ -114,13 +123,12 @@ public class LoginForm extends JFrame {
         content.add(sep);
         content.add(Box.createVerticalStrut(32));
 
-        // Features
         String[] features = {
+                "Cr\u00e9ez votre compte en quelques secondes",
+                "Acc\u00e8s s\u00e9curis\u00e9 selon votre r\u00f4le",
                 "Gestion compl\u00e8te des bons cadeau",
                 "Suivi des demandes en temps r\u00e9el",
-                "Multi-magasins & multi-r\u00f4les",
-                "G\u00e9n\u00e9ration PDF avec QR Code",
-                "R\u00e9demption s\u00e9curis\u00e9e anti-fraude"
+                "Multi-magasins & multi-r\u00f4les"
         };
         for (String f : features) {
             JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
@@ -142,7 +150,6 @@ public class LoginForm extends JFrame {
 
         p.add(content, BorderLayout.CENTER);
 
-        // Footer
         JLabel copy = new JLabel("\u00a9 2025 Intermart Maurice. Tous droits r\u00e9serv\u00e9s.");
         copy.setFont(new Font("Trebuchet MS", Font.PLAIN, 10));
         copy.setForeground(new Color(255, 255, 255, 100));
@@ -155,6 +162,10 @@ public class LoginForm extends JFrame {
     //  RIGHT FORM PANEL
     // =====================================================================
     private JPanel buildRightForm() {
+        JPanel outer = new JPanel(new BorderLayout());
+        outer.setBackground(Color.WHITE);
+
+        // Scrollable form so it works on smaller screens
         JPanel p = new JPanel(new GridBagLayout());
         p.setBackground(Color.WHITE);
 
@@ -162,116 +173,150 @@ public class LoginForm extends JFrame {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridx = 0;
         gbc.weightx = 1.0;
-        gbc.insets = new Insets(0, 60, 0, 60);
 
         // Close button
         gbc.gridy = 0;
         gbc.insets = new Insets(16, 0, 0, 16);
         gbc.anchor = GridBagConstraints.NORTHEAST;
         gbc.fill = GridBagConstraints.NONE;
-        JButton btnClose = buildCloseBtn();
-        p.add(btnClose, gbc);
+        p.add(buildCloseBtn(), gbc);
 
-        // Reset constraints
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.CENTER;
-        gbc.insets = new Insets(0, 60, 0, 60);
 
-        // Welcome
+        // Title
         gbc.gridy = 1;
-        gbc.insets = new Insets(10, 60, 4, 60);
-        JLabel lblWelcome = new JLabel("Connexion");
-        lblWelcome.setFont(new Font("Georgia", Font.BOLD, 28));
-        lblWelcome.setForeground(TEXT_P);
-        p.add(lblWelcome, gbc);
+        gbc.insets = new Insets(6, 50, 2, 50);
+        JLabel lblTitle = new JLabel("Cr\u00e9er un compte");
+        lblTitle.setFont(new Font("Georgia", Font.BOLD, 26));
+        lblTitle.setForeground(TEXT_P);
+        p.add(lblTitle, gbc);
 
         gbc.gridy = 2;
-        gbc.insets = new Insets(0, 60, 28, 60);
-        JLabel lblSub = new JLabel("Acc\u00e9dez \u00e0 votre espace de gestion Intermart");
+        gbc.insets = new Insets(0, 50, 20, 50);
+        JLabel lblSub = new JLabel("Rejoignez la plateforme Intermart VMS");
         lblSub.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
         lblSub.setForeground(TEXT_M);
         p.add(lblSub, gbc);
 
-        // Username field
+        // ── Username ──
         gbc.gridy = 3;
-        gbc.insets = new Insets(0, 60, 4, 60);
-        JLabel lblUser = new JLabel("Nom d'utilisateur");
-        lblUser.setFont(new Font("Trebuchet MS", Font.BOLD, 12));
-        lblUser.setForeground(TEXT_S);
-        p.add(lblUser, gbc);
+        gbc.insets = new Insets(0, 50, 3, 50);
+        p.add(buildLabel("Nom d'utilisateur"), gbc);
 
         gbc.gridy = 4;
-        gbc.insets = new Insets(0, 60, 16, 60);
+        gbc.insets = new Insets(0, 50, 12, 50);
         txtUsername = new JTextField();
-        styleField(txtUsername, "\u2302  Entrez votre identifiant");
+        styleField(txtUsername, "Entrez votre identifiant");
         p.add(txtUsername, gbc);
 
-        // Password field
+        // ── Email ──
         gbc.gridy = 5;
-        gbc.insets = new Insets(0, 60, 4, 60);
-        JLabel lblPass = new JLabel("Mot de passe");
-        lblPass.setFont(new Font("Trebuchet MS", Font.BOLD, 12));
-        lblPass.setForeground(TEXT_S);
-        p.add(lblPass, gbc);
+        gbc.insets = new Insets(0, 50, 3, 50);
+        p.add(buildLabel("Adresse e-mail"), gbc);
 
         gbc.gridy = 6;
-        gbc.insets = new Insets(0, 60, 8, 60);
-        JPanel passRow = buildPasswordField();
-        p.add(passRow, gbc);
+        gbc.insets = new Insets(0, 50, 12, 50);
+        txtEmail = new JTextField();
+        styleField(txtEmail, "exemple@intermart.mu");
+        p.add(txtEmail, gbc);
 
-        // Error message
+        // ── Password ──
         gbc.gridy = 7;
-        gbc.insets = new Insets(0, 60, 12, 60);
+        gbc.insets = new Insets(0, 50, 3, 50);
+        p.add(buildLabel("Mot de passe"), gbc);
+
+        gbc.gridy = 8;
+        gbc.insets = new Insets(0, 50, 12, 50);
+        txtPassword = new JPasswordField();
+        JPanel pwdRow = buildPasswordRow(txtPassword, true);
+        p.add(pwdRow, gbc);
+
+        // ── Confirm password ──
+        gbc.gridy = 9;
+        gbc.insets = new Insets(0, 50, 3, 50);
+        p.add(buildLabel("Confirmer le mot de passe"), gbc);
+
+        gbc.gridy = 10;
+        gbc.insets = new Insets(0, 50, 12, 50);
+        txtConfirm = new JPasswordField();
+        JPanel confRow = buildPasswordRow(txtConfirm, false);
+        p.add(confRow, gbc);
+
+        // ── Role ──
+        gbc.gridy = 11;
+        gbc.insets = new Insets(0, 50, 3, 50);
+        p.add(buildLabel("R\u00f4le"), gbc);
+
+        gbc.gridy = 12;
+        gbc.insets = new Insets(0, 50, 12, 50);
+        cboRole = new JComboBox<>(ROLES);
+        styleComboBox(cboRole);
+        p.add(cboRole, gbc);
+
+        // ── Error ──
+        gbc.gridy = 13;
+        gbc.insets = new Insets(0, 50, 8, 50);
         lblError = new JLabel(" ");
         lblError.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
         lblError.setForeground(RED);
         p.add(lblError, gbc);
 
-        // Login button
-        gbc.gridy = 8;
-        gbc.insets = new Insets(0, 60, 16, 60);
-        btnLogin = buildLoginButton();
-        p.add(btnLogin, gbc);
+        // ── Register button ──
+        gbc.gridy = 14;
+        gbc.insets = new Insets(0, 50, 12, 50);
+        btnRegister = buildGradientButton("Cr\u00e9er mon compte");
+        p.add(btnRegister, gbc);
 
-        // Register link
-        gbc.gridy = 9;
-        gbc.insets = new Insets(0, 60, 0, 60);
+        // ── Link to login ──
+        gbc.gridy = 15;
+        gbc.insets = new Insets(0, 50, 20, 50);
         JPanel linkRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
         linkRow.setOpaque(false);
-        JLabel lblNoAccount = new JLabel("Pas encore de compte ?");
-        lblNoAccount.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
-        lblNoAccount.setForeground(TEXT_M);
-        JLabel lblRegister = new JLabel("S'inscrire");
-        lblRegister.setFont(new Font("Trebuchet MS", Font.BOLD, 12));
-        lblRegister.setForeground(RED);
-        lblRegister.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        lblRegister.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { ouvrirInscription(); }
-            public void mouseEntered(MouseEvent e) { lblRegister.setForeground(RED_DK); }
-            public void mouseExited(MouseEvent e)  { lblRegister.setForeground(RED); }
+        JLabel lblHas = new JLabel("D\u00e9j\u00e0 un compte ?");
+        lblHas.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        lblHas.setForeground(TEXT_M);
+        JLabel lblLogin = new JLabel("Se connecter");
+        lblLogin.setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        lblLogin.setForeground(RED);
+        lblLogin.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        lblLogin.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) { ouvrirLogin(); }
+            public void mouseEntered(MouseEvent e) { lblLogin.setForeground(RED_DK); }
+            public void mouseExited(MouseEvent e)  { lblLogin.setForeground(RED); }
         });
-        linkRow.add(lblNoAccount);
-        linkRow.add(lblRegister);
+        linkRow.add(lblHas);
+        linkRow.add(lblLogin);
         p.add(linkRow, gbc);
 
-        // Enter key
-        txtPassword.addActionListener(e -> actionLogin());
-        txtUsername.addActionListener(e -> txtPassword.requestFocusInWindow());
+        // Enter key on last field triggers registration
+        txtConfirm.addActionListener(e -> actionRegister());
 
-        return p;
+        JScrollPane scroll = new JScrollPane(p);
+        scroll.setBorder(null);
+        scroll.getVerticalScrollBar().setUnitIncrement(12);
+        outer.add(scroll, BorderLayout.CENTER);
+        return outer;
     }
 
-    // ── Styled text field ──────────────────────────────────────────────────
+    // ── Label helper ──────────────────────────────────────────────────────
+    private JLabel buildLabel(String text) {
+        JLabel lbl = new JLabel(text);
+        lbl.setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        lbl.setForeground(TEXT_S);
+        return lbl;
+    }
+
+    // ── Styled text field (same pattern as LoginForm) ─────────────────────
     private void styleField(JTextField field, String placeholder) {
         field.setFont(new Font("Trebuchet MS", Font.PLAIN, 14));
         field.setForeground(TEXT_P);
         field.setCaretColor(RED);
-        field.setPreferredSize(new Dimension(0, 44));
+        field.setPreferredSize(new Dimension(0, 42));
         field.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(BORDER, 1),
                 BorderFactory.createEmptyBorder(8, 14, 8, 14)));
 
-        // Placeholder
         field.addFocusListener(new FocusAdapter() {
             public void focusGained(FocusEvent e) { field.repaint(); }
             public void focusLost(FocusEvent e)   { field.repaint(); }
@@ -291,19 +336,18 @@ public class LoginForm extends JFrame {
         });
     }
 
-    // ── Password field with toggle ─────────────────────────────────────────
-    private JPanel buildPasswordField() {
+    // ── Password row with toggle ──────────────────────────────────────────
+    private JPanel buildPasswordRow(JPasswordField field, boolean isPrimary) {
         JPanel row = new JPanel(new BorderLayout(0, 0));
         row.setBackground(Color.WHITE);
-        row.setPreferredSize(new Dimension(0, 44));
+        row.setPreferredSize(new Dimension(0, 42));
         row.setBorder(BorderFactory.createLineBorder(BORDER, 1));
 
-        txtPassword = new JPasswordField();
-        txtPassword.setFont(new Font("Trebuchet MS", Font.PLAIN, 14));
-        txtPassword.setForeground(TEXT_P);
-        txtPassword.setCaretColor(RED);
-        txtPassword.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 8));
-        txtPassword.setOpaque(false);
+        field.setFont(new Font("Trebuchet MS", Font.PLAIN, 14));
+        field.setForeground(TEXT_P);
+        field.setCaretColor(RED);
+        field.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 8));
+        field.setOpaque(false);
 
         JButton btnToggle = new JButton("\u25CF") {
             {
@@ -314,29 +358,60 @@ public class LoginForm extends JFrame {
                 setBorderPainted(false);
                 setFocusPainted(false);
                 setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(44, 44));
-                setToolTipText("Afficher / masquer le mot de passe");
+                setPreferredSize(new Dimension(42, 42));
+                setToolTipText("Afficher / masquer");
                 addActionListener(e -> {
-                    showPassword = !showPassword;
-                    if (showPassword) {
-                        txtPassword.setEchoChar((char) 0);
-                        setText("\u25CB");
+                    if (isPrimary) {
+                        showPwd = !showPwd;
+                        field.setEchoChar(showPwd ? (char) 0 : '\u2022');
+                        setText(showPwd ? "\u25CB" : "\u25CF");
                     } else {
-                        txtPassword.setEchoChar('\u2022');
-                        setText("\u25CF");
+                        showConf = !showConf;
+                        field.setEchoChar(showConf ? (char) 0 : '\u2022');
+                        setText(showConf ? "\u25CB" : "\u25CF");
                     }
                 });
             }
         };
 
-        row.add(txtPassword, BorderLayout.CENTER);
+        row.add(field, BorderLayout.CENTER);
         row.add(btnToggle, BorderLayout.EAST);
         return row;
     }
 
-    // ── Login button ───────────────────────────────────────────────────────
-    private JButton buildLoginButton() {
-        JButton btn = new JButton("Se connecter") {
+    // ── Styled combo box ──────────────────────────────────────────────────
+    private void styleComboBox(JComboBox<String> cbo) {
+        cbo.setFont(new Font("Trebuchet MS", Font.PLAIN, 14));
+        cbo.setForeground(TEXT_P);
+        cbo.setBackground(Color.WHITE);
+        cbo.setPreferredSize(new Dimension(0, 42));
+        cbo.setBorder(BorderFactory.createLineBorder(BORDER, 1));
+        cbo.setFocusable(false);
+
+        cbo.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value,
+                    int index, boolean sel, boolean focus) {
+                JLabel lbl = (JLabel) super.getListCellRendererComponent(list, value, index, sel, focus);
+                lbl.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
+                lbl.setBorder(BorderFactory.createEmptyBorder(6, 14, 6, 14));
+                if (sel) {
+                    lbl.setBackground(VMSStyle.RED_LIGHT);
+                    lbl.setForeground(RED_DK);
+                } else {
+                    lbl.setBackground(Color.WHITE);
+                    lbl.setForeground(TEXT_P);
+                }
+                String display = value != null ? value.toString().replace('_', ' ') : "";
+                lbl.setText(display);
+                return lbl;
+            }
+        });
+    }
+
+    // ── Gradient button (matches LoginForm style) ─────────────────────────
+    private JButton buildGradientButton(String text) {
+        JButton btn = new JButton(text) {
             boolean hov = false;
             {
                 setFont(new Font("Trebuchet MS", Font.BOLD, 15));
@@ -346,12 +421,12 @@ public class LoginForm extends JFrame {
                 setBorderPainted(false);
                 setFocusPainted(false);
                 setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(0, 48));
+                setPreferredSize(new Dimension(0, 46));
                 addMouseListener(new MouseAdapter() {
                     public void mouseEntered(MouseEvent e) { hov = true;  repaint(); }
                     public void mouseExited(MouseEvent e)  { hov = false; repaint(); }
                 });
-                addActionListener(e -> actionLogin());
+                addActionListener(e -> actionRegister());
             }
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -368,7 +443,7 @@ public class LoginForm extends JFrame {
         return btn;
     }
 
-    // ── Close button ───────────────────────────────────────────────────────
+    // ── Close button ──────────────────────────────────────────────────────
     private JButton buildCloseBtn() {
         JButton btn = new JButton("\u2715") {
             boolean hov = false;
@@ -401,43 +476,76 @@ public class LoginForm extends JFrame {
         return btn;
     }
 
-    // ── LOGIN ACTION ───────────────────────────────────────────────────────
-    private void actionLogin() {
-        String user = txtUsername.getText().trim();
-        String pass = new String(txtPassword.getPassword());
+    // =====================================================================
+    //  VALIDATION & REGISTRATION
+    // =====================================================================
+    private void actionRegister() {
+        String username = txtUsername.getText().trim();
+        String email    = txtEmail.getText().trim();
+        String pwd      = new String(txtPassword.getPassword());
+        String conf     = new String(txtConfirm.getPassword());
+        String role     = (String) cboRole.getSelectedItem();
 
-        if (user.isEmpty() || pass.isEmpty()) {
+        // Validations
+        if (username.isEmpty() || email.isEmpty() || pwd.isEmpty() || conf.isEmpty()) {
             showError("Veuillez remplir tous les champs.");
             return;
         }
+        if (username.length() < 3) {
+            showError("Le nom d'utilisateur doit contenir au moins 3 caract\u00e8res.");
+            return;
+        }
+        if (!EMAIL_RE.matcher(email).matches()) {
+            showError("Veuillez entrer une adresse e-mail valide.");
+            return;
+        }
+        if (pwd.length() < 6) {
+            showError("Le mot de passe doit contenir au moins 6 caract\u00e8res.");
+            return;
+        }
+        if (!pwd.equals(conf)) {
+            showError("Les mots de passe ne correspondent pas.");
+            return;
+        }
 
-        btnLogin.setEnabled(false);
-        btnLogin.setText("Connexion en cours...");
+        btnRegister.setEnabled(false);
+        btnRegister.setText("Inscription en cours...");
         lblError.setText(" ");
 
-        new SwingWorker<AuthDAO.UserSession, Void>() {
-            @Override protected AuthDAO.UserSession doInBackground() throws Exception {
-                return AuthDAO.authenticate(user, pass);
+        new SwingWorker<Boolean, Void>() {
+            private String errorMsg;
+
+            @Override protected Boolean doInBackground() {
+                try {
+                    return UserDAO.registerUser(username, email, pwd, role);
+                } catch (SQLException ex) {
+                    if (ex.getMessage() != null && ex.getMessage().contains("duplicate key")) {
+                        errorMsg = "Ce nom d'utilisateur ou cet e-mail existe d\u00e9j\u00e0.";
+                    } else {
+                        errorMsg = "Erreur de connexion \u00e0 la base de donn\u00e9es.";
+                    }
+                    ex.printStackTrace();
+                    return false;
+                }
             }
 
             @Override protected void done() {
                 try {
-                    AuthDAO.UserSession session = get();
-                    if (session != null) {
-                        dispose();
-                        SwingUtilities.invokeLater(() -> {
-                            new Dashboard(session.userId, session.username, session.role, session.email)
-                                    .setVisible(true);
-                        });
+                    boolean ok = get();
+                    if (ok) {
+                        showSuccess("Compte cr\u00e9\u00e9 avec succ\u00e8s ! Redirection...");
+                        Timer t = new Timer(1500, ev -> ouvrirLogin());
+                        t.setRepeats(false);
+                        t.start();
                     } else {
-                        showError("Identifiants incorrects. V\u00e9rifiez votre nom d'utilisateur et mot de passe.");
-                        btnLogin.setEnabled(true);
-                        btnLogin.setText("Se connecter");
+                        showError(errorMsg != null ? errorMsg : "L'inscription a \u00e9chou\u00e9. Veuillez r\u00e9essayer.");
+                        btnRegister.setEnabled(true);
+                        btnRegister.setText("Cr\u00e9er mon compte");
                     }
                 } catch (Exception ex) {
-                    showError("Erreur de connexion \u00e0 la base de donn\u00e9es.");
-                    btnLogin.setEnabled(true);
-                    btnLogin.setText("Se connecter");
+                    showError("Erreur inattendue.");
+                    btnRegister.setEnabled(true);
+                    btnRegister.setText("Cr\u00e9er mon compte");
                     ex.printStackTrace();
                 }
             }
@@ -449,15 +557,18 @@ public class LoginForm extends JFrame {
         lblError.setForeground(RED);
     }
 
-    // ── INSCRIPTION ────────────────────────────────────────────────────────
-    private void ouvrirInscription() {
-        dispose();
-        SwingUtilities.invokeLater(() -> {
-            new InscriptionForm().setVisible(true);
-        });
+    private void showSuccess(String msg) {
+        lblError.setText(msg);
+        lblError.setForeground(SUCCESS);
     }
 
-    // ── DRAG ───────────────────────────────────────────────────────────────
+    // ── NAVIGATION ────────────────────────────────────────────────────────
+    private void ouvrirLogin() {
+        dispose();
+        SwingUtilities.invokeLater(() -> new LoginForm().setVisible(true));
+    }
+
+    // ── DRAG ──────────────────────────────────────────────────────────────
     private void enableDrag(JPanel panel) {
         panel.addMouseListener(new MouseAdapter() {
             public void mousePressed(MouseEvent e) { xOff = e.getX(); yOff = e.getY(); }
@@ -467,9 +578,5 @@ public class LoginForm extends JFrame {
                 setLocation(e.getXOnScreen() - xOff, e.getYOnScreen() - yOff);
             }
         });
-    }
-
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new LoginForm().setVisible(true));
     }
 }
