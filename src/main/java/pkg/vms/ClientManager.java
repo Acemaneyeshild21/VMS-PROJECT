@@ -24,7 +24,7 @@ public class ClientManager {
      * @return true si succès, false sinon
      */
     public boolean ajouterClient(Client client) {
-        String sql = "INSERT INTO client (name, email, contactnumber, company, actif) VALUES (?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO client (name, email, contact_number, company, actif) VALUES (?, ?, ?, ?, ?)";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -50,7 +50,7 @@ public class ClientManager {
      */
     public List<Client> obtenirTousLesClients() {
         List<Client> clients = new ArrayList<>();
-        String sql = "SELECT * FROM client ORDER BY client_id DESC";
+        String sql = "SELECT * FROM client ORDER BY clientid DESC";
 
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement();
@@ -58,10 +58,10 @@ public class ClientManager {
 
             while (rs.next()) {
                 Client client = new Client(
-                        rs.getInt("client_id"),
+                        rs.getInt("clientid"),
                         rs.getString("name"),
                         rs.getString("email"),
-                        rs.getString("contactnumber"),
+                        rs.getString("contact_number"),
                         rs.getString("company"),
                         rs.getTimestamp("date_creation"),
                         rs.getBoolean("actif")
@@ -82,7 +82,7 @@ public class ClientManager {
      * @return Le client trouvé, ou null si non trouvé
      */
     public Client obtenirClientParId(int clientId) {
-        String sql = "SELECT * FROM client WHERE client_id = ?";
+        String sql = "SELECT * FROM client WHERE clientid = ?";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -92,10 +92,10 @@ public class ClientManager {
 
             if (rs.next()) {
                 return new Client(
-                        rs.getInt("client_id"),
+                        rs.getInt("clientid"),
                         rs.getString("name"),
                         rs.getString("email"),
-                        rs.getString("contactnumber"),
+                        rs.getString("contact_number"),
                         rs.getString("company"),
                         rs.getTimestamp("date_creation"),
                         rs.getBoolean("actif")
@@ -120,7 +120,7 @@ public class ClientManager {
                 "LOWER(name) LIKE LOWER(?) OR " +
                 "LOWER(email) LIKE LOWER(?) OR " +
                 "LOWER(company) LIKE LOWER(?) " +
-                "ORDER BY client_id DESC";
+                "ORDER BY clientid DESC";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -134,10 +134,10 @@ public class ClientManager {
 
             while (rs.next()) {
                 Client client = new Client(
-                        rs.getInt("client_id"),
+                        rs.getInt("clientid"),
                         rs.getString("name"),
                         rs.getString("email"),
-                        rs.getString("contactnumber"),
+                        rs.getString("contact_number"),
                         rs.getString("company"),
                         rs.getTimestamp("date_creation"),
                         rs.getBoolean("actif")
@@ -158,7 +158,7 @@ public class ClientManager {
      * @return true si succès, false sinon
      */
     public boolean modifierClient(Client client) {
-        String sql = "UPDATE client SET name = ?, email = ?, contactnumber = ?, company = ?, actif = ? WHERE client_id = ?";
+        String sql = "UPDATE client SET name = ?, email = ?, contact_number = ?, company = ?, actif = ? WHERE clientid = ?";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -186,7 +186,7 @@ public class ClientManager {
      */
     public boolean supprimerClient(int clientId) {
         // Désactivation logique au lieu de suppression physique
-        String sql = "UPDATE client SET actif = false WHERE client_id = ?";
+        String sql = "UPDATE client SET actif = false WHERE clientid = ?";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -207,7 +207,7 @@ public class ClientManager {
      * @return true si succès, false sinon
      */
     public boolean supprimerClientDefinitivement(int clientId) {
-        String sql = "DELETE FROM client WHERE client_id = ?";
+        String sql = "DELETE FROM client WHERE clientid = ?";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -229,7 +229,7 @@ public class ClientManager {
      * @return true si l'email existe déjà, false sinon
      */
     public boolean emailExiste(String email, int clientIdExclure) {
-        String sql = "SELECT COUNT(*) FROM client WHERE email = ? AND client_id != ?";
+        String sql = "SELECT COUNT(*) FROM client WHERE email = ? AND clientid != ?";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {

@@ -89,7 +89,7 @@ public class VoucherDAO {
 
     public static List<String[]> getVoucherRequests(String role, int userId) throws SQLException {
         List<String[]> data = new ArrayList<>();
-        String query = "SELECT d.demande_id, d.reference, c.name, d.montant, d.type_bon, d.statuts, " +
+        String query = "SELECT d.demande_id, d.reference, c.name, d.montant_total, d.type_bon, d.statuts, " +
                        "d.date_creation, d.invoice_reference, d.valeur_unitaire " +
                        "FROM demande d JOIN client c ON d.clientid = c.clientid ";
 
@@ -111,7 +111,7 @@ public class VoucherDAO {
                         String.valueOf(rs.getInt("demande_id")),
                         rs.getString("reference"),
                         rs.getString("name"),
-                        String.format("%.2f", rs.getDouble("montant")),
+                        String.format("%.2f", rs.getDouble("montant_total")),
                         rs.getString("type_bon"),
                         rs.getString("statuts"),
                         rs.getTimestamp("date_creation") != null ? rs.getTimestamp("date_creation").toString() : "",

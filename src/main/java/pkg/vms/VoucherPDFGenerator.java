@@ -16,7 +16,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.util.HashMap;
 import java.util.Map;
-
+import com.itextpdf.text.pdf.draw.LineSeparator;
 /**
  * Génère un PDF par bon avec QR code unique, code-barres, et signature autorisée.
  */

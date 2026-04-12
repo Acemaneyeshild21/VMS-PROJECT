@@ -136,7 +136,7 @@ CREATE TABLE IF NOT EXISTS redemption (
     CONSTRAINT uq_redemption_bon UNIQUE (bon_id) -- un bon = une seule rédemption
 );
 
--- Audit trail (traçabilité complète)
+-- Audit trail (traçabilité complète.)
 CREATE TABLE IF NOT EXISTS audit_log (
     audit_id    SERIAL PRIMARY KEY,
     table_name  VARCHAR(50) NOT NULL,
@@ -436,7 +436,7 @@ INSERT INTO magasin (societe_id, nom_magasin, adresse) VALUES
     (1, 'Intermart Curepipe',    'Curepipe Road, Curepipe')
 ON CONFLICT DO NOTHING;
 
--- Utilisateur admin par défaut (mot de passe: admin)
+-- Utilisateur admin par défaut (mot de passe : admin)
 INSERT INTO utilisateur (username, email, password, role) VALUES
     ('admin', 'admin@intermart.mu', 'admin', 'Administrateur')
 ON CONFLICT (username) DO NOTHING;
