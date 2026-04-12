@@ -438,7 +438,9 @@ public class Dashboard extends JFrame {
             case "Demandes"        -> contentPanel.add(new GestionDemande(role, userId),    BorderLayout.CENTER);
             case "Bons"            -> contentPanel.add(new GestionBons(role, userId),       BorderLayout.CENTER);
             case "R\u00e9demption" -> contentPanel.add(new RedemptionPanel(userId, username, role), BorderLayout.CENTER);
-            case "Param\u00e8tres" -> contentPanel.add(new ParametresPanel(role),           BorderLayout.CENTER);
+            case "Validation"      -> contentPanel.add(new ValidationPanel(role, userId),   BorderLayout.CENTER);
+            case "Statistiques"    -> contentPanel.add(new StatistiquesPanel(),              BorderLayout.CENTER);
+            case "Parametres"      -> contentPanel.add(new ParametresPanel(role),           BorderLayout.CENTER);
             case "Inscription"     -> contentPanel.add(new FormulaireUtilisateur(),         BorderLayout.CENTER);
             case "Nouvelle Demande" -> contentPanel.add(new FormulaireCreationBon(userId, username), BorderLayout.CENTER);
             case "Formulaire Utilisateur" -> contentPanel.add(new FormulaireUtilisateur(), BorderLayout.CENTER);
@@ -668,9 +670,9 @@ public class Dashboard extends JFrame {
                 {"Gestion des Bons", "\uD83C\uDF81", RED_PRIMARY,             "\u00c9mettre, modifier, archiver",          "Bons"},
                 {"Demandes",         "\uD83D\uDCCB", ACCENT_BLUE,             "File de traitement en cours",               "Demandes"},
                 {"Clients",          "\uD83D\uDC64", SUCCESS,                 "Fiches, historiques & fid\u00e9lit\u00e9",   "Clients"},
-                {"Paiements",        "\uD83D\uDCB3", WARNING,                 "Suivi & rapprochement bancaire",             null},
+                {"Paiements",        "\uD83D\uDCB3", WARNING,                 "Suivi & rapprochement bancaire",             "Validation"},
                 {"Validation",       "\u2713",        new Color(20,170,190),  "Approbation des demandes",                   "Validation"},
-                {"Statistiques",     "\uD83D\uDCC8", new Color(150,80,210),   "Rapports & analyses",                        null},
+                {"Statistiques",     "\uD83D\uDCC8", new Color(150,80,210),   "Rapports & analyses",                        "Statistiques"},
         };
         for (Object[] m : mods)
             grid.add(buildModuleCard((String)m[0],(String)m[1],(Color)m[2],(String)m[3],(String)m[4]));

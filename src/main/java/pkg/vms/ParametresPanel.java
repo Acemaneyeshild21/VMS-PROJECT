@@ -1,9 +1,14 @@
 package pkg.vms;
 
+import pkg.vms.DAO.DBconnect;
+
 import javax.swing.*;
+import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
+import java.sql.*;
+import java.text.SimpleDateFormat;
 
 class ParametresPanel extends JPanel {
 
@@ -504,13 +509,10 @@ class ParametresPanel extends JPanel {
     }
 
     private void afficherGestionUtilisateurs() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83D\uDC65 Gestion des Utilisateurs</h3>" +
-                        "<ul><li>Cr\u00e9er de nouveaux utilisateurs</li>" +
-                        "<li>Modifier les informations</li>" +
-                        "<li>Attribuer des r\u00f4les</li>" +
-                        "<li>D\u00e9sactiver / Supprimer des comptes</li></ul></html>",
-                "Gestion Utilisateurs", JOptionPane.INFORMATION_MESSAGE);
+        Dashboard db = (Dashboard) SwingUtilities.getWindowAncestor(this);
+        if (db != null) {
+            db.showPanel(new FormulaireUtilisateur());
+        }
     }
 
     private void afficherGestionRoles() {
@@ -542,12 +544,67 @@ class ParametresPanel extends JPanel {
     }
 
     private void afficherLogs() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83D\uDCCA Logs & Audit Trail</h3>" +
-                        "<ul><li>Connexions / D\u00e9connexions</li><li>Cr\u00e9ation de demandes</li>" +
-                        "<li>Validation paiements</li><li>G\u00e9n\u00e9ration de bons</li>" +
-                        "<li>R\u00e9demptions</li></ul></html>",
-                "Logs Syst\u00e8me", JOptionPane.INFORMATION_MESSAGE);
+        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Logs & Audit Trail", true);
+        dlg.setSize(750, 500);
+        dlg.setLocationRelativeTo(this);
+
+        JPanel root = new JPanel(new BorderLayout(0, 10));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+
+        JLabel title = new JLabel("Historique des actions");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(20f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        String[] cols = {"Date", "Action", "Description", "Utilisateur", "Table"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        JTable table = new JTable(model);
+        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        table.setRowHeight(32);
+        table.setShowHorizontalLines(true);
+        table.setShowVerticalLines(false);
+        table.setGridColor(new Color(240, 242, 246));
+        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        table.getTableHeader().setBackground(new Color(248, 249, 252));
+        table.getTableHeader().setForeground(TEXT_SECOND);
+
+        try (Connection conn = DBconnect.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "SELECT date_action, action, description, nom_utilisateur, table_name " +
+                     "FROM audit_log ORDER BY date_action DESC LIMIT 50")) {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+            while (rs.next()) {
+                Timestamp ts = rs.getTimestamp("date_action");
+                model.addRow(new Object[]{
+                        ts != null ? sdf.format(ts) : "",
+                        rs.getString("action"),
+                        rs.getString("description"),
+                        rs.getString("nom_utilisateur"),
+                        rs.getString("table_name")
+                });
+            }
+        } catch (SQLException e) {
+            model.addRow(new Object[]{"", "Erreur", e.getMessage(), "", ""});
+        }
+
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createLineBorder(BORDER_LIGHT, 1));
+        root.add(scroll, BorderLayout.CENTER);
+
+        JButton btnFermer = new JButton("Fermer");
+        btnFermer.addActionListener(e -> dlg.dispose());
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footer.setOpaque(false);
+        footer.add(btnFermer);
+        root.add(footer, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
     }
 
     private void afficherGestionSocietes() {
@@ -560,12 +617,65 @@ class ParametresPanel extends JPanel {
     }
 
     private void afficherGestionMagasins() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83C\uDFEA Gestion des Magasins</h3>" +
-                        "<ul><li>Ajouter / Modifier des magasins</li>" +
-                        "<li>Assigner des superviseurs</li>" +
-                        "<li>Configuration de r\u00e9demption</li></ul></html>",
-                "Gestion Magasins", JOptionPane.INFORMATION_MESSAGE);
+        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Gestion des Magasins", true);
+        dlg.setSize(650, 400);
+        dlg.setLocationRelativeTo(this);
+
+        JPanel root = new JPanel(new BorderLayout(0, 10));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+
+        JLabel title = new JLabel("Points de vente Intermart");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(20f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        String[] cols = {"ID", "Nom", "Adresse", "Superviseur"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        JTable table = new JTable(model);
+        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        table.setRowHeight(36);
+        table.setShowHorizontalLines(true);
+        table.setShowVerticalLines(false);
+        table.setGridColor(new Color(240, 242, 246));
+        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        table.getTableHeader().setBackground(new Color(248, 249, 252));
+        table.getTableHeader().setForeground(TEXT_SECOND);
+
+        try (Connection conn = DBconnect.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "SELECT m.magasin_id, m.nom_magasin, m.adresse, u.username AS superviseur " +
+                     "FROM magasin m LEFT JOIN utilisateur u ON m.superviseur_id = u.userid " +
+                     "ORDER BY m.magasin_id")) {
+            while (rs.next()) {
+                model.addRow(new Object[]{
+                        rs.getInt("magasin_id"),
+                        rs.getString("nom_magasin"),
+                        rs.getString("adresse"),
+                        rs.getString("superviseur") != null ? rs.getString("superviseur") : "\u2014"
+                });
+            }
+        } catch (SQLException e) {
+            model.addRow(new Object[]{"", "Erreur", e.getMessage(), ""});
+        }
+
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createLineBorder(BORDER_LIGHT, 1));
+        root.add(scroll, BorderLayout.CENTER);
+
+        JButton btnFermer = new JButton("Fermer");
+        btnFermer.addActionListener(e -> dlg.dispose());
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footer.setOpaque(false);
+        footer.add(btnFermer);
+        root.add(footer, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
     }
 
     private void afficherConfigBons() {
