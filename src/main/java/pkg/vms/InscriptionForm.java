@@ -24,8 +24,8 @@ public class InscriptionForm extends JFrame {
             "^[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,}$");
 
     private static final String[] ROLES = {
-            "Collaborateur", "Comptable", "Approbateur",
-            "Manager", "Superviseur_Magasin", "Administrateur"
+            "Administrateur", "Manager", "Comptable", "Approbateur",
+            "Collaborateur", "Superviseur_Magasin"
     };
 
     private JTextField       txtUsername;

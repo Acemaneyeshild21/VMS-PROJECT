@@ -509,10 +509,10 @@ class ParametresPanel extends JPanel {
     }
 
     private void afficherGestionUtilisateurs() {
-        Dashboard db = (Dashboard) SwingUtilities.getWindowAncestor(this);
-        if (db != null) {
-            db.showPanel(new FormulaireUtilisateur());
-        }
+        JOptionPane.showMessageDialog(this,
+                "<html><h3>\uD83D\uDC65 Gestion des Utilisateurs</h3>" +
+                        "<p>Ce module est en cours de refonte.<br>Veuillez utiliser l'écran d'inscription pour ajouter des utilisateurs.</p></html>",
+                "Gestion Utilisateurs", JOptionPane.INFORMATION_MESSAGE);
     }
 
     private void afficherGestionRoles() {
@@ -687,10 +687,60 @@ class ParametresPanel extends JPanel {
     }
 
     private void afficherConfigRapports() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83D\uDCC8 Configuration Rapports Excel</h3>" +
-                        "<ul><li>Configuration ODBC PostgreSQL</li>" +
-                        "<li>Mod\u00e8les de rapports</li><li>Export des donn\u00e9es</li></ul></html>",
-                "Configuration Rapports", JOptionPane.INFORMATION_MESSAGE);
+        JPanel p = new JPanel(new GridLayout(3, 1, 10, 10));
+        JButton btnDemandes = new JButton("Exporter les Demandes (.xlsx)");
+        JButton btnBons = new JButton("Exporter les Bons Cadeaux (.xlsx)");
+        JButton btnClients = new JButton("Exporter la Liste Clients (.xlsx)");
+
+        btnDemandes.addActionListener(e -> {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setSelectedFile(new java.io.File("Export_Demandes.xlsx"));
+            if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                try {
+                    java.util.List<java.util.Map<String, Object>> data = pkg.vms.DAO.BonDAO.getDemandesForExport();
+                    String[] cols = {"ID", "Référence", "Facture", "Client", "Montant", "Nb Bons", "Statut", "Date"};
+                    ExcelExportService.exportData(chooser.getSelectedFile().getAbsolutePath(), "Demandes", cols, data);
+                    JOptionPane.showMessageDialog(this, "Export des demandes réussi !");
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this, "Erreur export : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        btnBons.addActionListener(e -> {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setSelectedFile(new java.io.File("Export_Bons.xlsx"));
+            if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                try {
+                    java.util.List<java.util.Map<String, Object>> data = pkg.vms.DAO.BonDAO.getBonsForExport();
+                    String[] cols = {"ID", "Code Unique", "Valeur", "Statut", "Émission", "Réf Demande", "Client"};
+                    ExcelExportService.exportData(chooser.getSelectedFile().getAbsolutePath(), "Bons", cols, data);
+                    JOptionPane.showMessageDialog(this, "Export des bons réussi !");
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this, "Erreur export : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        btnClients.addActionListener(e -> {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setSelectedFile(new java.io.File("Export_Clients.xlsx"));
+            if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                try {
+                    java.util.List<java.util.Map<String, Object>> data = pkg.vms.DAO.ClientDAO.getClientsForExport();
+                    String[] cols = {"ID", "Nom", "Email", "Téléphone", "Adresse", "Contact", "Création", "Actif"};
+                    ExcelExportService.exportData(chooser.getSelectedFile().getAbsolutePath(), "Clients", cols, data);
+                    JOptionPane.showMessageDialog(this, "Export des clients réussi !");
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this, "Erreur export : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        p.add(btnDemandes);
+        p.add(btnBons);
+        p.add(btnClients);
+
+        JOptionPane.showMessageDialog(this, p, "Export de données Excel", JOptionPane.PLAIN_MESSAGE);
     }
 }

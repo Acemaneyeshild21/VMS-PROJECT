@@ -59,4 +59,29 @@ public class ClientDAO {
         }
         return magasins;
     }
+
+    /**
+     * Récupère tous les clients pour l'export Excel.
+     */
+    public static java.util.List<java.util.Map<String, Object>> getClientsForExport() throws SQLException {
+        java.util.List<java.util.Map<String, Object>> list = new java.util.ArrayList<>();
+        String sql = "SELECT clientid, name, email, contact_number, company, date_creation, actif " +
+                     "FROM client ORDER BY name ASC";
+        try (Connection conn = DBconnect.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                java.util.Map<String, Object> row = new java.util.HashMap<>();
+                row.put("ID", rs.getInt("clientid"));
+                row.put("Nom", rs.getString("name"));
+                row.put("Email", rs.getString("email"));
+                row.put("Téléphone", rs.getString("contact_number"));
+                row.put("Société", rs.getString("company"));
+                row.put("Création", rs.getString("date_creation"));
+                row.put("Actif", rs.getBoolean("actif") ? "Oui" : "Non");
+                list.add(row);
+            }
+        }
+        return list;
+    }
 }

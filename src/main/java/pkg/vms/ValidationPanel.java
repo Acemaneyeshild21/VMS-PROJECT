@@ -19,7 +19,6 @@ import java.util.List;
 public class ValidationPanel extends JPanel {
 
     // ── Palette (Centralisee via VMSStyle) ──────────────────────────────────
-    private static final Color BG_ROOT      = VMSStyle.BG_ROOT;
     private static final Color BG_CARD      = VMSStyle.BG_CARD;
     private static final Color RED_PRIMARY  = VMSStyle.RED_PRIMARY;
     private static final Color RED_DARK     = VMSStyle.RED_DARK;
@@ -29,8 +28,6 @@ public class ValidationPanel extends JPanel {
     private static final Color TEXT_SECOND  = VMSStyle.TEXT_SECONDARY;
     private static final Color TEXT_MUTED   = VMSStyle.TEXT_MUTED;
     private static final Color SUCCESS      = VMSStyle.SUCCESS;
-    private static final Color WARNING      = VMSStyle.WARNING;
-    private static final Color ACCENT_BLUE  = VMSStyle.ACCENT_BLUE;
 
     // Statuts BD
     private static final String ST_ATTENTE_PAIEMENT = "EN_ATTENTE_PAIEMENT";
@@ -48,19 +45,16 @@ public class ValidationPanel extends JPanel {
 
     // Colonnes tableau
     private static final String[] COLS = {
-            "#", "R\u00e9f\u00e9rence", "Client", "Nb Bons", "Valeur Unit.",
+            "#", "Référence", "Client", "Nb Bons", "Valeur Unit.",
             "Montant Total", "Date", "Actions"
     };
     private static final int COL_ID      = 0;
     private static final int COL_REF     = 1;
-    private static final int COL_CLIENT  = 2;
     private static final int COL_NB      = 3;
     private static final int COL_VU      = 4;
     private static final int COL_TOTAL   = 5;
-    private static final int COL_DATE    = 6;
     private static final int COL_ACTIONS = 7;
 
-    private final String role;
     private final int    userId;
 
     private DefaultTableModel tableModel;
@@ -72,13 +66,12 @@ public class ValidationPanel extends JPanel {
     private JLabel            badgeApprobations;
     private String            activeTab; // "PAIEMENTS" ou "APPROBATIONS"
 
-    private boolean canPaiement;
-    private boolean canApprobation;
+    private final boolean canPaiement;
+    private final boolean canApprobation;
 
     public ValidationPanel(String role, int userId) {
-        this.role   = role;
         this.userId = userId;
-        this.canPaiement    = "Comptable".equalsIgnoreCase(role) || "Administrateur".equalsIgnoreCase(role);
+        this.canPaiement    = "Comptable".equalsIgnoreCase(role) || "Administrateur".equalsIgnoreCase(role) || "Manager".equalsIgnoreCase(role);
         this.canApprobation = "Approbateur".equalsIgnoreCase(role) || "Manager".equalsIgnoreCase(role)
                               || "Administrateur".equalsIgnoreCase(role);
 
@@ -98,7 +91,7 @@ public class ValidationPanel extends JPanel {
     private void initNoAccess() {
         JPanel center = new JPanel(new GridBagLayout());
         center.setOpaque(false);
-        JLabel msg = new JLabel("Vous n'avez pas les permissions n\u00e9cessaires");
+        JLabel msg = new JLabel("Vous n'avez pas les permissions nécessaires");
         msg.setFont(new Font("Trebuchet MS", Font.PLAIN, 15));
         msg.setForeground(TEXT_MUTED);
         center.add(msg);
@@ -139,7 +132,7 @@ public class ValidationPanel extends JPanel {
         };
         titleRow.setOpaque(false);
         titleRow.setBorder(BorderFactory.createEmptyBorder(0, 14, 0, 0));
-        JLabel icon  = new JLabel("\u2713");
+        JLabel icon  = new JLabel("✓");
         icon.setFont(new Font("Trebuchet MS", Font.BOLD, 26));
         icon.setForeground(RED_PRIMARY);
         JLabel title = new JLabel("  Validation");
@@ -158,7 +151,7 @@ public class ValidationPanel extends JPanel {
         left.add(titleRow);
         left.add(sub);
 
-        JButton btnRefresh = buildIconButton("\u21BB", "Actualiser");
+        JButton btnRefresh = buildIconButton("↻", "Actualiser");
         btnRefresh.addActionListener(e -> chargerDonnees());
 
         h.add(left,       BorderLayout.CENTER);
@@ -172,7 +165,7 @@ public class ValidationPanel extends JPanel {
         } else if (canPaiement) {
             return "Validation des paiements en attente";
         } else {
-            return "Approbation des demandes pay\u00e9es";
+            return "Approbation des demandes payées";
         }
     }
 
@@ -182,7 +175,7 @@ public class ValidationPanel extends JPanel {
         bar.setOpaque(false);
 
         if (canPaiement) {
-            badgePaiements = buildBadgeLabel("0");
+            badgePaiements = buildBadgeLabel();
             tabPaiements = buildTabButton("Paiements en attente", badgePaiements,
                     "PAIEMENTS".equals(activeTab));
             tabPaiements.addActionListener(e -> switchTab("PAIEMENTS"));
@@ -190,7 +183,7 @@ public class ValidationPanel extends JPanel {
         }
 
         if (canApprobation) {
-            badgeApprobations = buildBadgeLabel("0");
+            badgeApprobations = buildBadgeLabel();
             tabApprobations = buildTabButton("Approbations en attente", badgeApprobations,
                     "APPROBATIONS".equals(activeTab));
             tabApprobations.addActionListener(e -> switchTab("APPROBATIONS"));
@@ -200,8 +193,8 @@ public class ValidationPanel extends JPanel {
         return bar;
     }
 
-    private JLabel buildBadgeLabel(String text) {
-        JLabel lbl = new JLabel(text) {
+    private JLabel buildBadgeLabel() {
+        JLabel lbl = new JLabel("0") {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);

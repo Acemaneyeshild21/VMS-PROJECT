@@ -17,18 +17,24 @@ import java.util.Properties;
 public class EmailService {
 
     // ── Configuration SMTP (à adapter selon le serveur) ──
-    private static final String SMTP_HOST = "smtp.gmail.com";
-    private static final String SMTP_PORT = "587";
-    private static final String SMTP_USER = "vms.intermart@gmail.com";
-    private static final String SMTP_PASS = "";  // Configurer avec un App Password
-    private static final String FROM_NAME = "Intermart VMS";
+    // Pour Gmail, utilisez un "App Password" (Mot de passe d'application) :
+    // 1. Allez sur votre compte Google > Sécurité
+    // 2. Activez la Validation en deux étapes
+    // 3. Recherchez "Mots de passe d'application"
+    // 4. Créez-en un pour "Messagerie" et "Autre (VMS)"
+    // 5. Copiez le code de 16 caractères ci-dessous
+    private static final String SMTP_HOST = Config.get("smtp.host", "smtp.gmail.com");
+    private static final String SMTP_PORT = Config.get("smtp.port", "587");
+    private static final String SMTP_USER = Config.get("smtp.user", "vms.intermart@gmail.com");
+    private static final String SMTP_PASS = Config.get("smtp.pass", "");
+    private static final String FROM_NAME = Config.get("smtp.from.name", "Intermart VMS");
 
-    private static final String ADMIN_EMAIL = "admin@intermart.mu";
+    private static final String ADMIN_EMAIL = Config.get("smtp.admin.email", "admin@intermart.mu");
 
     /**
      * Envoie les bons PDF par email au client + récap à l'admin.
      */
-    public static void envoyerBonsParEmail(int demandeId, List<BonDAO.BonInfo> bons) throws Exception {
+    public static void envoyerBonsParEmail(int demandeId, java.util.List<pkg.vms.DAO.BonDAO.BonInfo> bons, int userId) throws Exception {
         if (bons == null || bons.isEmpty()) return;
 
         // Récupérer les infos de la demande
@@ -52,12 +58,12 @@ public class EmailService {
         String sujetAdmin = "Récapitulatif génération — " + reference + " (" + bons.size() + " bons)";
         String corpsAdmin = buildCorpsEmailAdmin(reference, bons);
 
-        BonDAO.BonInfo recapBon = new BonDAO.BonInfo();
+        pkg.vms.DAO.BonDAO.BonInfo recapBon = new pkg.vms.DAO.BonDAO.BonInfo();
         recapBon.pdfPath = recapPath;
-        envoyerEmail(ADMIN_EMAIL, null, sujetAdmin, corpsAdmin, List.of(recapBon));
+        envoyerEmail(ADMIN_EMAIL, null, sujetAdmin, corpsAdmin, java.util.List.of(recapBon));
 
         // 3. Marquer comme envoyé
-        VoucherDAO.marquerCommeEnvoye(demandeId);
+        pkg.vms.DAO.VoucherDAO.marquerCommeEnvoye(demandeId, userId);
     }
 
     /**

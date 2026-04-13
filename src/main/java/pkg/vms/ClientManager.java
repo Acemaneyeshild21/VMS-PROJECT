@@ -14,7 +14,7 @@ public class ClientManager {
     /**
      * Obtenir une connexion à la base de données
      */
-    private Connection getConnection() {
+    private Connection getConnection() throws SQLException {
         return DBconnect.getConnection();
     }
 

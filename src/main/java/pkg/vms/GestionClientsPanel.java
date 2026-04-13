@@ -146,10 +146,14 @@ public class GestionClientsPanel extends JPanel {
         JButton btnSupprimer = buildRedButton("Supprimer");
         btnSupprimer.addActionListener(e -> supprimerClientSelectionne());
 
+        JButton btnExport = buildIconButton("\uD83D\uDCE5", "Exporter en Excel");
+        btnExport.addActionListener(e -> exporterClientsExcel());
+
         rightPanel.add(txtRecherche);
         rightPanel.add(btnNouveau);
         rightPanel.add(btnRefresh);
         rightPanel.add(btnSupprimer);
+        rightPanel.add(btnExport);
 
         panel.add(leftPanel, BorderLayout.WEST);
         panel.add(rightPanel, BorderLayout.EAST);
@@ -329,6 +333,45 @@ public class GestionClientsPanel extends JPanel {
             }
         };
         return btn;
+    }
+
+    // ==================== EXPORTER CLIENTS EN EXCEL ====================
+    private void exporterClientsExcel() {
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Exporter les clients en Excel");
+        fc.setSelectedFile(new java.io.File("clients_vms.xlsx"));
+        fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Fichiers Excel (*.xlsx)", "xlsx"));
+
+        if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            String path = fc.getSelectedFile().getAbsolutePath();
+            if (!path.endsWith(".xlsx")) path += ".xlsx";
+            final String filePath = path;
+
+            SwingWorker<Void, Void> worker = new SwingWorker<>() {
+                @Override
+                protected Void doInBackground() throws Exception {
+                    String[] columns = {"ID", "Nom", "Email", "Téléphone", "Société", "Création", "Actif"};
+                    java.util.List<java.util.Map<String, Object>> data = pkg.vms.DAO.ClientDAO.getClientsForExport();
+                    ExcelExportService.exportData(filePath, "Clients", columns, data);
+                    return null;
+                }
+
+                @Override
+                protected void done() {
+                    try {
+                        get();
+                        JOptionPane.showMessageDialog(GestionClientsPanel.this,
+                                "Export réussi : " + filePath,
+                                "Export Excel", JOptionPane.INFORMATION_MESSAGE);
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(GestionClientsPanel.this,
+                                "Erreur lors de l'export : " + ex.getMessage(),
+                                "Erreur", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            };
+            worker.execute();
+        }
     }
 
     // ==================== CHARGER LES CLIENTS ====================

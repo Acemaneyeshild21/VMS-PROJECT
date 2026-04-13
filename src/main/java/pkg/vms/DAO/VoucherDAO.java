@@ -1,5 +1,7 @@
 package pkg.vms.DAO;
 
+import pkg.vms.EmailService;
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -129,44 +131,115 @@ public class VoucherDAO {
      */
     public static void updateVoucherStatus(int demandeId, String newStatus, int userId) throws SQLException {
         String query;
+        boolean useUserId = false;
+        
         switch (newStatus) {
-            case "PAYE" -> query = "UPDATE demande SET statuts = 'PAYE', paiement_valide = TRUE, " +
-                                   "date_paiement = CURRENT_TIMESTAMP, valide_par = ? WHERE demande_id = ?";
-            case "APPROUVE" -> query = "UPDATE demande SET statuts = 'APPROUVE', approuve = TRUE, " +
-                                       "date_approbation = CURRENT_TIMESTAMP, approuve_par = ? WHERE demande_id = ?";
-            case "REJETE" -> query = "UPDATE demande SET statuts = 'REJETE' WHERE demande_id = ?";
-            default -> query = "UPDATE demande SET statuts = '" + newStatus + "' WHERE demande_id = ?";
+            case "PAYE" -> {
+                query = "UPDATE demande SET statuts = 'PAYE', paiement_valide = TRUE, " +
+                        "date_paiement = CURRENT_TIMESTAMP, valide_par = ? WHERE demande_id = ?";
+                useUserId = true;
+            }
+            case "APPROUVE" -> {
+                query = "UPDATE demande SET statuts = 'APPROUVE', approuve = TRUE, " +
+                        "date_approbation = CURRENT_TIMESTAMP, approuve_par = ? WHERE demande_id = ?";
+                useUserId = true;
+            }
+            case "REJETE" -> {
+                query = "UPDATE demande SET statuts = 'REJETE' WHERE demande_id = ?";
+            }
+            case "ARCHIVE" -> {
+                query = "UPDATE demande SET statuts = 'ARCHIVE' WHERE demande_id = ?";
+            }
+            case "GENERE" -> {
+                query = "UPDATE demande SET statuts = 'GENERE' WHERE demande_id = ?";
+            }
+            case "ENVOYE" -> {
+                query = "UPDATE demande SET statuts = 'ENVOYE' WHERE demande_id = ?";
+            }
+            default -> {
+                query = "UPDATE demande SET statuts = ? WHERE demande_id = ?";
+            }
         }
 
         try (Connection conn = DBconnect.getConnection();
              PreparedStatement ps = conn.prepareStatement(query)) {
-            if ("PAYE".equals(newStatus) || "APPROUVE".equals(newStatus)) {
+            
+            if (useUserId) {
                 ps.setInt(1, userId);
                 ps.setInt(2, demandeId);
-            } else {
+            } else if ("REJETE".equals(newStatus) || "ARCHIVE".equals(newStatus) || 
+                       "GENERE".equals(newStatus) || "ENVOYE".equals(newStatus)) {
                 ps.setInt(1, demandeId);
+            } else {
+                ps.setString(1, newStatus);
+                ps.setInt(2, demandeId);
             }
             ps.executeUpdate();
+
+            // Note : le trigger trg_demande_update enregistre automatiquement
+            // l'audit lors du changement de statut — pas de log manuel ici.
+
+            // Notification Email si nécessaire
+            try {
+                if ("APPROUVE".equals(newStatus) || "REJETE".equals(newStatus)) {
+                    String destinataire = getEmailDestinataire(demandeId);
+                    if (destinataire != null) {
+                        String sujet = "Mise à jour de votre demande VMS — " + newStatus;
+                        String corps = "Votre demande #" + demandeId + " a été changée vers le statut : " + newStatus;
+                        EmailService.envoyerNotification(destinataire, sujet, corps);
+                    }
+                }
+                
+                // Notification à l'approbateur après paiement
+                if ("PAYE".equals(newStatus)) {
+                    // Pour le BTS, on peut notifier une adresse d'approbation centralisée ou via les rôles
+                    EmailService.envoyerNotification(pkg.vms.Config.get("smtp.approver.email", "approbations@intermart.mu"), 
+                        "Demande PAYÉE — En attente d'approbation", 
+                        "La demande #" + demandeId + " vient d'être payée. Merci de procéder à l'approbation.");
+                }
+            } catch (Exception e) {
+                System.err.println("Erreur notification email: " + e.getMessage());
+            }
         }
     }
 
-    /**
-     * Ancienne méthode conservée pour compatibilité.
-     */
-    public static void updateVoucherStatus(int id, String status) throws SQLException {
-        String query = "UPDATE demande SET statuts = ? WHERE demande_id = ?";
+    private static String getEmailDestinataire(int demandeId) {
+        String query = "SELECT email_destinataire FROM demande WHERE demande_id = ?";
         try (Connection conn = DBconnect.getConnection();
              PreparedStatement ps = conn.prepareStatement(query)) {
-            ps.setString(1, status);
-            ps.setInt(2, id);
-            ps.executeUpdate();
+            ps.setInt(1, demandeId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getString("email_destinataire");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Archive les demandes dont les bons sont expirés.
+     */
+    public static int archiverDemandesExpirees(int userId) throws SQLException {
+        String sql = "UPDATE demande SET statuts = 'ARCHIVE' " +
+                     "WHERE statuts IN ('GENERE', 'ENVOYE') " +
+                     "AND (date_creation + (validite_jours || ' days')::interval) < CURRENT_TIMESTAMP " +
+                     "AND statuts != 'ARCHIVE'";
+        
+        try (Connection conn = DBconnect.getConnection();
+             Statement st = conn.createStatement()) {
+            int count = st.executeUpdate(sql);
+            if (count > 0) {
+                AuditDAO.logSimple("demande", -1, "ARCHIVAGE_MASSIF", userId, count + " demandes archivées automatiquement");
+            }
+            return count;
         }
     }
 
     /**
      * Met à jour le statut de la demande à ENVOYE après dispatch email.
      */
-    public static void marquerCommeEnvoye(int demandeId) throws SQLException {
-        updateVoucherStatus(demandeId, "ENVOYE");
+    public static void marquerCommeEnvoye(int demandeId, int userId) throws SQLException {
+        updateVoucherStatus(demandeId, "ENVOYE", userId);
     }
 }

@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS demande (
     date_modification       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT chk_statuts CHECK (statuts IN (
-        'EN_ATTENTE_PAIEMENT','PAYE','APPROUVE','GENERE','ENVOYE','REJETE','ANNULE'
+        'EN_ATTENTE_PAIEMENT','PAYE','APPROUVE','GENERE','ENVOYE','REJETE','ANNULE','ARCHIVE'
     )),
     CONSTRAINT chk_nombre_bons CHECK (nombre_bons > 0),
     CONSTRAINT chk_valeur_unitaire CHECK (valeur_unitaire >= 0)
@@ -152,7 +152,9 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
     CONSTRAINT chk_action CHECK (action IN (
         'CREATION','MODIFICATION','SUPPRESSION','PAIEMENT','APPROBATION',
-        'GENERATION','ENVOI','REDEMPTION','REJET','ANNULATION'
+        'GENERATION','ENVOI','REDEMPTION','REJET','ANNULATION',
+        'CONNEXION','CONNEXION_ECHOUEE','INSCRIPTION',
+        'CHANGEMENT_STATUT','ARCHIVAGE_MASSIF','UTILISATION_BON'
     ))
 );
 
@@ -181,6 +183,7 @@ BEGIN
                 WHEN 'ENVOYE'   THEN 'ENVOI'
                 WHEN 'REJETE'   THEN 'REJET'
                 WHEN 'ANNULE'   THEN 'ANNULATION'
+                WHEN 'ARCHIVE'  THEN 'ARCHIVAGE_MASSIF'
                 ELSE 'MODIFICATION'
             END,
             jsonb_build_object('statuts', OLD.statuts),
@@ -436,7 +439,7 @@ INSERT INTO magasin (societe_id, nom_magasin, adresse) VALUES
     (1, 'Intermart Curepipe',    'Curepipe Road, Curepipe')
 ON CONFLICT DO NOTHING;
 
--- Utilisateur admin par défaut (mot de passe : admin)
+-- Utilisateur admin par defaut (mot de passe : admin)
 INSERT INTO utilisateur (username, email, password, role) VALUES
-    ('admin', 'admin@intermart.mu', 'admin', 'Administrateur')
+    ('admin', 'admin@intermart.mu', '$2a$10$IHLDj8FrYmsg3payhyc6x.mVUo7JdHH.kP5YaFg2K9MvqgOzG.0/6', 'Administrateur')
 ON CONFLICT (username) DO NOTHING;

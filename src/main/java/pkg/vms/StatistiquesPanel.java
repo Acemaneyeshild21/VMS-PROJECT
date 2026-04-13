@@ -436,7 +436,7 @@ public class StatistiquesPanel extends JPanel {
                         if (rs.next()) totalBons = rs.getInt("cnt");
                     }
                     try (Statement st = conn.createStatement();
-                         ResultSet rs = st.executeQuery("SELECT COUNT(*) AS cnt FROM bon WHERE statut = 'UTILISE'")) {
+                         ResultSet rs = st.executeQuery("SELECT COUNT(*) AS cnt FROM bon WHERE statut = 'REDIME'")) {
                         if (rs.next()) redeemedBons = rs.getInt("cnt");
                     }
                     data.tauxRedemption = totalBons > 0 ? (redeemedBons * 100.0 / totalBons) : 0.0;
@@ -458,7 +458,7 @@ public class StatistiquesPanel extends JPanel {
                     // Activite recente (audit_log)
                     try (Statement st = conn.createStatement();
                          ResultSet rs = st.executeQuery(
-                                 "SELECT action, description, date_action, nom_utilisateur " +
+                                 "SELECT action, contexte, date_action, username " +
                                  "FROM audit_log ORDER BY date_action DESC LIMIT 10")) {
                         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
                         while (rs.next()) {
@@ -466,9 +466,9 @@ public class StatistiquesPanel extends JPanel {
                             String dateStr = ts != null ? sdf.format(ts) : "";
                             data.auditRows.add(new Object[]{
                                 rs.getString("action"),
-                                rs.getString("description"),
+                                rs.getString("contexte"),
                                 dateStr,
-                                rs.getString("nom_utilisateur")
+                                rs.getString("username")
                             });
                         }
                     }
@@ -634,6 +634,7 @@ public class StatistiquesPanel extends JPanel {
                 case ST_GENERE:           return new Color(220, 252, 231);
                 case ST_ENVOYE:           return new Color(209, 250, 246);
                 case ST_REJETE:           return new Color(254, 226, 226);
+                case "ARCHIVE":           return new Color(241, 245, 249);
                 default:                  return new Color(241, 245, 249);
             }
         }
@@ -646,6 +647,7 @@ public class StatistiquesPanel extends JPanel {
                 case ST_GENERE:           return SUCCESS;
                 case ST_ENVOYE:           return new Color(20, 170, 190);
                 case ST_REJETE:           return RED_PRIMARY;
+                case "ARCHIVE":           return new Color(100, 116, 139);
                 default:                  return TEXT_MUTED;
             }
         }
