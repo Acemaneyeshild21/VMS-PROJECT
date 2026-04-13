@@ -1,5 +1,7 @@
 package pkg.vms;
+import pkg.vms.DAO.BonDAO;
 import pkg.vms.DAO.DBconnect;
+import pkg.vms.DAO.VoucherDAO;
 
 import javax.swing.*;
 import javax.swing.table.*;
@@ -12,18 +14,19 @@ import java.util.List;
 
 public class GestionDemande extends JPanel {
 
-    private static final Color BG_ROOT      = new Color(245, 246, 250);
-    private static final Color BG_CARD      = new Color(255, 255, 255);
-    private static final Color RED_PRIMARY  = new Color(210,  35,  45);
-    private static final Color RED_DARK     = new Color(170,  20,  28);
-    private static final Color RED_LIGHT    = new Color(255, 235, 236);
-    private static final Color BORDER_LIGHT = new Color(228, 230, 236);
-    private static final Color TEXT_PRIMARY = new Color( 22,  28,  45);
-    private static final Color TEXT_SECOND  = new Color( 90, 100, 120);
-    private static final Color TEXT_MUTED   = new Color(160, 168, 185);
-    private static final Color SUCCESS      = new Color( 22, 163,  74);
-    private static final Color WARNING      = new Color(217, 119,   6);
-    private static final Color ACCENT_BLUE  = new Color( 37,  99, 235);
+    // ── Palette (Centralisée via VMSStyle) ──────────────────────────────────
+    private static final Color BG_ROOT      = VMSStyle.BG_ROOT;
+    private static final Color BG_CARD      = VMSStyle.BG_CARD;
+    private static final Color RED_PRIMARY  = VMSStyle.RED_PRIMARY;
+    private static final Color RED_DARK     = VMSStyle.RED_DARK;
+    private static final Color RED_LIGHT    = VMSStyle.RED_LIGHT;
+    private static final Color BORDER_LIGHT = VMSStyle.BORDER_LIGHT;
+    private static final Color TEXT_PRIMARY = VMSStyle.TEXT_PRIMARY;
+    private static final Color TEXT_SECOND  = VMSStyle.TEXT_SECONDARY;
+    private static final Color TEXT_MUTED   = VMSStyle.TEXT_MUTED;
+    private static final Color SUCCESS      = VMSStyle.SUCCESS;
+    private static final Color WARNING      = VMSStyle.WARNING;
+    private static final Color ACCENT_BLUE  = VMSStyle.ACCENT_BLUE;
     private static final Color ACCENT_PURP  = new Color(124,  58, 237);
 
     // Vrais noms de statuts dans la BD (colonne: statuts)
@@ -32,10 +35,12 @@ public class GestionDemande extends JPanel {
     private static final String ST_APPROUVE         = "APPROUVE";
     private static final String ST_GENERE           = "GENERE";
     private static final String ST_REJETE           = "REJETE";
+    private static final String ST_ENVOYE           = "ENVOYE";
 
-    private static final Font FONT_PAGE_TITLE = new Font("Georgia",      Font.BOLD,  24);
-    private static final Font FONT_SECTION    = new Font("Trebuchet MS", Font.BOLD,   9);
-    private static final Font FONT_TABLE_HDR  = new Font("Trebuchet MS", Font.BOLD,  12);
+    // ── Fonts (Centralisées via VMSStyle) ────────────────────────────────────
+    private static final Font FONT_PAGE_TITLE = VMSStyle.FONT_BRAND.deriveFont(24f);
+    private static final Font FONT_SECTION    = VMSStyle.FONT_BADGE.deriveFont(9f);
+    private static final Font FONT_TABLE_HDR  = VMSStyle.FONT_BADGE.deriveFont(12f);
     private static final Font FONT_TABLE_CELL = new Font("Trebuchet MS", Font.PLAIN, 12);
     private static final Font FONT_BADGE      = new Font("Trebuchet MS", Font.BOLD,  10);
     private static final Font FONT_BTN        = new Font("Trebuchet MS", Font.BOLD,  12);
@@ -61,6 +66,7 @@ public class GestionDemande extends JPanel {
     private final String role;
     private final int    userId;
 
+    private JButton           btnNouveau;
     private DefaultTableModel tableModel;
     private JTable            table;
     private JTextField        txtSearch;
@@ -70,10 +76,17 @@ public class GestionDemande extends JPanel {
     public GestionDemande(String role, int userId) {
         this.role   = role;
         this.userId = userId;
+        boolean canCreate = "Administrateur".equalsIgnoreCase(role) || "Manager".equalsIgnoreCase(role) 
+                            || "Collaborateur".equalsIgnoreCase(role);
         setLayout(new BorderLayout());
         setOpaque(false);
         initComponents();
         chargerDemandes();
+        
+        // Cacher le bouton "Nouvelle Demande" si pas autorisé
+        if (!canCreate && btnNouveau != null) {
+            btnNouveau.setVisible(false);
+        }
     }
 
     private void initComponents() {
@@ -124,10 +137,10 @@ public class GestionDemande extends JPanel {
         sub.setAlignmentX(Component.LEFT_ALIGNMENT);
         left.add(titleRow); left.add(sub);
 
-        JButton btnNew = buildRedButton("+ Nouvelle Demande");
-        btnNew.addActionListener(e -> ouvrirNouvelledemande());
+        btnNouveau = UIUtils.buildRedButton("+ Nouvelle Demande");
+        btnNouveau.addActionListener(e -> ouvrirNouvelledemande());
         h.add(left,   BorderLayout.CENTER);
-        h.add(btnNew, BorderLayout.EAST);
+        h.add(btnNouveau, BorderLayout.EAST);
         return h;
     }
 
@@ -143,6 +156,7 @@ public class GestionDemande extends JPanel {
         chips.add(buildChip("Payées",     ACCENT_BLUE, ST_PAYE));
         chips.add(buildChip("Approuvées", ACCENT_PURP, ST_APPROUVE));
         chips.add(buildChip("Générées",   SUCCESS,     ST_GENERE));
+        chips.add(buildChip("Envoyées",   new Color(20,170,190), ST_ENVOYE));
         chips.add(buildChip("Rejetées",   RED_PRIMARY, ST_REJETE));
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
@@ -310,50 +324,52 @@ public class GestionDemande extends JPanel {
     // utilisateur_creation_id, description, statut, magasin_id, validite_jours,
     // email_destinataire, reference
     private void chargerDemandes() {
-        tableModel.setRowCount(0);
-        String sql =
-                "SELECT d.demande_id, d.invoice_reference, " +
-                        "       c.name AS nom_client, " +
-                        "       d.nombre_bons, d.valeur_unitaire, d.montant_total, " +
-                        "       m.nom_magasin, d.date_creation, d.validite_jours, d.statuts " +
-                        "FROM demande d " +
-                        "LEFT JOIN client  c ON d.client_id  = c.client_id " +
-                        "LEFT JOIN magazin m ON d.magasin_id = m.magasin_id " +
-                        "ORDER BY d.date_creation DESC";
-
-        try (Connection conn = DBconnect.getConnection();
-             Statement  stmt = conn.createStatement();
-             ResultSet  rs   = stmt.executeQuery(sql)) {
-
-            int count = 0;
-            while (rs.next()) {
-                String ref      = rs.getString("invoice_reference");
-                String dateRaw  = rs.getString("date_creation");
-                String dateAff  = (dateRaw != null && dateRaw.length() >= 10)
-                        ? dateRaw.substring(0, 10) : (dateRaw != null ? dateRaw : "—");
-                int validite    = rs.getInt("validite_jours");
-
-                tableModel.addRow(new Object[]{
-                        rs.getInt("demande_id"),
-                        ref != null ? ref : "—",
-                        rs.getString("nom_client")  != null ? rs.getString("nom_client")  : "—",
-                        rs.getInt("nombre_bons"),
-                        String.format("Rs %,.0f", rs.getDouble("valeur_unitaire")),
-                        String.format("Rs %,.0f", rs.getDouble("montant_total")),
-                        rs.getString("nom_magasin") != null ? rs.getString("nom_magasin") : "—",
-                        dateAff,
-                        validite > 0 ? validite + " j" : "—",
-                        rs.getString("statuts") != null ? rs.getString("statuts") : "—",
-                        "actions"
-                });
-                count++;
+        new SwingWorker<List<Object[]>, Void>() {
+            @Override
+            protected List<Object[]> doInBackground() throws Exception {
+                List<Object[]> data = new ArrayList<>();
+                String sql = "SELECT d.demande_id, d.invoice_reference, c.name AS nom_client, " +
+                             "d.nombre_bons, d.valeur_unitaire, d.montant_total, m.nom_magasin, " +
+                             "d.date_creation, d.validite_jours, d.statuts " +
+                             "FROM demande d LEFT JOIN client c ON d.clientid = c.clientid " +
+                             "LEFT JOIN magasin m ON d.magasin_id = m.magasin_id " +
+                             "ORDER BY d.date_creation DESC";
+                try (Connection conn = DBconnect.getConnection();
+                     Statement st = conn.createStatement();
+                     ResultSet rs = st.executeQuery(sql)) {
+                    while (rs.next()) {
+                        data.add(new Object[]{
+                            rs.getInt("demande_id"),
+                            rs.getString("invoice_reference"),
+                            rs.getString("nom_client"),
+                            rs.getInt("nombre_bons"),
+                            rs.getDouble("valeur_unitaire"),
+                            rs.getDouble("montant_total"),
+                            rs.getString("nom_magasin"),
+                            rs.getString("date_creation"),
+                            rs.getInt("validite_jours"),
+                            rs.getString("statuts"),
+                            "actions"
+                        });
+                    }
+                }
+                return data;
             }
-            lblTotal.setText(count + " demande" + (count > 1 ? "s" : "") + " au total");
 
-        } catch (SQLException e) {
-            e.printStackTrace();
-            lblTotal.setText("Erreur : " + e.getMessage());
-        }
+            @Override
+            protected void done() {
+                try {
+                    tableModel.setRowCount(0);
+                    List<Object[]> data = get();
+                    for (Object[] row : data) {
+                        tableModel.addRow(row);
+                    }
+                    lblTotal.setText(data.size() + " demande" + (data.size() > 1 ? "s" : "") + " au total");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }.execute();
     }
 
     // ── FILTRES ─────────────────────────────────────────────────────────────
@@ -407,6 +423,7 @@ public class GestionDemande extends JPanel {
                 case ST_PAYE:            return new Color(219,234,254);
                 case ST_APPROUVE:        return new Color(237,233,254);
                 case ST_GENERE:          return new Color(220,252,231);
+                case ST_ENVOYE:          return new Color(209,250,246);
                 case ST_REJETE:          return new Color(254,226,226);
                 default:                 return new Color(241,245,249);
             }
@@ -417,6 +434,7 @@ public class GestionDemande extends JPanel {
                 case ST_PAYE:            return ACCENT_BLUE;
                 case ST_APPROUVE:        return ACCENT_PURP;
                 case ST_GENERE:          return SUCCESS;
+                case ST_ENVOYE:          return new Color(20,170,190);
                 case ST_REJETE:          return RED_PRIMARY;
                 default:                 return TEXT_MUTED;
             }
@@ -427,6 +445,7 @@ public class GestionDemande extends JPanel {
                 case ST_PAYE:            return "\uD83D\uDCB3  Pay\u00e9e";
                 case ST_APPROUVE:        return "\u2705  Approuv\u00e9e";
                 case ST_GENERE:          return "\uD83C\uDF9F  G\u00e9n\u00e9r\u00e9e";
+                case ST_ENVOYE:          return "\uD83D\uDCE8  Envoy\u00e9e";
                 case ST_REJETE:          return "\u274C  Rejet\u00e9e";
                 default:                 return s;
             }
@@ -503,8 +522,8 @@ public class GestionDemande extends JPanel {
                         "       m.nom_magasin, " +
                         "       u.username AS createur " +
                         "FROM demande d " +
-                        "LEFT JOIN client      c ON d.client_id   = c.client_id " +
-                        "LEFT JOIN magazin     m ON d.magasin_id  = m.magasin_id " +
+                        "LEFT JOIN client      c ON d.clientid   = c.clientid " +
+                        "LEFT JOIN magasin     m ON d.magasin_id  = m.magasin_id " +
                         "LEFT JOIN utilisateur u ON d.cree_par    = u.userid " +
                         "WHERE d.demande_id = ?";
 
@@ -613,24 +632,45 @@ public class GestionDemande extends JPanel {
         p.setOpaque(false);
         p.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER_LIGHT));
 
-        JButton btnClose = buildOutlineButton("Fermer");
+        JButton btnClose = UIUtils.buildOutlineButton("Fermer");
         btnClose.addActionListener(e -> dlg.dispose());
         p.add(btnClose);
 
+        // Étape 1 : Valider paiement (Comptable / Admin / Manager)
         if (ST_ATTENTE_PAIEMENT.equals(statut) &&
-                (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Comptable"))) {
-            JButton btn = buildRedButton("Valider Paiement");
+                (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Comptable") || role.equalsIgnoreCase("Manager"))) {
+            JButton btn = UIUtils.buildRedButton("Valider Paiement");
             btn.addActionListener(e -> { changerStatut(demandeId, ST_PAYE); dlg.dispose(); chargerDemandes(); });
             p.add(btn);
         }
+
+        // Étape 2 : Approuver (Approbateur / Admin / Manager)
         if (ST_PAYE.equals(statut) &&
-                (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Approbateur"))) {
-            JButton btn = buildRedButton("Approuver");
+                (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Approbateur") || role.equalsIgnoreCase("Manager"))) {
+            JButton btn = UIUtils.buildRedButton("Approuver");
             btn.addActionListener(e -> { changerStatut(demandeId, ST_APPROUVE); dlg.dispose(); chargerDemandes(); });
             p.add(btn);
         }
-        if (!ST_REJETE.equals(statut) && !ST_GENERE.equals(statut) && role.equalsIgnoreCase("Administrateur")) {
-            JButton btn = buildOutlineButton("Rejeter");
+
+        // Étape 3 : Générer les bons (Admin / Manager / Approbateur) — après approbation
+        if (ST_APPROUVE.equals(statut) &&
+                (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Manager") || role.equalsIgnoreCase("Approbateur"))) {
+            JButton btn = UIUtils.buildRedButton("\uD83C\uDF9F Générer les Bons");
+            btn.addActionListener(e -> {
+                int conf = JOptionPane.showConfirmDialog(dlg,
+                        "Générer les bons PDF pour cette demande ?\nLes bons seront créés et envoyés par email.",
+                        "Génération des bons", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+                if (conf == JOptionPane.YES_OPTION) {
+                    genererBonsDemande(demandeId, dlg);
+                }
+            });
+            p.add(btn);
+        }
+
+        // Rejeter (Admin / Manager / Approbateur, tant que pas généré/envoyé)
+        if (!ST_REJETE.equals(statut) && !ST_GENERE.equals(statut) && !ST_ENVOYE.equals(statut)
+                && (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Manager") || role.equalsIgnoreCase("Approbateur"))) {
+            JButton btn = UIUtils.buildOutlineButton("Rejeter");
             btn.setForeground(RED_PRIMARY);
             btn.addActionListener(e -> {
                 int conf = JOptionPane.showConfirmDialog(dlg, "Confirmer le rejet ?",
@@ -642,27 +682,65 @@ public class GestionDemande extends JPanel {
         return p;
     }
 
-    // ── CHANGER STATUT ──────────────────────────────────────────────────────
+    // ── CHANGER STATUT (avec traçabilité userId) ────────────────────────────
     private void changerStatut(int demandeId, String nouveauStatut) {
-        // La colonne statut s'appelle "statuts" dans la BD
-        try (Connection conn = DBconnect.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                     "UPDATE demande SET statuts = ? WHERE demande_id = ?")) {
-            ps.setString(1, nouveauStatut);
-            ps.setInt(2, demandeId);
-            ps.executeUpdate();
+        try {
+            VoucherDAO.updateVoucherStatus(demandeId, nouveauStatut, userId);
+            chargerDemandes();
         } catch (SQLException e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(this, "Erreur : " + e.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
         }
     }
 
+    // ── GÉNÉRER LES BONS (appel procédure stockée + PDF + email) ────────────
+    private void genererBonsDemande(int demandeId, JDialog dlg) {
+        dlg.dispose();
+        SwingWorker<Integer, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Integer doInBackground() throws Exception {
+                // 1. Appeler la procédure stockée pour créer les bons en BD
+                int nbBons = BonDAO.genererBons(demandeId, userId);
+
+                // 2. Générer les PDFs avec QR codes
+                java.util.List<BonDAO.BonInfo> bons = BonDAO.getBonsByDemande(demandeId);
+                for (BonDAO.BonInfo bon : bons) {
+                    String pdfPath = VoucherPDFGenerator.genererPDF(bon);
+                    BonDAO.updatePdfPath(bon.bonId, pdfPath);
+                    bon.pdfPath = pdfPath;
+                }
+
+                // 3. Envoyer par email
+                EmailService.envoyerBonsParEmail(demandeId, bons, userId);
+
+                return nbBons;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    int nb = get();
+                    JOptionPane.showMessageDialog(GestionDemande.this,
+                            nb + " bon(s) générés et envoyés avec succès !",
+                            "Génération terminée", JOptionPane.INFORMATION_MESSAGE);
+                    chargerDemandes();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    JOptionPane.showMessageDialog(GestionDemande.this,
+                            "Erreur lors de la génération : " + ex.getMessage(),
+                            "Erreur", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        };
+        worker.execute();
+    }
+
     // ── NOUVELLE DEMANDE ────────────────────────────────────────────────────
     private void ouvrirNouvelledemande() {
-        Frame parent = (Frame) SwingUtilities.getWindowAncestor(this);
-        FormulaireCreationBon dlg = new FormulaireCreationBon((JFrame) parent, userId, "", role);
-        dlg.setVisible(true);
-        chargerDemandes();
+        Dashboard db = (Dashboard) SwingUtilities.getWindowAncestor(this);
+        if (db != null) {
+            db.showPanel(new FormulaireCreationBon(userId, ""));
+        }
     }
 
     // ── HELPERS UI ──────────────────────────────────────────────────────────
@@ -693,55 +771,7 @@ public class GestionDemande extends JPanel {
         return row;
     }
 
-    private JButton buildRedButton(String text) {
-        JButton btn = new JButton(text) {
-            boolean h = false;
-            { setFont(FONT_BTN); setForeground(Color.WHITE);
-                setOpaque(false); setContentAreaFilled(false);
-                setBorderPainted(false); setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(getPreferredSize().width + 28, 38));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { h=true;  repaint(); }
-                    public void mouseExited(MouseEvent e)  { h=false; repaint(); }
-                });
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(h ? RED_DARK : RED_PRIMARY);
-                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 8, 8));
-                g2.dispose(); super.paintComponent(g);
-            }
-        };
-        return btn;
-    }
 
-    private JButton buildOutlineButton(String text) {
-        JButton btn = new JButton(text) {
-            boolean h = false;
-            { setFont(FONT_BTN); setForeground(TEXT_SECOND);
-                setOpaque(false); setContentAreaFilled(false);
-                setBorderPainted(false); setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(getPreferredSize().width + 24, 38));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { h=true;  repaint(); }
-                    public void mouseExited(MouseEvent e)  { h=false; repaint(); }
-                });
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(h ? new Color(245,246,250) : BG_CARD);
-                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 8, 8));
-                g2.setColor(BORDER_LIGHT); g2.setStroke(new BasicStroke(1f));
-                g2.draw(new RoundRectangle2D.Double(0.5, 0.5, getWidth()-1, getHeight()-1, 8, 8));
-                g2.dispose(); super.paintComponent(g);
-            }
-        };
-        return btn;
-    }
 
     private JButton buildIconButton(String symbol, String tooltip) {
         JButton btn = new JButton(symbol) {

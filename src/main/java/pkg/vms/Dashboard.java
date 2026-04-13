@@ -1,7 +1,8 @@
 package pkg.vms;
 
-import javafx.stage.Stage;
 import pkg.vms.DAO.DBconnect;
+import pkg.vms.DAO.VoucherDAO;
+import pkg.vms.UIUtils;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -12,36 +13,36 @@ import java.sql.*;
 
 public class Dashboard extends JFrame {
 
-    // ── Palette ─────────────────────────────────────────────────────────────
-    private static final Color BG_ROOT        = new Color(245, 246, 250);
-    private static final Color BG_SIDEBAR     = new Color(255, 255, 255);
-    private static final Color BG_TOPBAR      = new Color(255, 255, 255);
-    private static final Color BG_CARD        = new Color(255, 255, 255);
-    private static final Color BG_CARD_HOVER  = new Color(255, 248, 248);
-    private static final Color RED_PRIMARY    = new Color(210,  35,  45);
-    private static final Color RED_DARK       = new Color(170,  20,  28);
-    private static final Color RED_LIGHT      = new Color(255, 235, 236);
-    private static final Color BORDER_LIGHT   = new Color(228, 230, 236);
-    private static final Color TEXT_PRIMARY   = new Color( 22,  28,  45);
-    private static final Color TEXT_SECONDARY = new Color( 90, 100, 120);
-    private static final Color TEXT_MUTED     = new Color(160, 168, 185);
-    private static final Color ACCENT_BLUE    = new Color( 37, 120, 220);
-    private static final Color SUCCESS        = new Color( 34, 177, 110);
-    private static final Color WARNING        = new Color(240, 150,  40);
-    private static final Color SHADOW_COLOR   = new Color(0, 0, 0, 18);
+    // ── Palette (Centralisée via VMSStyle) ──────────────────────────────────
+    private static final Color BG_ROOT        = VMSStyle.BG_ROOT;
+    private static final Color BG_SIDEBAR     = VMSStyle.BG_SIDEBAR;
+    private static final Color BG_TOPBAR      = VMSStyle.BG_TOPBAR;
+    private static final Color BG_CARD        = VMSStyle.BG_CARD;
+    private static final Color BG_CARD_HOVER  = VMSStyle.BG_CARD_HOVER;
+    private static final Color RED_PRIMARY    = VMSStyle.RED_PRIMARY;
+    private static final Color RED_DARK       = VMSStyle.RED_DARK;
+    private static final Color RED_LIGHT      = VMSStyle.RED_LIGHT;
+    private static final Color BORDER_LIGHT   = VMSStyle.BORDER_LIGHT;
+    private static final Color TEXT_PRIMARY   = VMSStyle.TEXT_PRIMARY;
+    private static final Color TEXT_SECONDARY = VMSStyle.TEXT_SECONDARY;
+    private static final Color TEXT_MUTED     = VMSStyle.TEXT_MUTED;
+    private static final Color ACCENT_BLUE    = VMSStyle.ACCENT_BLUE;
+    private static final Color SUCCESS        = VMSStyle.SUCCESS;
+    private static final Color WARNING        = VMSStyle.WARNING;
+    private static final Color SHADOW_COLOR   = VMSStyle.SHADOW_COLOR;
 
-    // ── Fonts ────────────────────────────────────────────────────────────────
-    private static final Font FONT_BRAND    = new Font("Georgia",      Font.BOLD,  30);
-    private static final Font FONT_SUBTITLE = new Font("Georgia",      Font.ITALIC,12);
-    private static final Font FONT_NAV      = new Font("Trebuchet MS", Font.PLAIN, 13);
-    private static final Font FONT_NAV_ACT  = new Font("Trebuchet MS", Font.BOLD,  13);
-    private static final Font FONT_CARD_TTL = new Font("Georgia",      Font.BOLD,  16);
-    private static final Font FONT_CARD_DSC = new Font("Trebuchet MS", Font.PLAIN, 12);
-    private static final Font FONT_BTN_MAIN = new Font("Trebuchet MS", Font.BOLD,  14);
-    private static final Font FONT_BADGE    = new Font("Trebuchet MS", Font.BOLD,  10);
-    private static final Font FONT_USER     = new Font("Trebuchet MS", Font.BOLD,  13);
-    private static final Font FONT_KPI_VAL  = new Font("Georgia",      Font.BOLD,  26);
-    private static final Font FONT_KPI_LBL  = new Font("Trebuchet MS", Font.PLAIN, 11);
+    // ── Fonts (Centralisées via VMSStyle) ────────────────────────────────────
+    private static final Font FONT_BRAND    = VMSStyle.FONT_BRAND;
+    private static final Font FONT_SUBTITLE = VMSStyle.FONT_SUBTITLE;
+    private static final Font FONT_NAV      = VMSStyle.FONT_NAV;
+    private static final Font FONT_NAV_ACT  = VMSStyle.FONT_NAV_ACT;
+    private static final Font FONT_CARD_TTL = VMSStyle.FONT_CARD_TTL;
+    private static final Font FONT_CARD_DSC = VMSStyle.FONT_CARD_DSC;
+    private static final Font FONT_BTN_MAIN = VMSStyle.FONT_BTN_MAIN;
+    private static final Font FONT_BADGE    = VMSStyle.FONT_BADGE;
+    private static final Font FONT_USER     = VMSStyle.FONT_USER;
+    private static final Font FONT_KPI_VAL  = VMSStyle.FONT_KPI_VAL;
+    private static final Font FONT_KPI_LBL  = VMSStyle.FONT_KPI_LBL;
 
     // ── State ────────────────────────────────────────────────────────────────
     private final JPanel  contentPanel;
@@ -51,8 +52,9 @@ public class Dashboard extends JFrame {
     private final String  email;
     private String        activePage = "Accueil";
 
-    private final JButton[] navButtons = new JButton[6];
-    private final String[]  navItems   = {"Accueil","Demandes","Clients","Validation","Param\u00e8tres"};
+    private final JButton[] navButtons = new JButton[7];
+    private final String[]  navItems   = {"Accueil","Demandes","Clients","R\u00e9demption","Validation","Parametres"};
+    private final String[]  navIcons   = {"\u2302","\uD83D\uDCCB","\u25C8","\uD83D\uDCF1","\u2713","\u2699"};
 
     private static final int RESIZE_MARGIN = 8;
     private Point     dragStart;
@@ -178,10 +180,28 @@ public class Dashboard extends JFrame {
         navLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         nav.add(navLabel);
 
-        String[] icons = {"\u2302","\uD83D\uDCCB","\u25C8","\u2713","\uD83C\uDF81","\u2699"};
+        boolean isAdmin        = "Administrateur".equalsIgnoreCase(role);
+        boolean isManager      = "Manager".equalsIgnoreCase(role);
+        boolean isComptable    = "Comptable".equalsIgnoreCase(role);
+        boolean isApprobateur  = "Approbateur".equalsIgnoreCase(role);
+        boolean isCollaborateur = "Collaborateur".equalsIgnoreCase(role);
+        boolean isSuperviseur  = "Superviseur_Magasin".equalsIgnoreCase(role);
+
         for (int i = 0; i < navItems.length; i++) {
-            JButton btn = buildNavButton(navItems[i], icons[i]);
-            final String page = navItems[i];
+            String page = navItems[i];
+            
+            // Restriction d'accès basée sur les rôles officiels BTS
+            if ("Validation".equals(page) && !(isAdmin || isManager || isComptable || isApprobateur)) {
+                continue;
+            }
+            if ("Parametres".equals(page) && !isAdmin) {
+                continue;
+            }
+            if ("Rédemption".equals(page) && !(isAdmin || isSuperviseur || isManager)) {
+                continue;
+            }
+
+            JButton btn = buildNavButton(page, navIcons[i]);
             btn.addActionListener(e -> switchPage(page));
             navButtons[i] = btn;
             nav.add(btn); nav.add(Box.createVerticalStrut(3));
@@ -437,7 +457,11 @@ public class Dashboard extends JFrame {
             case "Clients"         -> contentPanel.add(new GestionClientsPanel(),           BorderLayout.CENTER);
             case "Demandes"        -> contentPanel.add(new GestionDemande(role, userId),    BorderLayout.CENTER);
             case "Bons"            -> contentPanel.add(new GestionBons(role, userId),       BorderLayout.CENTER);
-            case "Param\u00e8tres" -> contentPanel.add(new ParametresPanel(role),           BorderLayout.CENTER);
+            case "R\u00e9demption" -> contentPanel.add(new RedemptionPanel(userId, username, role), BorderLayout.CENTER);
+            case "Validation"      -> contentPanel.add(new ValidationPanel(role, userId),   BorderLayout.CENTER);
+            case "Statistiques"    -> contentPanel.add(new StatistiquesPanel(),              BorderLayout.CENTER);
+            case "Parametres"      -> contentPanel.add(new ParametresPanel(role),           BorderLayout.CENTER);
+            case "Nouvelle Demande" -> contentPanel.add(new FormulaireCreationBon(userId, username), BorderLayout.CENTER);
             default -> {
                 JPanel ph = new JPanel(new GridBagLayout());
                 ph.setOpaque(false);
@@ -448,6 +472,13 @@ public class Dashboard extends JFrame {
                 contentPanel.add(ph, BorderLayout.CENTER);
             }
         }
+        contentPanel.revalidate();
+        contentPanel.repaint();
+    }
+
+    public void showPanel(JPanel panel) {
+        contentPanel.removeAll();
+        contentPanel.add(panel, BorderLayout.CENTER);
         contentPanel.revalidate();
         contentPanel.repaint();
     }
@@ -471,49 +502,29 @@ public class Dashboard extends JFrame {
 
     // ── Stats depuis BD (async) ───────────────────────────────────────────────
     private void chargerStatsAsync() {
-        SwingWorker<int[], Void> worker = new SwingWorker<>() {
-            @Override protected int[] doInBackground() throws Exception {
-                int[] stats = new int[4]; // [clients, bons, demandes, taux%]
-                try (Connection conn = DBconnect.getConnection()) {
-                    // Nombre de clients actifs
-                    try (Statement st = conn.createStatement();
-                         ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM client WHERE actif = true")) {
-                        if (rs.next()) stats[0] = rs.getInt(1);
-                    }
-                    // Nombre total de bons (demandes)
-                    try (Statement st = conn.createStatement();
-                         ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM demande")) {
-                        if (rs.next()) stats[1] = rs.getInt(1);
-                    }
-                    // Demandes en attente
-                    try (Statement st = conn.createStatement();
-                         ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM demande WHERE statuts = 'EN_ATTENTE_PAIEMENT'")) {
-                        if (rs.next()) stats[2] = rs.getInt(1);
-                    }
-                    // Taux validation = demandes approuvées ou générées / total * 100
-                    try (Statement st = conn.createStatement();
-                         ResultSet rs = st.executeQuery(
-                                 "SELECT ROUND(100.0 * SUM(CASE WHEN statuts IN ('APPROUVE','GENERE','PAYE') THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0)) FROM demande")) {
-                        if (rs.next()) stats[3] = rs.getInt(1);
-                    }
-                } catch (Exception ignored) {}
-                return stats;
+        new SwingWorker<VoucherDAO.VoucherStats, Void>() {
+            @Override
+            protected VoucherDAO.VoucherStats doInBackground() throws Exception {
+                return VoucherDAO.getDashboardStats();
             }
 
-            @Override protected void done() {
+            @Override
+            protected void done() {
                 try {
-                    int[] s = get();
-                    if (kpiClientsVal  != null) kpiClientsVal .setText(String.valueOf(s[0]));
-                    if (kpiBonsVal     != null) kpiBonsVal    .setText(String.valueOf(s[1]));
-                    if (kpiDemandesVal != null) kpiDemandesVal.setText(String.valueOf(s[2]));
-                    if (kpiTauxVal     != null) kpiTauxVal    .setText(s[3] + " %");
-                    if (kpiClientsTrend  != null) kpiClientsTrend .setText(s[0] + " client" + (s[0]>1?"s":"") + " actif" + (s[0]>1?"s":""));
-                    if (kpiBonsTrend    != null) kpiBonsTrend   .setText(s[1] + " bon" + (s[1]>1?"s":"") + " au total");
-                    if (kpiDemandesTrend != null) kpiDemandesTrend.setText(s[2] + " en attente paiement");
-                } catch (Exception ignored) {}
+                    VoucherDAO.VoucherStats stats = get();
+                    if (kpiClientsVal != null) kpiClientsVal.setText(String.valueOf(stats.activeClients));
+                    if (kpiBonsVal != null) kpiBonsVal.setText(String.valueOf(stats.totalVouchers));
+                    if (kpiDemandesVal != null) kpiDemandesVal.setText(String.valueOf(stats.pendingPayments));
+                    if (kpiTauxVal != null) kpiTauxVal.setText(stats.validationRate + " %");
+                    
+                    if (kpiClientsTrend != null) kpiClientsTrend.setText(stats.activeClients + " client" + (stats.activeClients > 1 ? "s" : "") + " actif" + (stats.activeClients > 1 ? "s" : ""));
+                    if (kpiBonsTrend != null) kpiBonsTrend.setText(stats.totalVouchers + " bon" + (stats.totalVouchers > 1 ? "s" : "") + " au total");
+                    if (kpiDemandesTrend != null) kpiDemandesTrend.setText(stats.pendingPayments + " en attente paiement");
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
-        };
-        worker.execute();
+        }.execute();
     }
 
     private JPanel buildCtaBanner() {
@@ -548,7 +559,7 @@ public class Dashboard extends JFrame {
         subh.setFont(FONT_CARD_DSC); subh.setForeground(TEXT_SECONDARY);
         textBlock.add(heading); textBlock.add(Box.createVerticalStrut(4)); textBlock.add(subh);
 
-        JButton cta = buildRedButton("+ Nouveau Bon d'Achat", 218, 42);
+        JButton cta = UIUtils.buildRedButton("+ Nouveau Bon d'Achat", 218, 42);
         cta.addActionListener(e -> ouvrirFormulaireCreationBon());
         JPanel ctaWrap = new JPanel(new GridBagLayout());
         ctaWrap.setOpaque(false); ctaWrap.add(cta);
@@ -677,9 +688,9 @@ public class Dashboard extends JFrame {
                 {"Gestion des Bons", "\uD83C\uDF81", RED_PRIMARY,             "\u00c9mettre, modifier, archiver",          "Bons"},
                 {"Demandes",         "\uD83D\uDCCB", ACCENT_BLUE,             "File de traitement en cours",               "Demandes"},
                 {"Clients",          "\uD83D\uDC64", SUCCESS,                 "Fiches, historiques & fid\u00e9lit\u00e9",   "Clients"},
-                {"Paiements",        "\uD83D\uDCB3", WARNING,                 "Suivi & rapprochement bancaire",             null},
+                {"Paiements",        "\uD83D\uDCB3", WARNING,                 "Suivi & rapprochement bancaire",             "Validation"},
                 {"Validation",       "\u2713",        new Color(20,170,190),  "Approbation des demandes",                   "Validation"},
-                {"Statistiques",     "\uD83D\uDCC8", new Color(150,80,210),   "Rapports & analyses",                        null},
+                {"Statistiques",     "\uD83D\uDCC8", new Color(150,80,210),   "Rapports & analyses",                        "Statistiques"},
         };
         for (Object[] m : mods)
             grid.add(buildModuleCard((String)m[0],(String)m[1],(Color)m[2],(String)m[3],(String)m[4]));
@@ -825,9 +836,9 @@ public class Dashboard extends JFrame {
 
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.CENTER,12,14));
         btns.setBackground(BG_ROOT);
-        JButton btnLogout = buildRedButton("D\u00e9connexion",140,38);
+        JButton btnLogout = UIUtils.buildRedButton("D\u00e9connexion",140,38);
         btnLogout.addActionListener(e -> { dlg.dispose(); confirmLogout(); });
-        JButton btnClose = buildOutlineButton("Fermer",140,38);
+        JButton btnClose = UIUtils.buildOutlineButton("Fermer",140,38);
         btnClose.addActionListener(e -> dlg.dispose());
         btns.add(btnLogout); btns.add(btnClose);
 
@@ -861,57 +872,6 @@ public class Dashboard extends JFrame {
     }
 
     // ── Buttons ──────────────────────────────────────────────────────────────
-    private JButton buildRedButton(String text, int w, int h) {
-        JButton btn = new JButton(text) {
-            boolean hov = false;
-            {
-                setFont(FONT_BTN_MAIN); setForeground(Color.WHITE);
-                setOpaque(false); setContentAreaFilled(false);
-                setBorderPainted(false); setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(w,h));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { hov=true; repaint(); }
-                    public void mouseExited(MouseEvent e)  { hov=false; repaint(); }
-                });
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(hov ? RED_DARK : RED_PRIMARY);
-                g2.fill(new RoundRectangle2D.Double(0,0,getWidth(),getHeight(),8,8));
-                g2.dispose(); super.paintComponent(g);
-            }
-        };
-        return btn;
-    }
-
-    private JButton buildOutlineButton(String text, int w, int h) {
-        JButton btn = new JButton(text) {
-            boolean hov = false;
-            {
-                setFont(FONT_BTN_MAIN); setForeground(TEXT_SECONDARY);
-                setOpaque(false); setContentAreaFilled(false);
-                setBorderPainted(false); setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(w,h));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { hov=true; setForeground(TEXT_PRIMARY); repaint(); }
-                    public void mouseExited(MouseEvent e)  { hov=false; setForeground(TEXT_SECONDARY); repaint(); }
-                });
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(hov ? new Color(0,0,0,8) : Color.WHITE);
-                g2.fill(new RoundRectangle2D.Double(0,0,getWidth(),getHeight(),8,8));
-                g2.setColor(BORDER_LIGHT); g2.setStroke(new BasicStroke(1f));
-                g2.draw(new RoundRectangle2D.Double(0,0,getWidth()-1,getHeight()-1,8,8));
-                g2.dispose(); super.paintComponent(g);
-            }
-        };
-        return btn;
-    }
 
     // ── Resize ────────────────────────────────────────────────────────────────
     private void installResizeHandler(JPanel root) {
@@ -982,28 +942,12 @@ public class Dashboard extends JFrame {
     }
 
     private void deconnecter() {
-        try {
-            this.setVisible(false);
-            try { javafx.application.Platform.startup(()->{});}
-            catch (IllegalStateException ignored) {}
-            javafx.application.Platform.runLater(() -> {
-                try {
-                    LoginForm login = new LoginForm();
-                    login.start(new Stage());
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                    SwingUtilities.invokeLater(() -> {
-                        this.setVisible(true);
-                        JOptionPane.showMessageDialog(this,
-                                "Impossible d'ouvrir le formulaire de connexion.",
-                                "Erreur", JOptionPane.ERROR_MESSAGE);
-                    });
-                }
-            });
-        } catch (Exception ex) { ex.printStackTrace(); this.setVisible(true); }
+        this.dispose();
+        SwingUtilities.invokeLater(() -> {
+            new LoginForm().setVisible(true);
+        });
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
     private Color getRoleColor(String r) {
         return switch (r.toLowerCase()) {
             case "administrateur" -> RED_PRIMARY;
@@ -1013,11 +957,6 @@ public class Dashboard extends JFrame {
     }
 
     private void ouvrirFormulaireCreationBon() {
-        FormulaireCreationBon f = new FormulaireCreationBon(this, userId, username, role);
-        f.setVisible(true);
-        // Rafraîchir les stats après création
-        if (activePage.equals("Accueil")) chargerStatsAsync();
+        switchPage("Nouvelle Demande");
     }
-
-    public void start(Stage s) { this.setVisible(true); }
 }

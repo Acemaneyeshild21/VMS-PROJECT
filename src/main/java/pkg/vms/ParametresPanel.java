@@ -1,40 +1,41 @@
 package pkg.vms;
 
+import pkg.vms.DAO.DBconnect;
+
 import javax.swing.*;
+import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
+import java.sql.*;
+import java.text.SimpleDateFormat;
 
 class ParametresPanel extends JPanel {
 
-    // =====================================================
-    //  PALETTE  (identique au Dashboard)
-    // =====================================================
-    private static final Color BG_ROOT      = new Color(245, 246, 250);
-    private static final Color BG_CARD      = new Color(255, 255, 255);
-    private static final Color BG_HOVER     = new Color(255, 245, 245);
-    private static final Color RED_PRIMARY  = new Color(210,  35,  45);
-    private static final Color RED_DARK     = new Color(170,  20,  28);
-    private static final Color RED_LIGHT    = new Color(255, 235, 236);
-    private static final Color BORDER_LIGHT = new Color(228, 230, 236);
-    private static final Color TEXT_PRIMARY = new Color( 22,  28,  45);
-    private static final Color TEXT_SECOND  = new Color( 90, 100, 120);
-    private static final Color TEXT_MUTED   = new Color(160, 168, 185);
-    private static final Color ACCENT_BLUE  = new Color( 37, 99, 235);
-    private static final Color ACCENT_GREEN = new Color( 22, 163,  74);
-    private static final Color ACCENT_AMBER = new Color(217, 119,   6);
+    // ── Palette (Centralisée via VMSStyle) ──────────────────────────────────
+    private static final Color BG_ROOT      = VMSStyle.BG_ROOT;
+    private static final Color BG_CARD      = VMSStyle.BG_CARD;
+    private static final Color BG_HOVER     = VMSStyle.BG_CARD_HOVER;
+    private static final Color RED_PRIMARY  = VMSStyle.RED_PRIMARY;
+    private static final Color RED_DARK     = VMSStyle.RED_DARK;
+    private static final Color RED_LIGHT    = VMSStyle.RED_LIGHT;
+    private static final Color BORDER_LIGHT = VMSStyle.BORDER_LIGHT;
+    private static final Color TEXT_PRIMARY = VMSStyle.TEXT_PRIMARY;
+    private static final Color TEXT_SECOND  = VMSStyle.TEXT_SECONDARY;
+    private static final Color TEXT_MUTED   = VMSStyle.TEXT_MUTED;
+    private static final Color ACCENT_BLUE  = VMSStyle.ACCENT_BLUE;
+    private static final Color ACCENT_GREEN = VMSStyle.SUCCESS;
+    private static final Color ACCENT_AMBER = VMSStyle.WARNING;
     private static final Color ACCENT_PURP  = new Color(124,  58, 237);
 
-    // =====================================================
-    //  FONTS
-    // =====================================================
-    private static final Font FONT_PAGE_TITLE = new Font("Georgia",      Font.BOLD,   26);
-    private static final Font FONT_SUBTITLE   = new Font("Trebuchet MS", Font.PLAIN,  14);
-    private static final Font FONT_SECTION    = new Font("Trebuchet MS", Font.BOLD,    9);
-    private static final Font FONT_CARD_TITLE = new Font("Trebuchet MS", Font.BOLD,   15);
-    private static final Font FONT_CARD_DESC  = new Font("Trebuchet MS", Font.PLAIN,  12);
-    private static final Font FONT_INFO_KEY   = new Font("Trebuchet MS", Font.BOLD,   12);
-    private static final Font FONT_INFO_VAL   = new Font("Trebuchet MS", Font.PLAIN,  12);
+    // ── Fonts (Centralisées via VMSStyle) ────────────────────────────────────
+    private static final Font FONT_PAGE_TITLE = VMSStyle.FONT_BRAND.deriveFont(26f);
+    private static final Font FONT_SUBTITLE   = VMSStyle.FONT_NAV.deriveFont(14f);
+    private static final Font FONT_SECTION    = VMSStyle.FONT_BADGE.deriveFont(9f);
+    private static final Font FONT_CARD_TITLE = VMSStyle.FONT_CARD_TTL.deriveFont(15f);
+    private static final Font FONT_CARD_DESC  = VMSStyle.FONT_CARD_DSC;
+    private static final Font FONT_INFO_KEY   = VMSStyle.FONT_NAV.deriveFont(Font.BOLD, 12f);
+    private static final Font FONT_INFO_VAL   = VMSStyle.FONT_NAV;
 
     private final String role;
 
@@ -83,25 +84,25 @@ class ParametresPanel extends JPanel {
 
             JPanel rowAdmin1 = buildCardRow(
                     buildCard("\uD83D\uDC65", "Utilisateurs",
-                            "Cr\u00e9er, modifier et g\u00e9rer les comptes",
+                            "Creer, modifier et gerer les comptes",
                             RED_PRIMARY, "utilisateurs"),
                     buildCard("\uD83C\uDFAD", "R\u00f4les & Permissions",
-                            "D\u00e9finir les niveaux d'acc\u00e8s",
+                            "Definir les niveaux d'acces",
                             ACCENT_AMBER, "roles")
             );
             JPanel rowAdmin2 = buildCardRow(
-                    buildCard("\uD83D\uDDC4", "Base de Donn\u00e9es",
+                    buildCard("\uD83D\uDDC4", "Base de Donnees",
                             "Sauvegardes et maintenance",
                             new Color(51, 65, 85), "database"),
                     buildCard("\uD83D\uDCE7", "Configuration Email",
-                            "Param\u00e8tres SMTP sortants",
+                            "Parametres SMTP sortants",
                             ACCENT_GREEN, "email")
             );
             JPanel rowAdmin3 = buildCardRow(
                     buildCard("\uD83D\uDCCA", "Logs & Audit",
                             "Historique complet des actions",
                             new Color(100, 116, 139), "logs"),
-                    buildCard("\uD83C\uDFE2", "Soci\u00e9t\u00e9s / Enseignes",
+                    buildCard("\uD83C\uDFE2", "Societes / Enseignes",
                             "Gestion multi-enseignes",
                             new Color(20, 184, 166), "societes")
             );
@@ -115,7 +116,7 @@ class ParametresPanel extends JPanel {
 
         // ── Section : Op\u00e9rations (admin + manager) ──────────────
         if (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Manager")) {
-            content.add(buildSectionLabel("OP\u00c9RATIONS"));
+            content.add(buildSectionLabel("OPeRATIONS"));
             content.add(Box.createVerticalStrut(12));
 
             JPanel rowOps = buildCardRow(
@@ -123,15 +124,15 @@ class ParametresPanel extends JPanel {
                             "Points de vente et superviseurs",
                             ACCENT_BLUE, "magasins"),
                     buildCard("\uD83D\uDCCB", "Bons Cadeau",
-                            "Mod\u00e8les, QR Code et r\u00e8gles",
+                            "Modeles, QR Code et regles",
                             RED_PRIMARY, "config_bons")
             );
             JPanel rowOps2 = buildCardRow(
                     buildCard("\uD83D\uDCC8", "Rapports Excel",
                             "Connexion ODBC et exports",
                             ACCENT_GREEN, "rapports"),
-                    buildCardDisabled("\uD83D\uDD12", "Param\u00e8tres Avanc\u00e9s",
-                            "Bient\u00f4t disponible")
+                    buildCardDisabled("\uD83D\uDD12", "Parametres Avances",
+                            "Bientot disponible")
             );
             content.add(rowOps);
             content.add(Box.createVerticalStrut(16));
@@ -141,20 +142,20 @@ class ParametresPanel extends JPanel {
 
         // ── Section : Acc\u00e8s limit\u00e9 (utilisateur standard) ──────
         if (role.equalsIgnoreCase("Utilisateur")) {
-            content.add(buildSectionLabel("PARAM\u00c8TRES SYST\u00c8ME"));
+            content.add(buildSectionLabel("PARAMETRES SYSTEME"));
             content.add(Box.createVerticalStrut(12));
             JPanel rowLocked = buildCardRow(
                     buildCardDisabled("\uD83D\uDC65", "Gestion Utilisateurs",
-                            "R\u00e9serv\u00e9 aux administrateurs"),
-                    buildCardDisabled("\uD83D\uDDC4", "Base de Donn\u00e9es",
-                            "R\u00e9serv\u00e9 aux administrateurs")
+                            "Reservee aux administrateurs"),
+                    buildCardDisabled("\uD83D\uDDC4", "Base de Donnees",
+                            "Reservee aux administrateurs")
             );
             content.add(rowLocked);
             content.add(Box.createVerticalStrut(28));
         }
 
         // ── Section : Infos syst\u00e8me ──────────────────────────────
-        content.add(buildSectionLabel("INFORMATIONS SYST\u00c8ME"));
+        content.add(buildSectionLabel("INFORMATIONS SYSTEME"));
         content.add(Box.createVerticalStrut(12));
         content.add(buildSystemInfoCard());
 
@@ -510,10 +511,7 @@ class ParametresPanel extends JPanel {
     private void afficherGestionUtilisateurs() {
         JOptionPane.showMessageDialog(this,
                 "<html><h3>\uD83D\uDC65 Gestion des Utilisateurs</h3>" +
-                        "<ul><li>Cr\u00e9er de nouveaux utilisateurs</li>" +
-                        "<li>Modifier les informations</li>" +
-                        "<li>Attribuer des r\u00f4les</li>" +
-                        "<li>D\u00e9sactiver / Supprimer des comptes</li></ul></html>",
+                        "<p>Ce module est en cours de refonte.<br>Veuillez utiliser l'écran d'inscription pour ajouter des utilisateurs.</p></html>",
                 "Gestion Utilisateurs", JOptionPane.INFORMATION_MESSAGE);
     }
 
@@ -546,12 +544,67 @@ class ParametresPanel extends JPanel {
     }
 
     private void afficherLogs() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83D\uDCCA Logs & Audit Trail</h3>" +
-                        "<ul><li>Connexions / D\u00e9connexions</li><li>Cr\u00e9ation de demandes</li>" +
-                        "<li>Validation paiements</li><li>G\u00e9n\u00e9ration de bons</li>" +
-                        "<li>R\u00e9demptions</li></ul></html>",
-                "Logs Syst\u00e8me", JOptionPane.INFORMATION_MESSAGE);
+        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Logs & Audit Trail", true);
+        dlg.setSize(750, 500);
+        dlg.setLocationRelativeTo(this);
+
+        JPanel root = new JPanel(new BorderLayout(0, 10));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+
+        JLabel title = new JLabel("Historique des actions");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(20f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        String[] cols = {"Date", "Action", "Description", "Utilisateur", "Table"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        JTable table = new JTable(model);
+        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        table.setRowHeight(32);
+        table.setShowHorizontalLines(true);
+        table.setShowVerticalLines(false);
+        table.setGridColor(new Color(240, 242, 246));
+        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        table.getTableHeader().setBackground(new Color(248, 249, 252));
+        table.getTableHeader().setForeground(TEXT_SECOND);
+
+        try (Connection conn = DBconnect.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "SELECT date_action, action, description, nom_utilisateur, table_name " +
+                     "FROM audit_log ORDER BY date_action DESC LIMIT 50")) {
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+            while (rs.next()) {
+                Timestamp ts = rs.getTimestamp("date_action");
+                model.addRow(new Object[]{
+                        ts != null ? sdf.format(ts) : "",
+                        rs.getString("action"),
+                        rs.getString("description"),
+                        rs.getString("nom_utilisateur"),
+                        rs.getString("table_name")
+                });
+            }
+        } catch (SQLException e) {
+            model.addRow(new Object[]{"", "Erreur", e.getMessage(), "", ""});
+        }
+
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createLineBorder(BORDER_LIGHT, 1));
+        root.add(scroll, BorderLayout.CENTER);
+
+        JButton btnFermer = new JButton("Fermer");
+        btnFermer.addActionListener(e -> dlg.dispose());
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footer.setOpaque(false);
+        footer.add(btnFermer);
+        root.add(footer, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
     }
 
     private void afficherGestionSocietes() {
@@ -564,12 +617,65 @@ class ParametresPanel extends JPanel {
     }
 
     private void afficherGestionMagasins() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83C\uDFEA Gestion des Magasins</h3>" +
-                        "<ul><li>Ajouter / Modifier des magasins</li>" +
-                        "<li>Assigner des superviseurs</li>" +
-                        "<li>Configuration de r\u00e9demption</li></ul></html>",
-                "Gestion Magasins", JOptionPane.INFORMATION_MESSAGE);
+        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Gestion des Magasins", true);
+        dlg.setSize(650, 400);
+        dlg.setLocationRelativeTo(this);
+
+        JPanel root = new JPanel(new BorderLayout(0, 10));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+
+        JLabel title = new JLabel("Points de vente Intermart");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(20f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        String[] cols = {"ID", "Nom", "Adresse", "Superviseur"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        JTable table = new JTable(model);
+        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        table.setRowHeight(36);
+        table.setShowHorizontalLines(true);
+        table.setShowVerticalLines(false);
+        table.setGridColor(new Color(240, 242, 246));
+        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        table.getTableHeader().setBackground(new Color(248, 249, 252));
+        table.getTableHeader().setForeground(TEXT_SECOND);
+
+        try (Connection conn = DBconnect.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "SELECT m.magasin_id, m.nom_magasin, m.adresse, u.username AS superviseur " +
+                     "FROM magasin m LEFT JOIN utilisateur u ON m.superviseur_id = u.userid " +
+                     "ORDER BY m.magasin_id")) {
+            while (rs.next()) {
+                model.addRow(new Object[]{
+                        rs.getInt("magasin_id"),
+                        rs.getString("nom_magasin"),
+                        rs.getString("adresse"),
+                        rs.getString("superviseur") != null ? rs.getString("superviseur") : "\u2014"
+                });
+            }
+        } catch (SQLException e) {
+            model.addRow(new Object[]{"", "Erreur", e.getMessage(), ""});
+        }
+
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createLineBorder(BORDER_LIGHT, 1));
+        root.add(scroll, BorderLayout.CENTER);
+
+        JButton btnFermer = new JButton("Fermer");
+        btnFermer.addActionListener(e -> dlg.dispose());
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footer.setOpaque(false);
+        footer.add(btnFermer);
+        root.add(footer, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
     }
 
     private void afficherConfigBons() {
@@ -581,10 +687,60 @@ class ParametresPanel extends JPanel {
     }
 
     private void afficherConfigRapports() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83D\uDCC8 Configuration Rapports Excel</h3>" +
-                        "<ul><li>Configuration ODBC PostgreSQL</li>" +
-                        "<li>Mod\u00e8les de rapports</li><li>Export des donn\u00e9es</li></ul></html>",
-                "Configuration Rapports", JOptionPane.INFORMATION_MESSAGE);
+        JPanel p = new JPanel(new GridLayout(3, 1, 10, 10));
+        JButton btnDemandes = new JButton("Exporter les Demandes (.xlsx)");
+        JButton btnBons = new JButton("Exporter les Bons Cadeaux (.xlsx)");
+        JButton btnClients = new JButton("Exporter la Liste Clients (.xlsx)");
+
+        btnDemandes.addActionListener(e -> {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setSelectedFile(new java.io.File("Export_Demandes.xlsx"));
+            if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                try {
+                    java.util.List<java.util.Map<String, Object>> data = pkg.vms.DAO.BonDAO.getDemandesForExport();
+                    String[] cols = {"ID", "Référence", "Facture", "Client", "Montant", "Nb Bons", "Statut", "Date"};
+                    ExcelExportService.exportData(chooser.getSelectedFile().getAbsolutePath(), "Demandes", cols, data);
+                    JOptionPane.showMessageDialog(this, "Export des demandes réussi !");
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this, "Erreur export : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        btnBons.addActionListener(e -> {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setSelectedFile(new java.io.File("Export_Bons.xlsx"));
+            if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                try {
+                    java.util.List<java.util.Map<String, Object>> data = pkg.vms.DAO.BonDAO.getBonsForExport();
+                    String[] cols = {"ID", "Code Unique", "Valeur", "Statut", "Émission", "Réf Demande", "Client"};
+                    ExcelExportService.exportData(chooser.getSelectedFile().getAbsolutePath(), "Bons", cols, data);
+                    JOptionPane.showMessageDialog(this, "Export des bons réussi !");
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this, "Erreur export : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        btnClients.addActionListener(e -> {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setSelectedFile(new java.io.File("Export_Clients.xlsx"));
+            if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                try {
+                    java.util.List<java.util.Map<String, Object>> data = pkg.vms.DAO.ClientDAO.getClientsForExport();
+                    String[] cols = {"ID", "Nom", "Email", "Téléphone", "Adresse", "Contact", "Création", "Actif"};
+                    ExcelExportService.exportData(chooser.getSelectedFile().getAbsolutePath(), "Clients", cols, data);
+                    JOptionPane.showMessageDialog(this, "Export des clients réussi !");
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(this, "Erreur export : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        p.add(btnDemandes);
+        p.add(btnBons);
+        p.add(btnClients);
+
+        JOptionPane.showMessageDialog(this, p, "Export de données Excel", JOptionPane.PLAIN_MESSAGE);
     }
 }
