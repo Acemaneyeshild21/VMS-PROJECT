@@ -460,7 +460,7 @@ public class Dashboard extends JFrame {
             case "R\u00e9demption" -> contentPanel.add(new RedemptionPanel(userId, username, role), BorderLayout.CENTER);
             case "Validation"      -> contentPanel.add(new ValidationPanel(role, userId),   BorderLayout.CENTER);
             case "Statistiques"    -> contentPanel.add(new StatistiquesPanel(),              BorderLayout.CENTER);
-            case "Parametres"      -> contentPanel.add(new ParametresPanel(role),           BorderLayout.CENTER);
+            case "Parametres"      -> contentPanel.add(new ParametresPanel(role, userId),           BorderLayout.CENTER);
             case "Nouvelle Demande" -> contentPanel.add(new FormulaireCreationBon(userId, username), BorderLayout.CENTER);
             default -> {
                 JPanel ph = new JPanel(new GridBagLayout());

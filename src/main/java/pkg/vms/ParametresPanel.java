@@ -1,6 +1,6 @@
 package pkg.vms;
 
-import pkg.vms.DAO.DBconnect;
+import pkg.vms.DAO.*;
 
 import javax.swing.*;
 import javax.swing.table.*;
@@ -9,10 +9,10 @@ import java.awt.event.*;
 import java.awt.geom.*;
 import java.sql.*;
 import java.text.SimpleDateFormat;
+import java.util.List;
 
 class ParametresPanel extends JPanel {
 
-    // ── Palette (Centralisée via VMSStyle) ──────────────────────────────────
     private static final Color BG_ROOT      = VMSStyle.BG_ROOT;
     private static final Color BG_CARD      = VMSStyle.BG_CARD;
     private static final Color BG_HOVER     = VMSStyle.BG_CARD_HOVER;
@@ -26,9 +26,8 @@ class ParametresPanel extends JPanel {
     private static final Color ACCENT_BLUE  = VMSStyle.ACCENT_BLUE;
     private static final Color ACCENT_GREEN = VMSStyle.SUCCESS;
     private static final Color ACCENT_AMBER = VMSStyle.WARNING;
-    private static final Color ACCENT_PURP  = new Color(124,  58, 237);
+    private static final Color ACCENT_PURP  = new Color(124, 58, 237);
 
-    // ── Fonts (Centralisées via VMSStyle) ────────────────────────────────────
     private static final Font FONT_PAGE_TITLE = VMSStyle.FONT_BRAND.deriveFont(26f);
     private static final Font FONT_SUBTITLE   = VMSStyle.FONT_NAV.deriveFont(14f);
     private static final Font FONT_SECTION    = VMSStyle.FONT_BADGE.deriveFont(9f);
@@ -38,73 +37,49 @@ class ParametresPanel extends JPanel {
     private static final Font FONT_INFO_VAL   = VMSStyle.FONT_NAV;
 
     private final String role;
+    private final int userId;
 
-    // =====================================================
-    //  CONSTRUCTOR
-    // =====================================================
-    public ParametresPanel(String role) {
+    public ParametresPanel(String role, int userId) {
         this.role = role;
+        this.userId = userId;
         setLayout(new BorderLayout());
         setOpaque(false);
         initComponents();
     }
 
-    // =====================================================
-    //  INIT
-    // =====================================================
     private void initComponents() {
         JPanel content = new JPanel();
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setOpaque(false);
         content.setBorder(BorderFactory.createEmptyBorder(32, 36, 32, 36));
 
-        // ── Page header ───────────────────────────────────────
         content.add(buildPageHeader());
         content.add(Box.createVerticalStrut(28));
-
-        // ── Section : Compte ──────────────────────────────────
         content.add(buildSectionLabel("MON COMPTE"));
         content.add(Box.createVerticalStrut(12));
 
         JPanel rowCompte = buildCardRow(
-                buildCard("\uD83D\uDC64", "Mon Profil",
-                        "Informations personnelles et pr\u00e9f\u00e9rences",
-                        ACCENT_BLUE, "profil"),
-                buildCard("\uD83D\uDD10", "S\u00e9curit\u00e9",
-                        "Mot de passe et acc\u00e8s",
-                        ACCENT_PURP, "securite")
+                buildCard("👤", "Mon Profil", "Informations personnelles", ACCENT_BLUE, "profil"),
+                buildCard("🔐", "Sécurité", "Changer le mot de passe", ACCENT_PURP, "securite")
         );
         content.add(rowCompte);
         content.add(Box.createVerticalStrut(28));
 
-        // ── Section : Administration (admin only) ─────────────
         if (role.equalsIgnoreCase("Administrateur")) {
             content.add(buildSectionLabel("ADMINISTRATION"));
             content.add(Box.createVerticalStrut(12));
 
             JPanel rowAdmin1 = buildCardRow(
-                    buildCard("\uD83D\uDC65", "Utilisateurs",
-                            "Creer, modifier et gerer les comptes",
-                            RED_PRIMARY, "utilisateurs"),
-                    buildCard("\uD83C\uDFAD", "R\u00f4les & Permissions",
-                            "Definir les niveaux d'acces",
-                            ACCENT_AMBER, "roles")
+                    buildCard("👥", "Utilisateurs", "Créer, modifier et gérer les comptes", RED_PRIMARY, "utilisateurs"),
+                    buildCard("🎭", "Rôles & Permissions", "Définir les niveaux d'accès", ACCENT_AMBER, "roles")
             );
             JPanel rowAdmin2 = buildCardRow(
-                    buildCard("\uD83D\uDDC4", "Base de Donnees",
-                            "Sauvegardes et maintenance",
-                            new Color(51, 65, 85), "database"),
-                    buildCard("\uD83D\uDCE7", "Configuration Email",
-                            "Parametres SMTP sortants",
-                            ACCENT_GREEN, "email")
+                    buildCard("🗄️", "Base de Données", "Sauvegardes et maintenance", new Color(51, 65, 85), "database"),
+                    buildCard("📧", "Configuration Email", "Paramètres SMTP sortants", ACCENT_GREEN, "email")
             );
             JPanel rowAdmin3 = buildCardRow(
-                    buildCard("\uD83D\uDCCA", "Logs & Audit",
-                            "Historique complet des actions",
-                            new Color(100, 116, 139), "logs"),
-                    buildCard("\uD83C\uDFE2", "Societes / Enseignes",
-                            "Gestion multi-enseignes",
-                            new Color(20, 184, 166), "societes")
+                    buildCard("📊", "Logs & Audit", "Historique complet des actions", new Color(100, 116, 139), "logs"),
+                    buildCard("🏢", "Societes / Enseignes", "Gestion multi-enseignes", new Color(20, 184, 166), "societes")
             );
             content.add(rowAdmin1);
             content.add(Box.createVerticalStrut(16));
@@ -114,25 +89,17 @@ class ParametresPanel extends JPanel {
             content.add(Box.createVerticalStrut(28));
         }
 
-        // ── Section : Op\u00e9rations (admin + manager) ──────────────
         if (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Manager")) {
-            content.add(buildSectionLabel("OPeRATIONS"));
+            content.add(buildSectionLabel("OPÉRATIONS"));
             content.add(Box.createVerticalStrut(12));
 
             JPanel rowOps = buildCardRow(
-                    buildCard("\uD83C\uDFEA", "Magasins",
-                            "Points de vente et superviseurs",
-                            ACCENT_BLUE, "magasins"),
-                    buildCard("\uD83D\uDCCB", "Bons Cadeau",
-                            "Modeles, QR Code et regles",
-                            RED_PRIMARY, "config_bons")
+                    buildCard("🏪", "Magasins", "Points de vente et superviseurs", ACCENT_BLUE, "magasins"),
+                    buildCard("📋", "Bons Cadeau", "Modeles, QR Code et regles", RED_PRIMARY, "config_bons")
             );
             JPanel rowOps2 = buildCardRow(
-                    buildCard("\uD83D\uDCC8", "Rapports Excel",
-                            "Connexion ODBC et exports",
-                            ACCENT_GREEN, "rapports"),
-                    buildCardDisabled("\uD83D\uDD12", "Parametres Avances",
-                            "Bientot disponible")
+                    buildCard("📈", "Rapports Excel", "Connexion ODBC et exports", ACCENT_GREEN, "rapports"),
+                    buildCardDisabled("🔒", "Parametres Avances", "Bientot disponible")
             );
             content.add(rowOps);
             content.add(Box.createVerticalStrut(16));
@@ -140,21 +107,17 @@ class ParametresPanel extends JPanel {
             content.add(Box.createVerticalStrut(28));
         }
 
-        // ── Section : Acc\u00e8s limit\u00e9 (utilisateur standard) ──────
-        if (role.equalsIgnoreCase("Utilisateur")) {
+        if (role.equalsIgnoreCase("Collaborateur")) {
             content.add(buildSectionLabel("PARAMETRES SYSTEME"));
             content.add(Box.createVerticalStrut(12));
             JPanel rowLocked = buildCardRow(
-                    buildCardDisabled("\uD83D\uDC65", "Gestion Utilisateurs",
-                            "Reservee aux administrateurs"),
-                    buildCardDisabled("\uD83D\uDDC4", "Base de Donnees",
-                            "Reservee aux administrateurs")
+                    buildCardDisabled("👥", "Gestion Utilisateurs", "Reservee aux administrateurs"),
+                    buildCardDisabled("🗄️", "Base de Donnees", "Reservee aux administrateurs")
             );
             content.add(rowLocked);
             content.add(Box.createVerticalStrut(28));
         }
 
-        // ── Section : Infos syst\u00e8me ──────────────────────────────
         content.add(buildSectionLabel("INFORMATIONS SYSTEME"));
         content.add(Box.createVerticalStrut(12));
         content.add(buildSystemInfoCard());
@@ -169,16 +132,12 @@ class ParametresPanel extends JPanel {
         add(scroll, BorderLayout.CENTER);
     }
 
-    // =====================================================
-    //  PAGE HEADER
-    // =====================================================
     private JPanel buildPageHeader() {
         JPanel header = new JPanel();
         header.setOpaque(false);
         header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
         header.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // Red left accent bar + title row
         JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0)) {
             @Override protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
@@ -190,17 +149,17 @@ class ParametresPanel extends JPanel {
         titleRow.setBorder(BorderFactory.createEmptyBorder(0, 14, 0, 0));
         titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel icon = new JLabel("\u2699\uFE0F");
+        JLabel icon = new JLabel("⚙️");
         icon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 28));
 
-        JLabel title = new JLabel("  Param\u00e8tres");
+        JLabel title = new JLabel("  Paramètres");
         title.setFont(FONT_PAGE_TITLE);
         title.setForeground(TEXT_PRIMARY);
 
         titleRow.add(icon);
         titleRow.add(title);
 
-        JLabel sub = new JLabel("Configuration et gestion du syst\u00e8me  \u2014  R\u00f4le : " + role);
+        JLabel sub = new JLabel("Configuration et gestion du système  —  Rôle : " + role);
         sub.setFont(FONT_SUBTITLE);
         sub.setForeground(TEXT_SECOND);
         sub.setBorder(BorderFactory.createEmptyBorder(6, 14, 0, 0));
@@ -211,9 +170,6 @@ class ParametresPanel extends JPanel {
         return header;
     }
 
-    // =====================================================
-    //  SECTION LABEL
-    // =====================================================
     private JLabel buildSectionLabel(String text) {
         JLabel lbl = new JLabel(text);
         lbl.setFont(FONT_SECTION);
@@ -222,9 +178,6 @@ class ParametresPanel extends JPanel {
         return lbl;
     }
 
-    // =====================================================
-    //  CARD ROW  (2 cards side by side)
-    // =====================================================
     private JPanel buildCardRow(JPanel c1, JPanel c2) {
         JPanel row = new JPanel(new GridLayout(1, 2, 16, 0));
         row.setOpaque(false);
@@ -235,24 +188,13 @@ class ParametresPanel extends JPanel {
         return row;
     }
 
-    // =====================================================
-    //  ACTIVE CARD
-    // =====================================================
-    private JPanel buildCard(String emoji, String titre, String desc,
-                             Color accent, String action) {
+    private JPanel buildCard(String emoji, String titre, String desc, Color accent, String action) {
         JPanel card = new JPanel() {
             boolean hovered = false;
             {
                 addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) {
-                        hovered = true;
-                        setCursor(new Cursor(Cursor.HAND_CURSOR));
-                        repaint();
-                    }
-                    public void mouseExited(MouseEvent e) {
-                        hovered = false;
-                        repaint();
-                    }
+                    public void mouseEntered(MouseEvent e) { hovered = true; setCursor(new Cursor(Cursor.HAND_CURSOR)); repaint(); }
+                    public void mouseExited(MouseEvent e) { hovered = false; repaint(); }
                     public void mouseClicked(MouseEvent e) { ouvrirParametre(action); }
                 });
             }
@@ -260,20 +202,13 @@ class ParametresPanel extends JPanel {
                 super.paintComponent(g);
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                // Card background
                 g2.setColor(hovered ? BG_HOVER : BG_CARD);
                 g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 12, 12));
-
-                // Border
                 g2.setColor(hovered ? new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 120) : BORDER_LIGHT);
                 g2.setStroke(new BasicStroke(1f));
                 g2.draw(new RoundRectangle2D.Double(0.5, 0.5, getWidth()-1, getHeight()-1, 12, 12));
-
-                // Left accent stripe
                 g2.setColor(accent);
                 g2.fill(new RoundRectangle2D.Double(0, 0, 4, getHeight(), 4, 4));
-
                 g2.dispose();
             }
         };
@@ -281,7 +216,6 @@ class ParametresPanel extends JPanel {
         card.setOpaque(false);
         card.setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 16));
 
-        // Icon bubble
         JLabel iconLbl = new JLabel(emoji) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -298,7 +232,6 @@ class ParametresPanel extends JPanel {
         iconLbl.setPreferredSize(new Dimension(48, 48));
         iconLbl.setOpaque(false);
 
-        // Text block
         JPanel textBlock = new JPanel();
         textBlock.setOpaque(false);
         textBlock.setLayout(new BoxLayout(textBlock, BoxLayout.Y_AXIS));
@@ -317,8 +250,7 @@ class ParametresPanel extends JPanel {
         textBlock.add(Box.createVerticalStrut(4));
         textBlock.add(descLbl);
 
-        // Arrow indicator
-        JLabel arrow = new JLabel("\u203A");
+        JLabel arrow = new JLabel("›");
         arrow.setFont(new Font("Trebuchet MS", Font.BOLD, 20));
         arrow.setForeground(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 140));
         arrow.setPreferredSize(new Dimension(20, 20));
@@ -330,9 +262,6 @@ class ParametresPanel extends JPanel {
         return card;
     }
 
-    // =====================================================
-    //  DISABLED CARD
-    // =====================================================
     private JPanel buildCardDisabled(String emoji, String titre, String desc) {
         JPanel card = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
@@ -344,7 +273,6 @@ class ParametresPanel extends JPanel {
                 g2.setColor(BORDER_LIGHT);
                 g2.setStroke(new BasicStroke(1f));
                 g2.draw(new RoundRectangle2D.Double(0.5, 0.5, getWidth()-1, getHeight()-1, 12, 12));
-                // Dashed left stripe
                 g2.setColor(new Color(200, 205, 215));
                 float[] dash = {4f, 4f};
                 g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, dash, 0));
@@ -381,7 +309,7 @@ class ParametresPanel extends JPanel {
         textBlock.add(Box.createVerticalStrut(4));
         textBlock.add(descLbl);
 
-        JLabel lockLbl = new JLabel("\uD83D\uDD12");
+        JLabel lockLbl = new JLabel("🔒");
         lockLbl.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 14));
         lockLbl.setForeground(TEXT_MUTED);
 
@@ -392,9 +320,6 @@ class ParametresPanel extends JPanel {
         return card;
     }
 
-    // =====================================================
-    //  SYSTEM INFO CARD
-    // =====================================================
     private JPanel buildSystemInfoCard() {
         JPanel card = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
@@ -406,7 +331,6 @@ class ParametresPanel extends JPanel {
                 g2.setColor(BORDER_LIGHT);
                 g2.setStroke(new BasicStroke(1f));
                 g2.draw(new RoundRectangle2D.Double(0.5, 0.5, getWidth()-1, getHeight()-1, 12, 12));
-                // Red top bar
                 g2.setColor(RED_PRIMARY);
                 g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), 4, 4, 4));
                 g2.dispose();
@@ -418,9 +342,9 @@ class ParametresPanel extends JPanel {
         card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 88));
         card.setBorder(BorderFactory.createEmptyBorder(16, 24, 16, 24));
 
-        card.add(buildInfoItem("\uD83D\uDCBB", "Version", "VMS 1.0.0"));
-        card.add(buildInfoItem("\uD83D\uDDC4", "Base de donn\u00e9es", "PostgreSQL"));
-        card.add(buildInfoItem("\uD83D\uDC64", "R\u00f4le actif", role));
+        card.add(buildInfoItem("💻", "Version", "VMS 1.0.0"));
+        card.add(buildInfoItem("🗄️", "Base de données", "PostgreSQL"));
+        card.add(buildInfoItem("👤", "Rôle actif", role));
 
         return card;
     }
@@ -446,9 +370,6 @@ class ParametresPanel extends JPanel {
         return p;
     }
 
-    // =====================================================
-    //  ROUTING
-    // =====================================================
     private void ouvrirParametre(String action) {
         switch (action) {
             case "profil":        afficherGestionProfil();          break;
@@ -463,89 +384,720 @@ class ParametresPanel extends JPanel {
             case "config_bons":   afficherConfigBons();             break;
             case "rapports":      afficherConfigRapports();         break;
             default:
-                JOptionPane.showMessageDialog(this,
-                        "Fonctionnalit\u00e9 en cours de d\u00e9veloppement",
-                        "Information", JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Fonctionnalité en cours de développement", "Information", JOptionPane.INFORMATION_MESSAGE);
         }
     }
 
-    // =====================================================
-    //  ACTION DIALOGS  (inchang\u00e9s, juste regroup\u00e9s)
-    // =====================================================
+    // ============== DIALOGS ==============
+
     private void afficherGestionProfil() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83D\uDC64 Gestion du Profil</h3>" +
-                        "<p>Permettra de modifier :</p>" +
-                        "<ul><li>Nom d'utilisateur</li><li>Email</li><li>Photo de profil</li></ul></html>",
-                "Mon Profil", JOptionPane.INFORMATION_MESSAGE);
+        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Mon Profil", true);
+        dlg.setSize(500, 350);
+        dlg.setLocationRelativeTo(this);
+
+        JPanel root = new JPanel(new BorderLayout(0, 16));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+
+        JLabel title = new JLabel("👤 Gérer mon Profil");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(20f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        JPanel form = new JPanel(new GridLayout(2, 2, 12, 12));
+        form.setOpaque(false);
+
+        JLabel usernameL = new JLabel("Nom d'utilisateur:");
+        usernameL.setForeground(TEXT_PRIMARY);
+        usernameL.setFont(FONT_INFO_KEY);
+        JTextField usernameF = new JTextField();
+        usernameF.setFont(FONT_INFO_VAL);
+
+        JLabel emailL = new JLabel("Email:");
+        emailL.setForeground(TEXT_PRIMARY);
+        emailL.setFont(FONT_INFO_KEY);
+        JTextField emailF = new JTextField();
+        emailF.setFont(FONT_INFO_VAL);
+
+        form.add(usernameL); form.add(usernameF);
+        form.add(emailL);    form.add(emailF);
+
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                UserDAO.UserProfile profile = UserDAO.getUserProfile(userId);
+                if (profile != null) {
+                    SwingUtilities.invokeLater(() -> {
+                        usernameF.setText(profile.username);
+                        emailF.setText(profile.email);
+                    });
+                }
+                return null;
+            }
+        }.execute();
+
+        root.add(form, BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        btnPanel.setOpaque(false);
+
+        JButton btnSave = UIUtils.buildRedButton("Enregistrer", 120, 38);
+        btnSave.addActionListener(e -> {
+            new SwingWorker<Boolean, Void>() {
+                @Override
+                protected Boolean doInBackground() throws Exception {
+                    return UserDAO.updateProfile(userId, usernameF.getText(), emailF.getText());
+                }
+
+                @Override
+                protected void done() {
+                    try {
+                        if (get()) {
+                            JOptionPane.showMessageDialog(dlg, "Profil mis à jour avec succès!", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                            dlg.dispose();
+                        } else {
+                            JOptionPane.showMessageDialog(dlg, "Erreur lors de la mise à jour", "Erreur", JOptionPane.ERROR_MESSAGE);
+                        }
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(dlg, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            }.execute();
+        });
+
+        JButton btnCancel = UIUtils.buildOutlineButton("Annuler", 120, 38);
+        btnCancel.addActionListener(e -> dlg.dispose());
+
+        btnPanel.add(btnSave);
+        btnPanel.add(btnCancel);
+        root.add(btnPanel, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
     }
 
     private void afficherChangementMotDePasse() {
-        JPanel panel = new JPanel(new GridLayout(3, 2, 10, 10));
-        JPasswordField txtAncien  = new JPasswordField();
-        JPasswordField txtNouveau = new JPasswordField();
-        JPasswordField txtConfirm = new JPasswordField();
-        panel.add(new JLabel("Mot de passe actuel :")); panel.add(txtAncien);
-        panel.add(new JLabel("Nouveau mot de passe :")); panel.add(txtNouveau);
-        panel.add(new JLabel("Confirmer :")); panel.add(txtConfirm);
+        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Changer le mot de passe", true);
+        dlg.setSize(480, 300);
+        dlg.setLocationRelativeTo(this);
 
-        int r = JOptionPane.showConfirmDialog(this, panel,
-                "\uD83D\uDD10 Changer le mot de passe",
-                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+        JPanel root = new JPanel(new BorderLayout(0, 16));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
 
-        if (r == JOptionPane.OK_OPTION) {
-            String nouveau  = new String(txtNouveau.getPassword());
-            String confirm  = new String(txtConfirm.getPassword());
-            if (!nouveau.equals(confirm)) {
-                JOptionPane.showMessageDialog(this,
-                        "Les mots de passe ne correspondent pas !",
-                        "Erreur", JOptionPane.ERROR_MESSAGE);
-            } else {
-                JOptionPane.showMessageDialog(this,
-                        "Mot de passe chang\u00e9 avec succ\u00e8s !",
-                        "Succ\u00e8s", JOptionPane.INFORMATION_MESSAGE);
+        JLabel title = new JLabel("🔐 Changer votre mot de passe");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(18f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        JPanel form = new JPanel(new GridLayout(3, 2, 12, 12));
+        form.setOpaque(false);
+
+        JLabel ancienL = new JLabel("Mot de passe actuel:");
+        ancienL.setFont(FONT_INFO_KEY);
+        ancienL.setForeground(TEXT_PRIMARY);
+        JPasswordField ancienF = new JPasswordField();
+
+        JLabel nouveauL = new JLabel("Nouveau mot de passe:");
+        nouveauL.setFont(FONT_INFO_KEY);
+        nouveauL.setForeground(TEXT_PRIMARY);
+        JPasswordField nouveauF = new JPasswordField();
+
+        JLabel confirmL = new JLabel("Confirmer:");
+        confirmL.setFont(FONT_INFO_KEY);
+        confirmL.setForeground(TEXT_PRIMARY);
+        JPasswordField confirmF = new JPasswordField();
+
+        form.add(ancienL); form.add(ancienF);
+        form.add(nouveauL); form.add(nouveauF);
+        form.add(confirmL); form.add(confirmF);
+
+        root.add(form, BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        btnPanel.setOpaque(false);
+
+        JButton btnSave = UIUtils.buildRedButton("Valider", 120, 38);
+        btnSave.addActionListener(e -> {
+            String ancien = new String(ancienF.getPassword());
+            String nouveau = new String(nouveauF.getPassword());
+            String confirm = new String(confirmF.getPassword());
+
+            if (ancien.isEmpty() || nouveau.isEmpty() || confirm.isEmpty()) {
+                JOptionPane.showMessageDialog(dlg, "Tous les champs sont obligatoires", "Erreur", JOptionPane.ERROR_MESSAGE);
+                return;
             }
-        }
+
+            if (!nouveau.equals(confirm)) {
+                JOptionPane.showMessageDialog(dlg, "Les mots de passe ne correspondent pas!", "Erreur", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            if (nouveau.length() < 6) {
+                JOptionPane.showMessageDialog(dlg, "Le mot de passe doit contenir au moins 6 caractères", "Erreur", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            new SwingWorker<Boolean, Void>() {
+                @Override
+                protected Boolean doInBackground() throws Exception {
+                    return UserDAO.updatePassword(userId, ancien, nouveau);
+                }
+
+                @Override
+                protected void done() {
+                    try {
+                        if (get()) {
+                            JOptionPane.showMessageDialog(dlg, "Mot de passe changé avec succès!", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                            dlg.dispose();
+                        } else {
+                            JOptionPane.showMessageDialog(dlg, "Ancien mot de passe incorrect", "Erreur", JOptionPane.ERROR_MESSAGE);
+                        }
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(dlg, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            }.execute();
+        });
+
+        JButton btnCancel = UIUtils.buildOutlineButton("Annuler", 120, 38);
+        btnCancel.addActionListener(e -> dlg.dispose());
+
+        btnPanel.add(btnSave);
+        btnPanel.add(btnCancel);
+        root.add(btnPanel, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
     }
 
     private void afficherGestionUtilisateurs() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83D\uDC65 Gestion des Utilisateurs</h3>" +
-                        "<p>Ce module est en cours de refonte.<br>Veuillez utiliser l'écran d'inscription pour ajouter des utilisateurs.</p></html>",
-                "Gestion Utilisateurs", JOptionPane.INFORMATION_MESSAGE);
+        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Gestion des Utilisateurs", true);
+        dlg.setSize(900, 550);
+        dlg.setLocationRelativeTo(this);
+
+        JPanel root = new JPanel(new BorderLayout(0, 12));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+
+        JLabel title = new JLabel("👥 Gestion des Utilisateurs");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(18f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        String[] cols = {"ID", "Nom", "Email", "Rôle"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        JTable table = new JTable(model);
+        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        table.setRowHeight(32);
+        table.setShowHorizontalLines(true);
+        table.setShowVerticalLines(false);
+        table.setGridColor(new Color(240, 242, 246));
+        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        table.getTableHeader().setBackground(new Color(248, 249, 252));
+        table.getTableHeader().setForeground(TEXT_SECOND);
+
+        new SwingWorker<List<UserDAO.UserProfile>, Void>() {
+            @Override
+            protected List<UserDAO.UserProfile> doInBackground() throws Exception {
+                return UserDAO.getAllUsers();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    List<UserDAO.UserProfile> users = get();
+                    for (UserDAO.UserProfile user : users) {
+                        model.addRow(new Object[]{user.userId, user.username, user.email, user.role});
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }.execute();
+
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createLineBorder(BORDER_LIGHT, 1));
+        root.add(scroll, BorderLayout.CENTER);
+
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        footer.setOpaque(false);
+
+        JButton btnAdd = UIUtils.buildRedButton("+ Ajouter", 120, 36);
+        btnAdd.addActionListener(e -> afficherFormulaireAjouterUtilisateur(dlg, model));
+
+        JButton btnClose = UIUtils.buildOutlineButton("Fermer", 120, 36);
+        btnClose.addActionListener(e -> dlg.dispose());
+
+        footer.add(btnAdd);
+        footer.add(btnClose);
+        root.add(footer, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
+    }
+
+    private void afficherFormulaireAjouterUtilisateur(JDialog parent, DefaultTableModel model) {
+        JDialog dlg = new JDialog(parent, "Ajouter un Utilisateur", true);
+        dlg.setSize(450, 380);
+        dlg.setLocationRelativeTo(parent);
+
+        JPanel root = new JPanel(new BorderLayout(0, 16));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+
+        JLabel title = new JLabel("Nouvel Utilisateur");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(16f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        JPanel form = new JPanel(new GridLayout(4, 2, 12, 12));
+        form.setOpaque(false);
+
+        JLabel usernameL = new JLabel("Nom d'utilisateur:");
+        usernameL.setFont(FONT_INFO_KEY);
+        usernameL.setForeground(TEXT_PRIMARY);
+        JTextField usernameF = new JTextField();
+
+        JLabel emailL = new JLabel("Email:");
+        emailL.setFont(FONT_INFO_KEY);
+        emailL.setForeground(TEXT_PRIMARY);
+        JTextField emailF = new JTextField();
+
+        JLabel passwordL = new JLabel("Mot de passe:");
+        passwordL.setFont(FONT_INFO_KEY);
+        passwordL.setForeground(TEXT_PRIMARY);
+        JPasswordField passwordF = new JPasswordField();
+
+        JLabel roleL = new JLabel("Rôle:");
+        roleL.setFont(FONT_INFO_KEY);
+        roleL.setForeground(TEXT_PRIMARY);
+        JComboBox<String> roleC = new JComboBox<>();
+
+        new SwingWorker<List<String>, Void>() {
+            @Override
+            protected List<String> doInBackground() throws Exception {
+                return UserDAO.getAllRoles();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    List<String> roles = get();
+                    for (String r : roles) {
+                        roleC.addItem(r);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }.execute();
+
+        form.add(usernameL); form.add(usernameF);
+        form.add(emailL);    form.add(emailF);
+        form.add(passwordL); form.add(passwordF);
+        form.add(roleL);     form.add(roleC);
+
+        root.add(form, BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        btnPanel.setOpaque(false);
+
+        JButton btnSave = UIUtils.buildRedButton("Créer", 120, 38);
+        btnSave.addActionListener(e -> {
+            String username = usernameF.getText();
+            String email = emailF.getText();
+            String password = new String(passwordF.getPassword());
+            String role = (String) roleC.getSelectedItem();
+
+            if (username.isEmpty() || email.isEmpty() || password.isEmpty()) {
+                JOptionPane.showMessageDialog(dlg, "Tous les champs sont obligatoires", "Erreur", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            new SwingWorker<Boolean, Void>() {
+                @Override
+                protected Boolean doInBackground() throws Exception {
+                    return UserDAO.registerUser(username, email, password, role);
+                }
+
+                @Override
+                protected void done() {
+                    try {
+                        if (get()) {
+                            JOptionPane.showMessageDialog(dlg, "Utilisateur créé avec succès!", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                            dlg.dispose();
+                        } else {
+                            JOptionPane.showMessageDialog(dlg, "Erreur lors de la création", "Erreur", JOptionPane.ERROR_MESSAGE);
+                        }
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(dlg, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            }.execute();
+        });
+
+        JButton btnCancel = UIUtils.buildOutlineButton("Annuler", 120, 38);
+        btnCancel.addActionListener(e -> dlg.dispose());
+
+        btnPanel.add(btnSave);
+        btnPanel.add(btnCancel);
+        root.add(btnPanel, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
     }
 
     private void afficherGestionRoles() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83C\uDFAD R\u00f4les disponibles</h3>" +
-                        "<ul><li><b>Administrateur</b> \u2014 Acc\u00e8s complet</li>" +
-                        "<li><b>Manager</b> \u2014 Gestion op\u00e9rationnelle</li>" +
-                        "<li><b>Comptable</b> \u2014 Validation paiements</li>" +
-                        "<li><b>Approbateur</b> \u2014 Approbation des demandes</li>" +
-                        "<li><b>Utilisateur</b> \u2014 Cr\u00e9ation de demandes</li>" +
-                        "<li><b>Superviseur Magasin</b> \u2014 R\u00e9demption des bons</li></ul></html>",
-                "Gestion des R\u00f4les", JOptionPane.INFORMATION_MESSAGE);
+        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Gestion des Rôles", true);
+        dlg.setSize(750, 520);
+        dlg.setLocationRelativeTo(this);
+
+        JPanel root = new JPanel(new BorderLayout(0, 12));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+
+        JLabel title = new JLabel("🎭 Utilisateurs et leurs Rôles");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(18f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        String[] cols = {"ID", "Nom d'utilisateur", "Email", "Rôle actuel"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        JTable table = new JTable(model);
+        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        table.setRowHeight(32);
+        table.setShowHorizontalLines(true);
+        table.setGridColor(new Color(240, 242, 246));
+        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        table.getTableHeader().setBackground(new Color(248, 249, 252));
+
+        // Charger les utilisateurs depuis la BD
+        new SwingWorker<Void, Void>() {
+            @Override protected Void doInBackground() throws Exception {
+                try (Connection conn = DBconnect.getConnection();
+                     Statement st = conn.createStatement();
+                     ResultSet rs = st.executeQuery(
+                         "SELECT userid, username, email, role FROM utilisateur ORDER BY userid")) {
+                    while (rs.next()) {
+                        model.addRow(new Object[]{
+                            rs.getInt("userid"),
+                            rs.getString("username"),
+                            rs.getString("email"),
+                            rs.getString("role")
+                        });
+                    }
+                }
+                return null;
+            }
+        }.execute();
+
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createLineBorder(BORDER_LIGHT, 1));
+        root.add(scroll, BorderLayout.CENTER);
+
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 8));
+        footer.setOpaque(false);
+
+        String[] rolesDisponibles = {"Administrateur", "Manager", "Comptable", "Approbateur", "Collaborateur", "Superviseur_Magasin"};
+
+        JButton btnChanger = UIUtils.buildRedButton("Changer le rôle", 160, 36);
+        btnChanger.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row < 0) {
+                JOptionPane.showMessageDialog(dlg, "Sélectionnez un utilisateur", "Info", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            int uid = (int) model.getValueAt(row, 0);
+            String currentRole = (String) model.getValueAt(row, 3);
+            String newRole = (String) JOptionPane.showInputDialog(dlg,
+                "Nouveau rôle pour " + model.getValueAt(row, 1) + " :",
+                "Changer le rôle", JOptionPane.PLAIN_MESSAGE, null, rolesDisponibles, currentRole);
+            if (newRole != null && !newRole.equals(currentRole)) {
+                try (Connection conn = DBconnect.getConnection();
+                     PreparedStatement ps = conn.prepareStatement("UPDATE utilisateur SET role = ? WHERE userid = ?")) {
+                    ps.setString(1, newRole);
+                    ps.setInt(2, uid);
+                    ps.executeUpdate();
+                    model.setValueAt(newRole, row, 3);
+                    AuditDAO.logSimple("utilisateur", uid, "MODIFICATION", userId,
+                        "Rôle changé: " + currentRole + " → " + newRole);
+                    JOptionPane.showMessageDialog(dlg, "Rôle mis à jour avec succès !", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                } catch (SQLException ex) {
+                    JOptionPane.showMessageDialog(dlg, "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        JButton btnClose = UIUtils.buildOutlineButton("Fermer", 120, 36);
+        btnClose.addActionListener(e -> dlg.dispose());
+
+        footer.add(btnChanger);
+        footer.add(btnClose);
+        root.add(footer, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
     }
 
     private void afficherGestionDatabase() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83D\uDDC4 Base de Donn\u00e9es</h3>" +
-                        "<ul><li>Sauvegarde automatique</li><li>Restauration</li>" +
-                        "<li>Optimisation des tables</li><li>Gestion des index</li></ul></html>",
-                "Base de Donn\u00e9es", JOptionPane.INFORMATION_MESSAGE);
-    }
+        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Monitoring Base de Données", true);
+        dlg.setSize(650, 500);
+        dlg.setLocationRelativeTo(this);
 
+        JPanel root = new JPanel(new BorderLayout(0, 16));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+
+        JLabel title = new JLabel("🗄️ Monitoring Base de Données");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(18f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        // Tableau des stats
+        String[] cols = {"Table", "Nombre de lignes"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+        JTable table = new JTable(model);
+        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
+        table.setRowHeight(30);
+        table.setShowHorizontalLines(true);
+        table.setGridColor(new Color(240, 242, 246));
+        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+
+        JLabel lblInfo = new JLabel("Chargement...");
+        lblInfo.setFont(FONT_SUBTITLE);
+        lblInfo.setForeground(TEXT_SECOND);
+        lblInfo.setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 0));
+
+        new SwingWorker<String, Object[]>() {
+            @Override protected String doInBackground() throws Exception {
+                StringBuilder info = new StringBuilder();
+                try (Connection conn = DBconnect.getConnection()) {
+                    // Version PostgreSQL
+                    try (Statement st = conn.createStatement();
+                         ResultSet rs = st.executeQuery("SELECT version()")) {
+                        if (rs.next()) {
+                            String v = rs.getString(1);
+                            info.append("PostgreSQL : ").append(v.substring(0, Math.min(v.length(), 60)));
+                        }
+                    }
+                    // Taille de la BD
+                    try (Statement st = conn.createStatement();
+                         ResultSet rs = st.executeQuery("SELECT pg_size_pretty(pg_database_size(current_database()))")) {
+                        if (rs.next()) info.append("  |  Taille : ").append(rs.getString(1));
+                    }
+                    // Comptage par table
+                    String[] tables = {"societe", "magasin", "utilisateur", "client", "demande", "bon", "redemption", "audit_log", "app_settings"};
+                    for (String t : tables) {
+                        try (Statement st = conn.createStatement();
+                             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM " + t)) {
+                            if (rs.next()) publish(new Object[]{t, rs.getInt(1)});
+                        } catch (SQLException ignored) {
+                            publish(new Object[]{t, "N/A"});
+                        }
+                    }
+                }
+                return info.toString();
+            }
+            @Override protected void process(java.util.List<Object[]> chunks) {
+                for (Object[] row : chunks) model.addRow(row);
+            }
+            @Override protected void done() {
+                try { lblInfo.setText(get()); }
+                catch (Exception ex) { lblInfo.setText("Erreur : " + ex.getMessage()); }
+            }
+        }.execute();
+
+        JPanel center = new JPanel(new BorderLayout(0, 8));
+        center.setOpaque(false);
+        center.add(lblInfo, BorderLayout.NORTH);
+        center.add(new JScrollPane(table), BorderLayout.CENTER);
+        root.add(center, BorderLayout.CENTER);
+
+        // Boutons d'action
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 8));
+        footer.setOpaque(false);
+
+        JButton btnVacuum = UIUtils.buildRedButton("Optimiser (VACUUM)", 180, 36);
+        btnVacuum.addActionListener(e -> {
+            new SwingWorker<Void, Void>() {
+                @Override protected Void doInBackground() throws Exception {
+                    try (Connection conn = DBconnect.getConnection();
+                         Statement st = conn.createStatement()) {
+                        st.execute("VACUUM ANALYZE");
+                    }
+                    return null;
+                }
+                @Override protected void done() {
+                    try { get(); JOptionPane.showMessageDialog(dlg, "Optimisation VACUUM ANALYZE terminée !", "Succès", JOptionPane.INFORMATION_MESSAGE); }
+                    catch (Exception ex) { JOptionPane.showMessageDialog(dlg, "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE); }
+                }
+            }.execute();
+        });
+
+        JButton btnTest = UIUtils.buildRedButton("Tester connexion", 160, 36);
+        btnTest.addActionListener(e -> {
+            try { boolean ok = DBconnect.testConnection();
+                JOptionPane.showMessageDialog(dlg, ok ? "Connexion OK !" : "Connexion échouée", ok ? "Succès" : "Erreur",
+                    ok ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dlg, "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        JButton btnClose = UIUtils.buildOutlineButton("Fermer", 120, 36);
+        btnClose.addActionListener(e -> dlg.dispose());
+
+        footer.add(btnVacuum);
+        footer.add(btnTest);
+        footer.add(btnClose);
+        root.add(footer, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
+    }
     private void afficherConfigEmail() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83D\uDCE7 Configuration Email</h3>" +
-                        "<ul><li>Serveur SMTP</li><li>Port et s\u00e9curit\u00e9 (TLS/SSL)</li>" +
-                        "<li>Authentification</li><li>Mod\u00e8les d'emails</li></ul></html>",
-                "Configuration Email", JOptionPane.INFORMATION_MESSAGE);
+        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Configuration Email", true);
+        dlg.setSize(550, 450);
+        dlg.setLocationRelativeTo(this);
+
+        JPanel root = new JPanel(new BorderLayout(0, 16));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+
+        JLabel title = new JLabel("📧 Configuration Email SMTP");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(18f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        JPanel form = new JPanel(new GridLayout(6, 2, 12, 12));
+        form.setOpaque(false);
+
+        JLabel serverL = new JLabel("Serveur SMTP:");
+        serverL.setFont(FONT_INFO_KEY);
+        serverL.setForeground(TEXT_PRIMARY);
+        JTextField serverF = new JTextField();
+
+        JLabel portL = new JLabel("Port:");
+        portL.setFont(FONT_INFO_KEY);
+        portL.setForeground(TEXT_PRIMARY);
+        JTextField portF = new JTextField();
+
+        JLabel userL = new JLabel("Nom d'utilisateur:");
+        userL.setFont(FONT_INFO_KEY);
+        userL.setForeground(TEXT_PRIMARY);
+        JTextField userF = new JTextField();
+
+        JLabel passL = new JLabel("Mot de passe:");
+        passL.setFont(FONT_INFO_KEY);
+        passL.setForeground(TEXT_PRIMARY);
+        JPasswordField passF = new JPasswordField();
+
+        JLabel tlsL = new JLabel("TLS Enabled:");
+        tlsL.setFont(FONT_INFO_KEY);
+        tlsL.setForeground(TEXT_PRIMARY);
+        JCheckBox tlsC = new JCheckBox();
+
+        JLabel fromL = new JLabel("From Email:");
+        fromL.setFont(FONT_INFO_KEY);
+        fromL.setForeground(TEXT_PRIMARY);
+        JTextField fromF = new JTextField();
+
+        form.add(serverL); form.add(serverF);
+        form.add(portL);   form.add(portF);
+        form.add(userL);   form.add(userF);
+        form.add(passL);   form.add(passF);
+        form.add(tlsL);    form.add(tlsC);
+        form.add(fromL);   form.add(fromF);
+
+        new SwingWorker<SettingsDAO.EmailSettings, Void>() {
+            @Override
+            protected SettingsDAO.EmailSettings doInBackground() throws Exception {
+                return SettingsDAO.getEmailSettings();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    SettingsDAO.EmailSettings settings = get();
+                    if (settings != null) {
+                        SwingUtilities.invokeLater(() -> {
+                            serverF.setText(settings.smtpServer);
+                            portF.setText(String.valueOf(settings.smtpPort));
+                            userF.setText(settings.smtpUsername);
+                            passF.setText(settings.smtpPassword);
+                            tlsC.setSelected(settings.tlsEnabled);
+                            fromF.setText(settings.fromEmail);
+                        });
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }.execute();
+
+        root.add(form, BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        btnPanel.setOpaque(false);
+
+        JButton btnSave = UIUtils.buildRedButton("Enregistrer", 140, 38);
+        btnSave.addActionListener(e -> {
+            try {
+                SettingsDAO.EmailSettings settings = new SettingsDAO.EmailSettings(
+                        serverF.getText(),
+                        Integer.parseInt(portF.getText()),
+                        userF.getText(),
+                        new String(passF.getPassword()),
+                        tlsC.isSelected(),
+                        fromF.getText()
+                );
+
+                new SwingWorker<Boolean, Void>() {
+                    @Override
+                    protected Boolean doInBackground() throws Exception {
+                        return SettingsDAO.updateEmailSettings(settings);
+                    }
+
+                    @Override
+                    protected void done() {
+                        try {
+                            if (get()) {
+                                JOptionPane.showMessageDialog(dlg, "Configuration email enregistrée!", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                                dlg.dispose();
+                            }
+                        } catch (Exception ex) {
+                            JOptionPane.showMessageDialog(dlg, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                        }
+                    }
+                }.execute();
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dlg, "Le port doit être un nombre", "Erreur", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        JButton btnCancel = UIUtils.buildOutlineButton("Annuler", 140, 38);
+        btnCancel.addActionListener(e -> dlg.dispose());
+
+        btnPanel.add(btnSave);
+        btnPanel.add(btnCancel);
+        root.add(btnPanel, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
     }
 
     private void afficherLogs() {
         JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Logs & Audit Trail", true);
-        dlg.setSize(750, 500);
+        dlg.setSize(950, 600);
         dlg.setLocationRelativeTo(this);
 
         JPanel root = new JPanel(new BorderLayout(0, 10));
@@ -575,16 +1127,16 @@ class ParametresPanel extends JPanel {
         try (Connection conn = DBconnect.getConnection();
              Statement st = conn.createStatement();
              ResultSet rs = st.executeQuery(
-                     "SELECT date_action, action, description, nom_utilisateur, table_name " +
-                     "FROM audit_log ORDER BY date_action DESC LIMIT 50")) {
+                     "SELECT date_action, action, contexte, username, table_name " +
+                             "FROM audit_log ORDER BY date_action DESC LIMIT 100")) {
             SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
             while (rs.next()) {
                 Timestamp ts = rs.getTimestamp("date_action");
                 model.addRow(new Object[]{
                         ts != null ? sdf.format(ts) : "",
                         rs.getString("action"),
-                        rs.getString("description"),
-                        rs.getString("nom_utilisateur"),
+                        rs.getString("contexte"),
+                        rs.getString("username") != null ? rs.getString("username") : "—",
                         rs.getString("table_name")
                 });
             }
@@ -606,26 +1158,106 @@ class ParametresPanel extends JPanel {
         dlg.add(root);
         dlg.setVisible(true);
     }
-
     private void afficherGestionSocietes() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83C\uDFE2 Gestion des Soci\u00e9t\u00e9s</h3>" +
-                        "<ul><li>Ajouter de nouvelles enseignes</li>" +
-                        "<li>Configuration par soci\u00e9t\u00e9</li>" +
-                        "<li>Logo et branding</li></ul></html>",
-                "Gestion Soci\u00e9t\u00e9s", JOptionPane.INFORMATION_MESSAGE);
+        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Gestion des Sociétés", true);
+        dlg.setSize(800, 550);
+        dlg.setLocationRelativeTo(this);
+
+        JPanel root = new JPanel(new BorderLayout(0, 12));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+
+        JLabel title = new JLabel("🏢 Gestion des Sociétés / Enseignes");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(18f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        String[] cols = {"ID", "Nom", "Adresse", "Téléphone", "Email"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0) {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+
+        JTable table = new JTable(model);
+        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        table.setRowHeight(32);
+        table.setShowHorizontalLines(true);
+        table.setGridColor(new Color(240, 242, 246));
+        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+
+        Runnable chargerSocietes = () -> {
+            model.setRowCount(0);
+            new SwingWorker<Void, Void>() {
+                @Override protected Void doInBackground() throws Exception {
+                    for (SocieteDAO.Societe s : SocieteDAO.getAllSocietes()) {
+                        model.addRow(new Object[]{s.societeId, s.nom, s.adresse, s.telephone, s.email});
+                    }
+                    return null;
+                }
+            }.execute();
+        };
+        chargerSocietes.run();
+
+        JScrollPane scroll = new JScrollPane(table);
+        scroll.setBorder(BorderFactory.createLineBorder(BORDER_LIGHT, 1));
+        root.add(scroll, BorderLayout.CENTER);
+
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 8));
+        footer.setOpaque(false);
+
+        JButton btnAdd = UIUtils.buildRedButton("+ Ajouter", 120, 36);
+        btnAdd.addActionListener(e -> {
+            JPanel form = new JPanel(new GridLayout(4, 2, 8, 8));
+            JTextField fNom = new JTextField(), fAdresse = new JTextField(), fTel = new JTextField(), fEmail = new JTextField();
+            form.add(new JLabel("Nom :")); form.add(fNom);
+            form.add(new JLabel("Adresse :")); form.add(fAdresse);
+            form.add(new JLabel("Téléphone :")); form.add(fTel);
+            form.add(new JLabel("Email :")); form.add(fEmail);
+            int r = JOptionPane.showConfirmDialog(dlg, form, "Nouvelle Société", JOptionPane.OK_CANCEL_OPTION);
+            if (r == JOptionPane.OK_OPTION && !fNom.getText().trim().isEmpty()) {
+                try {
+                    SocieteDAO.addSociete(fNom.getText().trim(), fAdresse.getText().trim(), fTel.getText().trim(), fEmail.getText().trim());
+                    chargerSocietes.run();
+                    JOptionPane.showMessageDialog(dlg, "Société ajoutée !", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                } catch (SQLException ex) {
+                    JOptionPane.showMessageDialog(dlg, "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
+        JButton btnDelete = UIUtils.buildRedButton("Supprimer", 120, 36);
+        btnDelete.addActionListener(e -> {
+            int row = table.getSelectedRow();
+            if (row < 0) { JOptionPane.showMessageDialog(dlg, "Sélectionnez une société"); return; }
+            int id = (int) model.getValueAt(row, 0);
+            int conf = JOptionPane.showConfirmDialog(dlg, "Supprimer cette société ?", "Confirmation", JOptionPane.YES_NO_OPTION);
+            if (conf == JOptionPane.YES_OPTION) {
+                try { SocieteDAO.deleteSociete(id); chargerSocietes.run(); }
+                catch (SQLException ex) { JOptionPane.showMessageDialog(dlg, "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE); }
+            }
+        });
+
+        JButton btnClose = UIUtils.buildOutlineButton("Fermer", 120, 36);
+        btnClose.addActionListener(e -> dlg.dispose());
+
+        footer.add(btnAdd);
+        footer.add(btnDelete);
+        footer.add(btnClose);
+        root.add(footer, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
     }
 
     private void afficherGestionMagasins() {
         JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Gestion des Magasins", true);
-        dlg.setSize(650, 400);
+        dlg.setSize(850, 550);
         dlg.setLocationRelativeTo(this);
 
-        JPanel root = new JPanel(new BorderLayout(0, 10));
+        JPanel root = new JPanel(new BorderLayout(0, 12));
         root.setBackground(BG_ROOT);
         root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
 
-        JLabel title = new JLabel("Points de vente Intermart");
+        JLabel title = new JLabel("🏪 Points de vente Intermart");
         title.setFont(FONT_PAGE_TITLE.deriveFont(20f));
         title.setForeground(TEXT_PRIMARY);
         root.add(title, BorderLayout.NORTH);
@@ -645,45 +1277,212 @@ class ParametresPanel extends JPanel {
         table.getTableHeader().setBackground(new Color(248, 249, 252));
         table.getTableHeader().setForeground(TEXT_SECOND);
 
-        try (Connection conn = DBconnect.getConnection();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(
-                     "SELECT m.magasin_id, m.nom_magasin, m.adresse, u.username AS superviseur " +
-                     "FROM magasin m LEFT JOIN utilisateur u ON m.superviseur_id = u.userid " +
-                     "ORDER BY m.magasin_id")) {
-            while (rs.next()) {
-                model.addRow(new Object[]{
-                        rs.getInt("magasin_id"),
-                        rs.getString("nom_magasin"),
-                        rs.getString("adresse"),
-                        rs.getString("superviseur") != null ? rs.getString("superviseur") : "\u2014"
-                });
+        new SwingWorker<List<MagasinDAO.Magasin>, Void>() {
+            @Override
+            protected List<MagasinDAO.Magasin> doInBackground() throws Exception {
+                return MagasinDAO.getAllMagasins();
             }
-        } catch (SQLException e) {
-            model.addRow(new Object[]{"", "Erreur", e.getMessage(), ""});
-        }
+
+            @Override
+            protected void done() {
+                try {
+                    List<MagasinDAO.Magasin> magasins = get();
+                    for (MagasinDAO.Magasin m : magasins) {
+                        model.addRow(new Object[]{
+                                m.magasinId,
+                                m.nomMagasin,
+                                m.adresse,
+                                m.superviseurNom != null ? m.superviseurNom : "—"
+                        });
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }.execute();
 
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(BorderFactory.createLineBorder(BORDER_LIGHT, 1));
         root.add(scroll, BorderLayout.CENTER);
 
-        JButton btnFermer = new JButton("Fermer");
-        btnFermer.addActionListener(e -> dlg.dispose());
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         footer.setOpaque(false);
-        footer.add(btnFermer);
+
+        JButton btnAdd = UIUtils.buildRedButton("+ Ajouter", 120, 36);
+        btnAdd.addActionListener(e -> afficherFormulaireAjouterMagasin(dlg, model));
+
+        JButton btnClose = UIUtils.buildOutlineButton("Fermer", 120, 36);
+        btnClose.addActionListener(e -> dlg.dispose());
+
+        footer.add(btnAdd);
+        footer.add(btnClose);
         root.add(footer, BorderLayout.SOUTH);
 
         dlg.add(root);
         dlg.setVisible(true);
     }
 
+    private void afficherFormulaireAjouterMagasin(JDialog parent, DefaultTableModel model) {
+        JDialog dlg = new JDialog(parent, "Ajouter un Magasin", true);
+        dlg.setSize(480, 380);
+        dlg.setLocationRelativeTo(parent);
+
+        JPanel root = new JPanel(new BorderLayout(0, 16));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+
+        JLabel title = new JLabel("Nouveau Magasin");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(16f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        JPanel form = new JPanel(new GridLayout(3, 2, 12, 12));
+        form.setOpaque(false);
+
+        JLabel nomL = new JLabel("Nom du magasin:");
+        nomL.setFont(FONT_INFO_KEY);
+        nomL.setForeground(TEXT_PRIMARY);
+        JTextField nomF = new JTextField();
+
+        JLabel adresseL = new JLabel("Adresse:");
+        adresseL.setFont(FONT_INFO_KEY);
+        adresseL.setForeground(TEXT_PRIMARY);
+        JTextField adresseF = new JTextField();
+
+        JLabel superviseurL = new JLabel("Superviseur:");
+        superviseurL.setFont(FONT_INFO_KEY);
+        superviseurL.setForeground(TEXT_PRIMARY);
+        JComboBox<String> superviseurC = new JComboBox<>();
+        superviseurC.addItem("Aucun");
+
+        form.add(nomL); form.add(nomF);
+        form.add(adresseL); form.add(adresseF);
+        form.add(superviseurL); form.add(superviseurC);
+
+        root.add(form, BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
+        btnPanel.setOpaque(false);
+
+        JButton btnSave = UIUtils.buildRedButton("Créer", 120, 38);
+        btnSave.addActionListener(e -> {
+            String nom = nomF.getText();
+            String adresse = adresseF.getText();
+
+            if (nom.isEmpty() || adresse.isEmpty()) {
+                JOptionPane.showMessageDialog(dlg, "Tous les champs sont obligatoires", "Erreur", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+
+            new SwingWorker<Boolean, Void>() {
+                @Override
+                protected Boolean doInBackground() throws Exception {
+                    return MagasinDAO.addMagasin(nom, adresse, null);
+                }
+
+                @Override
+                protected void done() {
+                    try {
+                        if (get()) {
+                            JOptionPane.showMessageDialog(dlg, "Magasin créé avec succès!", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                            dlg.dispose();
+                        }
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(dlg, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            }.execute();
+        });
+
+        JButton btnCancel = UIUtils.buildOutlineButton("Annuler", 120, 38);
+        btnCancel.addActionListener(e -> dlg.dispose());
+
+        btnPanel.add(btnSave);
+        btnPanel.add(btnCancel);
+        root.add(btnPanel, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
+    }
+
     private void afficherConfigBons() {
-        JOptionPane.showMessageDialog(this,
-                "<html><h3>\uD83D\uDCCB Configuration des Bons</h3>" +
-                        "<ul><li>Mod\u00e8le PDF personnalis\u00e9</li><li>Format QR Code / Code-barres</li>" +
-                        "<li>Signature num\u00e9rique</li><li>Validit\u00e9 par d\u00e9faut</li></ul></html>",
-                "Configuration Bons", JOptionPane.INFORMATION_MESSAGE);
+        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Configuration des Bons", true);
+        dlg.setSize(500, 400);
+        dlg.setLocationRelativeTo(this);
+
+        JPanel root = new JPanel(new BorderLayout(0, 16));
+        root.setBackground(BG_ROOT);
+        root.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+
+        JLabel title = new JLabel("📋 Configuration des Bons d'Achat");
+        title.setFont(FONT_PAGE_TITLE.deriveFont(18f));
+        title.setForeground(TEXT_PRIMARY);
+        root.add(title, BorderLayout.NORTH);
+
+        JPanel form = new JPanel(new GridLayout(5, 2, 12, 12));
+        form.setOpaque(false);
+
+        JLabel lVal = new JLabel("Validité par défaut (jours) :"); lVal.setFont(FONT_INFO_KEY); lVal.setForeground(TEXT_PRIMARY);
+        JTextField fVal = new JTextField("365");
+        JLabel lType = new JLabel("Type par défaut :"); lType.setFont(FONT_INFO_KEY); lType.setForeground(TEXT_PRIMARY);
+        JComboBox<String> fType = new JComboBox<>(new String[]{"Standard", "Cadeau", "Promo"});
+        JLabel lEnt = new JLabel("Nom entreprise (PDF) :"); lEnt.setFont(FONT_INFO_KEY); lEnt.setForeground(TEXT_PRIMARY);
+        JTextField fEnt = new JTextField("Intermart Maurice");
+        JLabel lQr = new JLabel("Format code :"); lQr.setFont(FONT_INFO_KEY); lQr.setForeground(TEXT_PRIMARY);
+        JComboBox<String> fQr = new JComboBox<>(new String[]{"QR_CODE", "CODE_128", "QR_CODE + CODE_128"});
+        JLabel lSig = new JLabel("Signature numérique :"); lSig.setFont(FONT_INFO_KEY); lSig.setForeground(TEXT_PRIMARY);
+        JCheckBox fSig = new JCheckBox();
+
+        form.add(lVal); form.add(fVal);
+        form.add(lType); form.add(fType);
+        form.add(lEnt); form.add(fEnt);
+        form.add(lQr); form.add(fQr);
+        form.add(lSig); form.add(fSig);
+
+        // Charger les valeurs depuis app_settings
+        new SwingWorker<Void, Void>() {
+            @Override protected Void doInBackground() throws Exception {
+                try { String v = SettingsDAO.getSetting("bon_validite_defaut"); if (v != null) SwingUtilities.invokeLater(() -> fVal.setText(v)); } catch (Exception ignored) {}
+                try { String v = SettingsDAO.getSetting("bon_type_defaut"); if (v != null) SwingUtilities.invokeLater(() -> fType.setSelectedItem(v)); } catch (Exception ignored) {}
+                try { String v = SettingsDAO.getSetting("bon_entreprise"); if (v != null) SwingUtilities.invokeLater(() -> fEnt.setText(v)); } catch (Exception ignored) {}
+                try { String v = SettingsDAO.getSetting("bon_format_qr"); if (v != null) SwingUtilities.invokeLater(() -> fQr.setSelectedItem(v)); } catch (Exception ignored) {}
+                try { String v = SettingsDAO.getSetting("bon_signature"); if (v != null) SwingUtilities.invokeLater(() -> fSig.setSelected("true".equals(v))); } catch (Exception ignored) {}
+                return null;
+            }
+        }.execute();
+
+        root.add(form, BorderLayout.CENTER);
+
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 8));
+        footer.setOpaque(false);
+
+        JButton btnSave = UIUtils.buildRedButton("Enregistrer", 140, 36);
+        btnSave.addActionListener(e -> {
+            new SwingWorker<Void, Void>() {
+                @Override protected Void doInBackground() throws Exception {
+                    SettingsDAO.updateSetting("bon_validite_defaut", fVal.getText().trim());
+                    SettingsDAO.updateSetting("bon_type_defaut", (String) fType.getSelectedItem());
+                    SettingsDAO.updateSetting("bon_entreprise", fEnt.getText().trim());
+                    SettingsDAO.updateSetting("bon_format_qr", (String) fQr.getSelectedItem());
+                    SettingsDAO.updateSetting("bon_signature", fSig.isSelected() ? "true" : "false");
+                    return null;
+                }
+                @Override protected void done() {
+                    try { get(); JOptionPane.showMessageDialog(dlg, "Configuration sauvegardée !", "Succès", JOptionPane.INFORMATION_MESSAGE); dlg.dispose(); }
+                    catch (Exception ex) { JOptionPane.showMessageDialog(dlg, "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE); }
+                }
+            }.execute();
+        });
+
+        JButton btnCancel = UIUtils.buildOutlineButton("Annuler", 120, 36);
+        btnCancel.addActionListener(e -> dlg.dispose());
+
+        footer.add(btnSave);
+        footer.add(btnCancel);
+        root.add(footer, BorderLayout.SOUTH);
+
+        dlg.add(root);
+        dlg.setVisible(true);
     }
 
     private void afficherConfigRapports() {
@@ -728,7 +1527,7 @@ class ParametresPanel extends JPanel {
             if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
                 try {
                     java.util.List<java.util.Map<String, Object>> data = pkg.vms.DAO.ClientDAO.getClientsForExport();
-                    String[] cols = {"ID", "Nom", "Email", "Téléphone", "Adresse", "Contact", "Création", "Actif"};
+                    String[] cols = {"ID", "Nom", "Email", "Téléphone", "Société", "Création", "Actif"};
                     ExcelExportService.exportData(chooser.getSelectedFile().getAbsolutePath(), "Clients", cols, data);
                     JOptionPane.showMessageDialog(this, "Export des clients réussi !");
                 } catch (Exception ex) {

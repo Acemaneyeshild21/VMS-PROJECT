@@ -20,13 +20,14 @@ CREATE TABLE IF NOT EXISTS societe (
 
 -- Magasins (points de vente rattachés à une société)
 CREATE TABLE IF NOT EXISTS magasin (
-    magasin_id   SERIAL PRIMARY KEY,
-    societe_id   INT REFERENCES societe(societe_id),
-    nom_magasin  VARCHAR(150) NOT NULL,
-    adresse      TEXT,
-    telephone    VARCHAR(30),
-    actif        BOOLEAN DEFAULT TRUE,
-    date_creation TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    magasin_id     SERIAL PRIMARY KEY,
+    societe_id     INT REFERENCES societe(societe_id),
+    nom_magasin    VARCHAR(150) NOT NULL,
+    adresse        TEXT,
+    telephone      VARCHAR(30),
+    superviseur_id INT,
+    actif          BOOLEAN DEFAULT TRUE,
+    date_creation  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Utilisateurs (siège + magasins)
@@ -43,6 +44,11 @@ CREATE TABLE IF NOT EXISTS utilisateur (
         'Administrateur','Manager','Comptable','Approbateur','Collaborateur','Superviseur_Magasin'
     ))
 );
+
+-- FK différée : superviseur_id dans magasin → utilisateur (créé après magasin)
+ALTER TABLE magasin
+    ADD CONSTRAINT fk_magasin_superviseur
+    FOREIGN KEY (superviseur_id) REFERENCES utilisateur(userid);
 
 -- Clients (bénéficiaires des bons)
 CREATE TABLE IF NOT EXISTS client (
@@ -154,12 +160,37 @@ CREATE TABLE IF NOT EXISTS audit_log (
         'CREATION','MODIFICATION','SUPPRESSION','PAIEMENT','APPROBATION',
         'GENERATION','ENVOI','REDEMPTION','REJET','ANNULATION',
         'CONNEXION','CONNEXION_ECHOUEE','INSCRIPTION',
-        'CHANGEMENT_STATUT','ARCHIVAGE_MASSIF','UTILISATION_BON'
+        'CHANGEMENT_STATUT','ARCHIVAGE_MASSIF','UTILISATION_BON',
+        'UPDATE_EMAIL'
     ))
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_table ON audit_log(table_name, record_id);
 CREATE INDEX IF NOT EXISTS idx_audit_date ON audit_log(date_action);
+
+-- Paramètres applicatifs (configuration email, bons, etc.)
+CREATE TABLE IF NOT EXISTS app_settings (
+    setting_id    SERIAL PRIMARY KEY,
+    setting_key   VARCHAR(50) NOT NULL UNIQUE,
+    setting_value TEXT,
+    smtp_server   VARCHAR(150),
+    smtp_port     INT DEFAULT 587,
+    smtp_username VARCHAR(150),
+    smtp_password VARCHAR(255),
+    tls_enabled   BOOLEAN DEFAULT TRUE,
+    from_email    VARCHAR(150),
+    date_modification TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Données par défaut
+INSERT INTO app_settings (setting_key, setting_value) VALUES
+    ('email', 'Configuration SMTP'),
+    ('bon_validite_defaut', '365'),
+    ('bon_type_defaut', 'Standard'),
+    ('bon_entreprise', 'Intermart Maurice'),
+    ('bon_format_qr', 'QR_CODE'),
+    ('bon_signature', 'false')
+ON CONFLICT (setting_key) DO NOTHING;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 2. TRIGGER : Mise à jour automatique de date_modification sur demande
