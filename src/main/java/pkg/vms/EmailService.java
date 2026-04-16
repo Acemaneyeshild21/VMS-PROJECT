@@ -196,4 +196,7 @@ public class EmailService {
         }
         return null;
     }
+
+    public static void sendEmail(String clientEmail, String s, String corps) {
+    }
 }

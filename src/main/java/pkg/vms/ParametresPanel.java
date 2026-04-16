@@ -966,7 +966,7 @@ class ParametresPanel extends JPanel {
     }
     private void afficherConfigEmail() {
         JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Configuration Email", true);
-        dlg.setSize(550, 450);
+        dlg.setSize(650, 550);
         dlg.setLocationRelativeTo(this);
 
         JPanel root = new JPanel(new BorderLayout(0, 16));
@@ -978,46 +978,68 @@ class ParametresPanel extends JPanel {
         title.setForeground(TEXT_PRIMARY);
         root.add(title, BorderLayout.NORTH);
 
-        JPanel form = new JPanel(new GridLayout(6, 2, 12, 12));
+        JPanel form = new JPanel(new GridLayout(8, 2, 12, 12));
         form.setOpaque(false);
 
+        // ── Serveur SMTP ──
         JLabel serverL = new JLabel("Serveur SMTP:");
         serverL.setFont(FONT_INFO_KEY);
         serverL.setForeground(TEXT_PRIMARY);
         JTextField serverF = new JTextField();
 
+        // ── Port ──
         JLabel portL = new JLabel("Port:");
         portL.setFont(FONT_INFO_KEY);
         portL.setForeground(TEXT_PRIMARY);
         JTextField portF = new JTextField();
 
-        JLabel userL = new JLabel("Nom d'utilisateur:");
+        // ── Nom d'utilisateur (Email) ──
+        JLabel userL = new JLabel("Email SMTP:");
         userL.setFont(FONT_INFO_KEY);
         userL.setForeground(TEXT_PRIMARY);
         JTextField userF = new JTextField();
 
+        // ── Mot de passe ──
         JLabel passL = new JLabel("Mot de passe:");
         passL.setFont(FONT_INFO_KEY);
         passL.setForeground(TEXT_PRIMARY);
         JPasswordField passF = new JPasswordField();
 
+        // ── TLS Enabled ──
         JLabel tlsL = new JLabel("TLS Enabled:");
         tlsL.setFont(FONT_INFO_KEY);
         tlsL.setForeground(TEXT_PRIMARY);
         JCheckBox tlsC = new JCheckBox();
+        tlsC.setSelected(true);
 
-        JLabel fromL = new JLabel("From Email:");
-        fromL.setFont(FONT_INFO_KEY);
-        fromL.setForeground(TEXT_PRIMARY);
-        JTextField fromF = new JTextField();
+        // ── From Email ──
+        JLabel fromEmailL = new JLabel("From Email:");
+        fromEmailL.setFont(FONT_INFO_KEY);
+        fromEmailL.setForeground(TEXT_PRIMARY);
+        JTextField fromEmailF = new JTextField();
+
+        // ── From Name ──
+        JLabel fromNameL = new JLabel("Nom de l'envoyeur:");
+        fromNameL.setFont(FONT_INFO_KEY);
+        fromNameL.setForeground(TEXT_PRIMARY);
+        JTextField fromNameF = new JTextField();
+
+        // ── Admin Email ──
+        JLabel adminEmailL = new JLabel("Email Admin:");
+        adminEmailL.setFont(FONT_INFO_KEY);
+        adminEmailL.setForeground(TEXT_PRIMARY);
+        JTextField adminEmailF = new JTextField();
 
         form.add(serverL); form.add(serverF);
         form.add(portL);   form.add(portF);
         form.add(userL);   form.add(userF);
         form.add(passL);   form.add(passF);
         form.add(tlsL);    form.add(tlsC);
-        form.add(fromL);   form.add(fromF);
+        form.add(fromEmailL); form.add(fromEmailF);
+        form.add(fromNameL); form.add(fromNameF);
+        form.add(adminEmailL); form.add(adminEmailF);
 
+        // Charger les paramètres actuels
         new SwingWorker<SettingsDAO.EmailSettings, Void>() {
             @Override
             protected SettingsDAO.EmailSettings doInBackground() throws Exception {
@@ -1035,7 +1057,9 @@ class ParametresPanel extends JPanel {
                             userF.setText(settings.smtpUsername);
                             passF.setText(settings.smtpPassword);
                             tlsC.setSelected(settings.tlsEnabled);
-                            fromF.setText(settings.fromEmail);
+                            fromEmailF.setText(settings.fromEmail);
+                            fromNameF.setText(settings.fromName);
+                            adminEmailF.setText(settings.adminEmail);
                         });
                     }
                 } catch (Exception e) {
@@ -1049,7 +1073,37 @@ class ParametresPanel extends JPanel {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         btnPanel.setOpaque(false);
 
-        JButton btnSave = UIUtils.buildRedButton("Enregistrer", 140, 38);
+        // ── Bouton Test ──
+        JButton btnTest = UIUtils.buildRedButton("🧪 Tester", 120, 38);
+        btnTest.addActionListener(e -> {
+            try {
+                SettingsDAO.EmailSettings settings = new SettingsDAO.EmailSettings(
+                        serverF.getText(),
+                        Integer.parseInt(portF.getText()),
+                        userF.getText(),
+                        new String(passF.getPassword()),
+                        tlsC.isSelected(),
+                        fromEmailF.getText(),
+                        fromNameF.getText(),
+                        adminEmailF.getText()
+                );
+
+                if (SettingsDAO.testSmtpConnection(settings)) {
+                    JOptionPane.showMessageDialog(dlg,
+                            "✅ Connexion SMTP réussie!\n\nLes paramètres sont correctement configurés.",
+                            "Test Réussi", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(dlg,
+                            "❌ Erreur de connexion SMTP.\n\nVérifiez vos identifiants et paramètres.",
+                            "Erreur", JOptionPane.ERROR_MESSAGE);
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dlg, "❌ Le port doit être un nombre", "Erreur", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        // ── Bouton Enregistrer ──
+        JButton btnSave = UIUtils.buildRedButton("💾 Enregistrer", 140, 38);
         btnSave.addActionListener(e -> {
             try {
                 SettingsDAO.EmailSettings settings = new SettingsDAO.EmailSettings(
@@ -1058,7 +1112,9 @@ class ParametresPanel extends JPanel {
                         userF.getText(),
                         new String(passF.getPassword()),
                         tlsC.isSelected(),
-                        fromF.getText()
+                        fromEmailF.getText(),
+                        fromNameF.getText(),
+                        adminEmailF.getText()
                 );
 
                 new SwingWorker<Boolean, Void>() {
@@ -1071,22 +1127,27 @@ class ParametresPanel extends JPanel {
                     protected void done() {
                         try {
                             if (get()) {
-                                JOptionPane.showMessageDialog(dlg, "Configuration email enregistrée!", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                                JOptionPane.showMessageDialog(dlg,
+                                        "✅ Configuration email enregistrée avec succès!",
+                                        "Succès", JOptionPane.INFORMATION_MESSAGE);
                                 dlg.dispose();
                             }
                         } catch (Exception ex) {
-                            JOptionPane.showMessageDialog(dlg, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                            JOptionPane.showMessageDialog(dlg,
+                                    "❌ Erreur: " + ex.getMessage(),
+                                    "Erreur", JOptionPane.ERROR_MESSAGE);
                         }
                     }
                 }.execute();
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(dlg, "Le port doit être un nombre", "Erreur", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(dlg, "❌ Le port doit être un nombre", "Erreur", JOptionPane.ERROR_MESSAGE);
             }
         });
 
         JButton btnCancel = UIUtils.buildOutlineButton("Annuler", 140, 38);
         btnCancel.addActionListener(e -> dlg.dispose());
 
+        btnPanel.add(btnTest);
         btnPanel.add(btnSave);
         btnPanel.add(btnCancel);
         root.add(btnPanel, BorderLayout.SOUTH);

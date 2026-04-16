@@ -693,41 +693,39 @@ public class GestionDemande extends JPanel {
         }
     }
 
-    // ── GÉNÉRER LES BONS (appel procédure stockée + PDF + email) ────────────
+    // ── GÉNÉRER LES BONS (appel procédure stockée + choix template + PDF + email) ──
     private void genererBonsDemande(int demandeId, JDialog dlg) {
         dlg.dispose();
-        SwingWorker<Integer, Void> worker = new SwingWorker<>() {
+
+        // 1. Créer les bons en BD via la procédure stockée
+        SwingWorker<java.util.List<BonDAO.BonInfo>, Void> worker = new SwingWorker<>() {
             @Override
-            protected Integer doInBackground() throws Exception {
-                // 1. Appeler la procédure stockée pour créer les bons en BD
-                int nbBons = BonDAO.genererBons(demandeId, userId);
-
-                // 2. Générer les PDFs avec QR codes
-                java.util.List<BonDAO.BonInfo> bons = BonDAO.getBonsByDemande(demandeId);
-                for (BonDAO.BonInfo bon : bons) {
-                    String pdfPath = VoucherPDFGenerator.genererPDF(bon);
-                    BonDAO.updatePdfPath(bon.bonId, pdfPath);
-                    bon.pdfPath = pdfPath;
-                }
-
-                // 3. Envoyer par email
-                EmailService.envoyerBonsParEmail(demandeId, bons, userId);
-
-                return nbBons;
+            protected java.util.List<BonDAO.BonInfo> doInBackground() throws Exception {
+                BonDAO.genererBons(demandeId, userId);
+                return BonDAO.getBonsByDemande(demandeId);
             }
 
             @Override
             protected void done() {
                 try {
-                    int nb = get();
-                    JOptionPane.showMessageDialog(GestionDemande.this,
-                            nb + " bon(s) générés et envoyés avec succès !",
-                            "Génération terminée", JOptionPane.INFORMATION_MESSAGE);
+                    java.util.List<BonDAO.BonInfo> bons = get();
+                    if (bons.isEmpty()) {
+                        JOptionPane.showMessageDialog(GestionDemande.this,
+                                "Aucun bon genere.", "Info", JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                    }
+
+                    // 2. Ouvrir le sélecteur de template (modal, sur l'EDT)
+                    Frame parentFrame = (Frame) SwingUtilities.getWindowAncestor(GestionDemande.this);
+                    VoucherTemplateChooser.afficherEtGenerer(parentFrame, demandeId, bons, userId);
+
+                    // 3. Rafraîchir la liste des demandes
                     chargerDemandes();
+
                 } catch (Exception ex) {
                     ex.printStackTrace();
                     JOptionPane.showMessageDialog(GestionDemande.this,
-                            "Erreur lors de la génération : " + ex.getMessage(),
+                            "Erreur lors de la generation : " + ex.getMessage(),
                             "Erreur", JOptionPane.ERROR_MESSAGE);
                 }
             }

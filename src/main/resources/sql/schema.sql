@@ -179,6 +179,8 @@ CREATE TABLE IF NOT EXISTS app_settings (
     smtp_password VARCHAR(255),
     tls_enabled   BOOLEAN DEFAULT TRUE,
     from_email    VARCHAR(150),
+    from_name     VARCHAR(150),
+    admin_email   VARCHAR(150),
     date_modification TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
