@@ -1,6 +1,7 @@
 package pkg.vms;
 
 import pkg.vms.DAO.DBconnect;
+import pkg.vms.DAO.VoucherDAO;
 
 import javax.swing.*;
 import javax.swing.table.*;
@@ -17,30 +18,30 @@ import java.util.List;
  */
 class GestionBons extends JPanel {
 
-    // ── Palette ─────────────────────────────────────────────────────────────
-    private static final Color BG_ROOT      = new Color(245, 246, 250);
-    private static final Color BG_CARD      = new Color(255, 255, 255);
-    private static final Color RED_PRIMARY  = new Color(210,  35,  45);
-    private static final Color RED_DARK     = new Color(170,  20,  28);
-    private static final Color RED_LIGHT    = new Color(255, 235, 236);
-    private static final Color BORDER_LIGHT = new Color(228, 230, 236);
-    private static final Color TEXT_PRIMARY = new Color( 22,  28,  45);
-    private static final Color TEXT_SECOND  = new Color( 90, 100, 120);
-    private static final Color TEXT_MUTED   = new Color(160, 168, 185);
-    private static final Color SUCCESS      = new Color( 22, 163,  74);
-    private static final Color WARNING      = new Color(217, 119,   6);
-    private static final Color DANGER       = new Color(220,  38,  38);
+    // ── Palette (Centralisée via VMSStyle) ──────────────────────────────────
+    private static final Color BG_ROOT      = VMSStyle.BG_ROOT;
+    private static final Color BG_CARD      = VMSStyle.BG_CARD;
+    private static final Color RED_PRIMARY  = VMSStyle.RED_PRIMARY;
+    private static final Color RED_DARK     = VMSStyle.RED_DARK;
+    private static final Color RED_LIGHT    = VMSStyle.RED_LIGHT;
+    private static final Color BORDER_LIGHT = VMSStyle.BORDER_LIGHT;
+    private static final Color TEXT_PRIMARY = VMSStyle.TEXT_PRIMARY;
+    private static final Color TEXT_SECOND  = VMSStyle.TEXT_SECONDARY;
+    private static final Color TEXT_MUTED   = VMSStyle.TEXT_MUTED;
+    private static final Color SUCCESS      = VMSStyle.SUCCESS;
+    private static final Color WARNING      = VMSStyle.WARNING;
+    private static final Color DANGER       = VMSStyle.RED_PRIMARY;
 
-    private static final Font FONT_TITLE  = new Font("Georgia",      Font.BOLD,  24);
-    private static final Font FONT_HDR    = new Font("Trebuchet MS", Font.BOLD,  12);
-    private static final Font FONT_CELL   = new Font("Trebuchet MS", Font.PLAIN, 12);
-    private static final Font FONT_BADGE  = new Font("Trebuchet MS", Font.BOLD,  10);
-    private static final Font FONT_BTN    = new Font("Trebuchet MS", Font.BOLD,  12);
-    private static final Font FONT_FILTER = new Font("Trebuchet MS", Font.PLAIN, 12);
+    private static final Font FONT_TITLE  = VMSStyle.FONT_BRAND.deriveFont(24f);
+    private static final Font FONT_HDR    = VMSStyle.FONT_BADGE.deriveFont(12f);
+    private static final Font FONT_CELL   = VMSStyle.FONT_NAV;
+    private static final Font FONT_BADGE  = VMSStyle.FONT_BADGE;
+    private static final Font FONT_BTN    = VMSStyle.FONT_BTN_MAIN.deriveFont(12f);
+    private static final Font FONT_FILTER = VMSStyle.FONT_NAV;
 
     // ── Colonnes ────────────────────────────────────────────────────────────
     private static final String[] COLS = {
-            "#", "Client", "Email", "Valeur Unit.", "Statut", "Expiration"
+            "#", "Client", "Email", "Valeur Unit.", "Statut", "Expiration", "Action"
     };
     private static final int COL_ID     = 0;
     private static final int COL_CLIENT = 1;
@@ -48,6 +49,7 @@ class GestionBons extends JPanel {
     private static final int COL_VALEUR = 3;
     private static final int COL_STATUT = 4;
     private static final int COL_EXPIR  = 5;
+    private static final int COL_ACTION = 6;
 
     private final int    userId;
     private final String role;
@@ -163,7 +165,27 @@ class GestionBons extends JPanel {
 
         JButton btnRefresh = buildIconBtn("\u21BB", "Actualiser");
         btnRefresh.addActionListener(e -> chargerBons());
+        
+        JButton btnArchive = buildIconBtn("\uD83D\uDCC4", "Archiver les expirés");
+        btnArchive.addActionListener(e -> {
+            int confirm = JOptionPane.showConfirmDialog(this, 
+                "Voulez-vous archiver toutes les demandes dont les bons sont expirés ?", 
+                "Confirmation Archivage", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                try {
+                    int count = VoucherDAO.archiverDemandesExpirees(userId);
+                    JOptionPane.showMessageDialog(this, count + " demandes ont été archivées.");
+                    chargerBons();
+                } catch (SQLException ex) {
+                    JOptionPane.showMessageDialog(this, "Erreur lors de l'archivage : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+
         right.add(txtSearch); right.add(btnRefresh);
+        if ("Administrateur".equalsIgnoreCase(role)) {
+            right.add(btnArchive);
+        }
 
         bar.add(chips, BorderLayout.CENTER);
         bar.add(right, BorderLayout.EAST);
@@ -258,14 +280,40 @@ class GestionBons extends JPanel {
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_LIGHT));
 
         // Largeurs
-        int[] widths = {40, 180, 220, 110, 130, 130};
-        for (int i = 0; i < widths.length; i++)
-            table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
+        int[] widths = {40, 180, 220, 110, 130, 130, 100};
+        for (int i = 0; i < widths.length; i++) {
+            if (i < table.getColumnCount())
+                table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
+        }
         table.getColumnModel().getColumn(COL_ID).setMaxWidth(40);
 
         // Renderers
         table.getColumnModel().getColumn(COL_STATUT).setCellRenderer(new StatutRenderer());
         table.getColumnModel().getColumn(COL_EXPIR).setCellRenderer(new ExpirationRenderer());
+        table.getColumnModel().getColumn(COL_ACTION).setCellRenderer(new ActionRenderer());
+
+        table.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) {
+                int row = table.rowAtPoint(e.getPoint());
+                int col = table.columnAtPoint(e.getPoint());
+                if (row >= 0 && col == COL_ACTION) {
+                    Object val = table.getValueAt(row, col);
+                    if ("ARCHIVER".equals(val)) {
+                        int id = (int) table.getValueAt(row, COL_ID);
+                        int confirm = JOptionPane.showConfirmDialog(GestionBons.this, 
+                            "Archiver cette demande ?", "Confirmation", JOptionPane.YES_NO_OPTION);
+                        if (confirm == JOptionPane.YES_OPTION) {
+                            try {
+                                VoucherDAO.updateVoucherStatus(id, "ARCHIVE", userId);
+                                chargerBons();
+                            } catch (SQLException ex) {
+                                JOptionPane.showMessageDialog(GestionBons.this, "Erreur : " + ex.getMessage());
+                            }
+                        }
+                    }
+                }
+            }
+        });
 
         DefaultTableCellRenderer rightR = new DefaultTableCellRenderer();
         rightR.setHorizontalAlignment(SwingConstants.RIGHT);
@@ -302,7 +350,7 @@ class GestionBons extends JPanel {
                         "       d.valeur_unitaire, d.statuts, " +
                         "       d.date_creation, d.validite_jours " +
                         "FROM demande d " +
-                        "LEFT JOIN client c ON d.client_id = c.client_id " +
+                        "LEFT JOIN client c ON d.clientid = c.clientid " +
                         "ORDER BY d.date_creation DESC";
 
         try (Connection conn = DBconnect.getConnection();
@@ -349,7 +397,8 @@ class GestionBons extends JPanel {
                         email   != null ? email  : "—",
                         String.format("Rs %,.0f", valeur),
                         statuts != null ? statuts : "—",
-                        expirTag + "|" + expirStr   // tag|texte pour renderer
+                        expirTag + "|" + expirStr,   // tag|texte pour renderer
+                        expirTag.equals("EXPIRE") && !"ARCHIVE".equals(statuts) ? "ARCHIVER" : ""
                 });
                 count++;
             }
@@ -378,7 +427,7 @@ class GestionBons extends JPanel {
         sorter.setRowFilter(filters.isEmpty() ? null : RowFilter.andFilter(filters));
 
         int visible = table.getRowCount();
-        lblTotal.setText(visible + " bon" + (visible > 1 ? "s" : "") + " affich\u00e9" + (visible > 1 ? "s" : ""));
+        lblTotal.setText(visible + " bon" + (visible > 1 ? "s" : "") + " affiche" + (visible > 1 ? "s" : ""));
     }
 
     // ── Renderer Statut ─────────────────────────────────────────────────────
@@ -472,38 +521,58 @@ class GestionBons extends JPanel {
         }
     }
 
+    private class ActionRenderer extends DefaultTableCellRenderer {
+        @Override public Component getTableCellRendererComponent(
+                JTable t, Object val, boolean sel, boolean foc, int row, int col) {
+            String s = val != null ? val.toString() : "";
+            if (s.isEmpty()) return new JLabel("");
+            
+            JPanel p = new JPanel(new GridBagLayout());
+            p.setOpaque(true);
+            p.setBackground(sel ? RED_LIGHT : (row % 2 == 0 ? BG_CARD : new Color(249, 250, 252)));
+            
+            JButton btn = new JButton(s) {
+                @Override protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setColor(new Color(150, 150, 150, 30));
+                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 8, 8);
+                    g2.dispose();
+                    super.paintComponent(g);
+                }
+            };
+            btn.setFont(FONT_BADGE);
+            btn.setForeground(TEXT_MUTED);
+            btn.setOpaque(false);
+            btn.setContentAreaFilled(false);
+            btn.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
+            p.add(btn);
+            return p;
+        }
+    }
+
     // ── Actions ─────────────────────────────────────────────────────────────
     private void ouvrirNouvelledemande() {
         Frame parent = (Frame) SwingUtilities.getWindowAncestor(this);
-        FormulaireCreationBon dlg = new FormulaireCreationBon((JFrame) parent, userId, "", role);
-        dlg.setVisible(true);
+
+        // Créer le panneau FormulaireCreationBon avec les paramètres attendus
+        FormulaireCreationBon panel = new FormulaireCreationBon(userId, role);
+
+        // Encapsuler dans un JDialog modal
+        JDialog dialog = new JDialog((JFrame) parent, "Nouvelle Demande de Bon", true);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        dialog.setSize(650, 550);
+        dialog.setLocationRelativeTo(parent);
+        dialog.add(panel);
+        dialog.setVisible(true);
+
+        // Actualiser la liste après fermeture de la boîte de dialogue
         chargerBons();
     }
 
     // ── Helpers UI ──────────────────────────────────────────────────────────
     private JButton buildRedButton(String text) {
-        JButton btn = new JButton(text) {
-            boolean h = false;
-            {
-                setFont(FONT_BTN); setForeground(Color.WHITE);
-                setOpaque(false); setContentAreaFilled(false);
-                setBorderPainted(false); setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(getPreferredSize().width + 28, 38));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { h=true;  repaint(); }
-                    public void mouseExited(MouseEvent e)  { h=false; repaint(); }
-                });
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(h ? RED_DARK : RED_PRIMARY);
-                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 8, 8));
-                g2.dispose(); super.paintComponent(g);
-            }
-        };
-        return btn;
+        return UIUtils.buildRedButton(text);
     }
 
     private JButton buildIconBtn(String symbol, String tooltip) {

@@ -2,6 +2,7 @@ package pkg.vms;
 
 import pkg.vms.DAO.DBconnect;
 import pkg.vms.DAO.VoucherDAO;
+import pkg.vms.UIUtils;
 
 import javax.swing.*;
 import javax.swing.border.*;
@@ -53,6 +54,7 @@ public class Dashboard extends JFrame {
 
     private final JButton[] navButtons = new JButton[7];
     private final String[]  navItems   = {"Accueil","Demandes","Clients","R\u00e9demption","Validation","Parametres"};
+    private final String[]  navIcons   = {"\u2302","\uD83D\uDCCB","\u25C8","\uD83D\uDCF1","\u2713","\u2699"};
 
     private static final int RESIZE_MARGIN = 8;
     private Point     dragStart;
@@ -178,10 +180,28 @@ public class Dashboard extends JFrame {
         navLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         nav.add(navLabel);
 
-        String[] icons = {"\u2302","\uD83D\uDCCB","\u25C8","\uD83D\uDCF1","\u2713","\u2699"};
+        boolean isAdmin        = "Administrateur".equalsIgnoreCase(role);
+        boolean isManager      = "Manager".equalsIgnoreCase(role);
+        boolean isComptable    = "Comptable".equalsIgnoreCase(role);
+        boolean isApprobateur  = "Approbateur".equalsIgnoreCase(role);
+        boolean isCollaborateur = "Collaborateur".equalsIgnoreCase(role);
+        boolean isSuperviseur  = "Superviseur_Magasin".equalsIgnoreCase(role);
+
         for (int i = 0; i < navItems.length; i++) {
-            JButton btn = buildNavButton(navItems[i], icons[i]);
-            final String page = navItems[i];
+            String page = navItems[i];
+            
+            // Restriction d'accès basée sur les rôles officiels BTS
+            if ("Validation".equals(page) && !(isAdmin || isManager || isComptable || isApprobateur)) {
+                continue;
+            }
+            if ("Parametres".equals(page) && !isAdmin) {
+                continue;
+            }
+            if ("Rédemption".equals(page) && !(isAdmin || isSuperviseur || isManager)) {
+                continue;
+            }
+
+            JButton btn = buildNavButton(page, navIcons[i]);
             btn.addActionListener(e -> switchPage(page));
             navButtons[i] = btn;
             nav.add(btn); nav.add(Box.createVerticalStrut(3));
@@ -438,10 +458,10 @@ public class Dashboard extends JFrame {
             case "Demandes"        -> contentPanel.add(new GestionDemande(role, userId),    BorderLayout.CENTER);
             case "Bons"            -> contentPanel.add(new GestionBons(role, userId),       BorderLayout.CENTER);
             case "R\u00e9demption" -> contentPanel.add(new RedemptionPanel(userId, username, role), BorderLayout.CENTER);
-            case "Param\u00e8tres" -> contentPanel.add(new ParametresPanel(role),           BorderLayout.CENTER);
-            case "Inscription"     -> contentPanel.add(new FormulaireUtilisateur(),         BorderLayout.CENTER);
+            case "Validation"      -> contentPanel.add(new ValidationPanel(role, userId),   BorderLayout.CENTER);
+            case "Statistiques"    -> contentPanel.add(new StatistiquesPanel(),              BorderLayout.CENTER);
+            case "Parametres"      -> contentPanel.add(new ParametresPanel(role, userId),           BorderLayout.CENTER);
             case "Nouvelle Demande" -> contentPanel.add(new FormulaireCreationBon(userId, username), BorderLayout.CENTER);
-            case "Formulaire Utilisateur" -> contentPanel.add(new FormulaireUtilisateur(), BorderLayout.CENTER);
             default -> {
                 JPanel ph = new JPanel(new GridBagLayout());
                 ph.setOpaque(false);
@@ -539,7 +559,7 @@ public class Dashboard extends JFrame {
         subh.setFont(FONT_CARD_DSC); subh.setForeground(TEXT_SECONDARY);
         textBlock.add(heading); textBlock.add(Box.createVerticalStrut(4)); textBlock.add(subh);
 
-        JButton cta = buildRedButton("+ Nouveau Bon d'Achat", 218, 42);
+        JButton cta = UIUtils.buildRedButton("+ Nouveau Bon d'Achat", 218, 42);
         cta.addActionListener(e -> ouvrirFormulaireCreationBon());
         JPanel ctaWrap = new JPanel(new GridBagLayout());
         ctaWrap.setOpaque(false); ctaWrap.add(cta);
@@ -668,9 +688,9 @@ public class Dashboard extends JFrame {
                 {"Gestion des Bons", "\uD83C\uDF81", RED_PRIMARY,             "\u00c9mettre, modifier, archiver",          "Bons"},
                 {"Demandes",         "\uD83D\uDCCB", ACCENT_BLUE,             "File de traitement en cours",               "Demandes"},
                 {"Clients",          "\uD83D\uDC64", SUCCESS,                 "Fiches, historiques & fid\u00e9lit\u00e9",   "Clients"},
-                {"Paiements",        "\uD83D\uDCB3", WARNING,                 "Suivi & rapprochement bancaire",             null},
+                {"Paiements",        "\uD83D\uDCB3", WARNING,                 "Suivi & rapprochement bancaire",             "Validation"},
                 {"Validation",       "\u2713",        new Color(20,170,190),  "Approbation des demandes",                   "Validation"},
-                {"Statistiques",     "\uD83D\uDCC8", new Color(150,80,210),   "Rapports & analyses",                        null},
+                {"Statistiques",     "\uD83D\uDCC8", new Color(150,80,210),   "Rapports & analyses",                        "Statistiques"},
         };
         for (Object[] m : mods)
             grid.add(buildModuleCard((String)m[0],(String)m[1],(Color)m[2],(String)m[3],(String)m[4]));
@@ -816,9 +836,9 @@ public class Dashboard extends JFrame {
 
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.CENTER,12,14));
         btns.setBackground(BG_ROOT);
-        JButton btnLogout = buildRedButton("D\u00e9connexion",140,38);
+        JButton btnLogout = UIUtils.buildRedButton("D\u00e9connexion",140,38);
         btnLogout.addActionListener(e -> { dlg.dispose(); confirmLogout(); });
-        JButton btnClose = buildOutlineButton("Fermer",140,38);
+        JButton btnClose = UIUtils.buildOutlineButton("Fermer",140,38);
         btnClose.addActionListener(e -> dlg.dispose());
         btns.add(btnLogout); btns.add(btnClose);
 
@@ -852,57 +872,6 @@ public class Dashboard extends JFrame {
     }
 
     // ── Buttons ──────────────────────────────────────────────────────────────
-    private JButton buildRedButton(String text, int w, int h) {
-        JButton btn = new JButton(text) {
-            boolean hov = false;
-            {
-                setFont(FONT_BTN_MAIN); setForeground(Color.WHITE);
-                setOpaque(false); setContentAreaFilled(false);
-                setBorderPainted(false); setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(w,h));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { hov=true; repaint(); }
-                    public void mouseExited(MouseEvent e)  { hov=false; repaint(); }
-                });
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(hov ? RED_DARK : RED_PRIMARY);
-                g2.fill(new RoundRectangle2D.Double(0,0,getWidth(),getHeight(),8,8));
-                g2.dispose(); super.paintComponent(g);
-            }
-        };
-        return btn;
-    }
-
-    private JButton buildOutlineButton(String text, int w, int h) {
-        JButton btn = new JButton(text) {
-            boolean hov = false;
-            {
-                setFont(FONT_BTN_MAIN); setForeground(TEXT_SECONDARY);
-                setOpaque(false); setContentAreaFilled(false);
-                setBorderPainted(false); setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(w,h));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { hov=true; setForeground(TEXT_PRIMARY); repaint(); }
-                    public void mouseExited(MouseEvent e)  { hov=false; setForeground(TEXT_SECONDARY); repaint(); }
-                });
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(hov ? new Color(0,0,0,8) : Color.WHITE);
-                g2.fill(new RoundRectangle2D.Double(0,0,getWidth(),getHeight(),8,8));
-                g2.setColor(BORDER_LIGHT); g2.setStroke(new BasicStroke(1f));
-                g2.draw(new RoundRectangle2D.Double(0,0,getWidth()-1,getHeight()-1,8,8));
-                g2.dispose(); super.paintComponent(g);
-            }
-        };
-        return btn;
-    }
 
     // ── Resize ────────────────────────────────────────────────────────────────
     private void installResizeHandler(JPanel root) {

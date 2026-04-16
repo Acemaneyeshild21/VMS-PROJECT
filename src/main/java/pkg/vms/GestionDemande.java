@@ -66,6 +66,7 @@ public class GestionDemande extends JPanel {
     private final String role;
     private final int    userId;
 
+    private JButton           btnNouveau;
     private DefaultTableModel tableModel;
     private JTable            table;
     private JTextField        txtSearch;
@@ -75,10 +76,17 @@ public class GestionDemande extends JPanel {
     public GestionDemande(String role, int userId) {
         this.role   = role;
         this.userId = userId;
+        boolean canCreate = "Administrateur".equalsIgnoreCase(role) || "Manager".equalsIgnoreCase(role) 
+                            || "Collaborateur".equalsIgnoreCase(role);
         setLayout(new BorderLayout());
         setOpaque(false);
         initComponents();
         chargerDemandes();
+        
+        // Cacher le bouton "Nouvelle Demande" si pas autorisé
+        if (!canCreate && btnNouveau != null) {
+            btnNouveau.setVisible(false);
+        }
     }
 
     private void initComponents() {
@@ -129,10 +137,10 @@ public class GestionDemande extends JPanel {
         sub.setAlignmentX(Component.LEFT_ALIGNMENT);
         left.add(titleRow); left.add(sub);
 
-        JButton btnNew = buildRedButton("+ Nouvelle Demande");
-        btnNew.addActionListener(e -> ouvrirNouvelledemande());
+        btnNouveau = UIUtils.buildRedButton("+ Nouvelle Demande");
+        btnNouveau.addActionListener(e -> ouvrirNouvelledemande());
         h.add(left,   BorderLayout.CENTER);
-        h.add(btnNew, BorderLayout.EAST);
+        h.add(btnNouveau, BorderLayout.EAST);
         return h;
     }
 
@@ -624,30 +632,30 @@ public class GestionDemande extends JPanel {
         p.setOpaque(false);
         p.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER_LIGHT));
 
-        JButton btnClose = buildOutlineButton("Fermer");
+        JButton btnClose = UIUtils.buildOutlineButton("Fermer");
         btnClose.addActionListener(e -> dlg.dispose());
         p.add(btnClose);
 
-        // Étape 1 : Valider paiement (Comptable / Admin)
+        // Étape 1 : Valider paiement (Comptable / Admin / Manager)
         if (ST_ATTENTE_PAIEMENT.equals(statut) &&
-                (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Comptable"))) {
-            JButton btn = buildRedButton("Valider Paiement");
+                (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Comptable") || role.equalsIgnoreCase("Manager"))) {
+            JButton btn = UIUtils.buildRedButton("Valider Paiement");
             btn.addActionListener(e -> { changerStatut(demandeId, ST_PAYE); dlg.dispose(); chargerDemandes(); });
             p.add(btn);
         }
 
-        // Étape 2 : Approuver (Approbateur / Admin)
+        // Étape 2 : Approuver (Approbateur / Admin / Manager)
         if (ST_PAYE.equals(statut) &&
-                (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Approbateur"))) {
-            JButton btn = buildRedButton("Approuver");
+                (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Approbateur") || role.equalsIgnoreCase("Manager"))) {
+            JButton btn = UIUtils.buildRedButton("Approuver");
             btn.addActionListener(e -> { changerStatut(demandeId, ST_APPROUVE); dlg.dispose(); chargerDemandes(); });
             p.add(btn);
         }
 
-        // Étape 3 : Générer les bons (Admin / Manager) — après approbation
+        // Étape 3 : Générer les bons (Admin / Manager / Approbateur) — après approbation
         if (ST_APPROUVE.equals(statut) &&
-                (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Manager"))) {
-            JButton btn = buildRedButton("\uD83C\uDF9F Générer les Bons");
+                (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Manager") || role.equalsIgnoreCase("Approbateur"))) {
+            JButton btn = UIUtils.buildRedButton("\uD83C\uDF9F Générer les Bons");
             btn.addActionListener(e -> {
                 int conf = JOptionPane.showConfirmDialog(dlg,
                         "Générer les bons PDF pour cette demande ?\nLes bons seront créés et envoyés par email.",
@@ -659,10 +667,10 @@ public class GestionDemande extends JPanel {
             p.add(btn);
         }
 
-        // Rejeter (Admin seulement, tant que pas généré/envoyé)
+        // Rejeter (Admin / Manager / Approbateur, tant que pas généré/envoyé)
         if (!ST_REJETE.equals(statut) && !ST_GENERE.equals(statut) && !ST_ENVOYE.equals(statut)
-                && role.equalsIgnoreCase("Administrateur")) {
-            JButton btn = buildOutlineButton("Rejeter");
+                && (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Manager") || role.equalsIgnoreCase("Approbateur"))) {
+            JButton btn = UIUtils.buildOutlineButton("Rejeter");
             btn.setForeground(RED_PRIMARY);
             btn.addActionListener(e -> {
                 int conf = JOptionPane.showConfirmDialog(dlg, "Confirmer le rejet ?",
@@ -685,41 +693,39 @@ public class GestionDemande extends JPanel {
         }
     }
 
-    // ── GÉNÉRER LES BONS (appel procédure stockée + PDF + email) ────────────
+    // ── GÉNÉRER LES BONS (appel procédure stockée + choix template + PDF + email) ──
     private void genererBonsDemande(int demandeId, JDialog dlg) {
         dlg.dispose();
-        SwingWorker<Integer, Void> worker = new SwingWorker<>() {
+
+        // 1. Créer les bons en BD via la procédure stockée
+        SwingWorker<java.util.List<BonDAO.BonInfo>, Void> worker = new SwingWorker<>() {
             @Override
-            protected Integer doInBackground() throws Exception {
-                // 1. Appeler la procédure stockée pour créer les bons en BD
-                int nbBons = BonDAO.genererBons(demandeId, userId);
-
-                // 2. Générer les PDFs avec QR codes
-                java.util.List<BonDAO.BonInfo> bons = BonDAO.getBonsByDemande(demandeId);
-                for (BonDAO.BonInfo bon : bons) {
-                    String pdfPath = VoucherPDFGenerator.genererPDF(bon);
-                    BonDAO.updatePdfPath(bon.bonId, pdfPath);
-                    bon.pdfPath = pdfPath;
-                }
-
-                // 3. Envoyer par email
-                EmailService.envoyerBonsParEmail(demandeId, bons);
-
-                return nbBons;
+            protected java.util.List<BonDAO.BonInfo> doInBackground() throws Exception {
+                BonDAO.genererBons(demandeId, userId);
+                return BonDAO.getBonsByDemande(demandeId);
             }
 
             @Override
             protected void done() {
                 try {
-                    int nb = get();
-                    JOptionPane.showMessageDialog(GestionDemande.this,
-                            nb + " bon(s) générés et envoyés avec succès !",
-                            "Génération terminée", JOptionPane.INFORMATION_MESSAGE);
+                    java.util.List<BonDAO.BonInfo> bons = get();
+                    if (bons.isEmpty()) {
+                        JOptionPane.showMessageDialog(GestionDemande.this,
+                                "Aucun bon genere.", "Info", JOptionPane.INFORMATION_MESSAGE);
+                        return;
+                    }
+
+                    // 2. Ouvrir le sélecteur de template (modal, sur l'EDT)
+                    Frame parentFrame = (Frame) SwingUtilities.getWindowAncestor(GestionDemande.this);
+                    VoucherTemplateChooser.afficherEtGenerer(parentFrame, demandeId, bons, userId);
+
+                    // 3. Rafraîchir la liste des demandes
                     chargerDemandes();
+
                 } catch (Exception ex) {
                     ex.printStackTrace();
                     JOptionPane.showMessageDialog(GestionDemande.this,
-                            "Erreur lors de la génération : " + ex.getMessage(),
+                            "Erreur lors de la generation : " + ex.getMessage(),
                             "Erreur", JOptionPane.ERROR_MESSAGE);
                 }
             }
@@ -763,55 +769,7 @@ public class GestionDemande extends JPanel {
         return row;
     }
 
-    private JButton buildRedButton(String text) {
-        JButton btn = new JButton(text) {
-            boolean h = false;
-            { setFont(FONT_BTN); setForeground(Color.WHITE);
-                setOpaque(false); setContentAreaFilled(false);
-                setBorderPainted(false); setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(getPreferredSize().width + 28, 38));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { h=true;  repaint(); }
-                    public void mouseExited(MouseEvent e)  { h=false; repaint(); }
-                });
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(h ? RED_DARK : RED_PRIMARY);
-                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 8, 8));
-                g2.dispose(); super.paintComponent(g);
-            }
-        };
-        return btn;
-    }
 
-    private JButton buildOutlineButton(String text) {
-        JButton btn = new JButton(text) {
-            boolean h = false;
-            { setFont(FONT_BTN); setForeground(TEXT_SECOND);
-                setOpaque(false); setContentAreaFilled(false);
-                setBorderPainted(false); setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(getPreferredSize().width + 24, 38));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { h=true;  repaint(); }
-                    public void mouseExited(MouseEvent e)  { h=false; repaint(); }
-                });
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(h ? new Color(245,246,250) : BG_CARD);
-                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 8, 8));
-                g2.setColor(BORDER_LIGHT); g2.setStroke(new BasicStroke(1f));
-                g2.draw(new RoundRectangle2D.Double(0.5, 0.5, getWidth()-1, getHeight()-1, 8, 8));
-                g2.dispose(); super.paintComponent(g);
-            }
-        };
-        return btn;
-    }
 
     private JButton buildIconButton(String symbol, String tooltip) {
         JButton btn = new JButton(symbol) {

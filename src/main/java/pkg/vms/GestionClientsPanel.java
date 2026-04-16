@@ -2,9 +2,11 @@ package pkg.vms;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.geom.RoundRectangle2D;
 import java.text.SimpleDateFormat;
 import java.util.List;
 
@@ -12,6 +14,29 @@ import java.util.List;
  * Panel de gestion complète des clients avec interface moderne
  */
 public class GestionClientsPanel extends JPanel {
+
+    // ── Palette (Centralisée via VMSStyle) ──────────────────────────────────
+    private static final Color BG_ROOT      = VMSStyle.BG_ROOT;
+    private static final Color BG_CARD      = VMSStyle.BG_CARD;
+    private static final Color RED_PRIMARY  = VMSStyle.RED_PRIMARY;
+    private static final Color RED_DARK     = VMSStyle.RED_DARK;
+    private static final Color RED_LIGHT    = VMSStyle.RED_LIGHT;
+    private static final Color BORDER_LIGHT = VMSStyle.BORDER_LIGHT;
+    private static final Color TEXT_PRIMARY = VMSStyle.TEXT_PRIMARY;
+    private static final Color TEXT_SECOND  = VMSStyle.TEXT_SECONDARY;
+    private static final Color TEXT_MUTED   = VMSStyle.TEXT_MUTED;
+    private static final Color SUCCESS      = VMSStyle.SUCCESS;
+    private static final Color WARNING      = VMSStyle.WARNING;
+
+    // ── Fonts (Centralisées via VMSStyle) ────────────────────────────────────
+    private static final Font FONT_TITLE     = VMSStyle.FONT_BRAND.deriveFont(24f);
+    private static final Font FONT_SUBTITLE  = new Font("Trebuchet MS", Font.PLAIN, 13);
+    private static final Font FONT_NAV       = VMSStyle.FONT_NAV;
+    private static final Font FONT_BTN       = new Font("Trebuchet MS", Font.BOLD, 12);
+    private static final Font FONT_TABLE     = VMSStyle.FONT_NAV;
+    private static final Font FONT_TABLE_HDR = VMSStyle.FONT_BADGE.deriveFont(12f);
+    private static final Font FONT_TABLE_CELL= new Font("Trebuchet MS", Font.PLAIN, 12);
+    private static final Font FONT_FILTER    = new Font("Trebuchet MS", Font.PLAIN, 12);
 
     private ClientManager clientManager;
     private JTable tableClients;
@@ -42,40 +67,68 @@ public class GestionClientsPanel extends JPanel {
         add(footerPanel, BorderLayout.SOUTH);
     }
 
-    // ==================== CRÉATION DU HEADER ====================
+    // ==================== CREATION DU HEADER ====================
     private JPanel createHeaderPanel() {
         JPanel panel = new JPanel(new BorderLayout(20, 0));
         panel.setOpaque(false);
-        panel.setBorder(BorderFactory.createEmptyBorder(30, 40, 20, 40));
+        panel.setBorder(BorderFactory.createEmptyBorder(28, 32, 20, 32));
 
-        // Titre à gauche
-        JPanel leftPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        // ── Titre a gauche avec accent bar rouge ──
+        JPanel leftPanel = new JPanel();
         leftPanel.setOpaque(false);
+        leftPanel.setLayout(new BoxLayout(leftPanel, BoxLayout.Y_AXIS));
 
-        JLabel titre = new JLabel("👥 Gestion des Clients");
-        titre.setFont(new Font("Arial", Font.BOLD, 32));
-        titre.setForeground(Color.WHITE);
-        leftPanel.add(titre);
+        JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0)) {
+            @Override protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                g.setColor(RED_PRIMARY);
+                g.fillRoundRect(0, 3, 4, getHeight() - 6, 4, 4);
+            }
+        };
+        titleRow.setOpaque(false);
+        titleRow.setBorder(BorderFactory.createEmptyBorder(0, 14, 0, 0));
+        JLabel titre = new JLabel("Gestion des Clients");
+        titre.setFont(FONT_TITLE);
+        titre.setForeground(TEXT_PRIMARY);
+        titleRow.add(titre);
+        titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        // Barre de recherche et boutons à droite
-        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 0));
+        JLabel subtitle = new JLabel("Gestion et suivi de la base de clients");
+        subtitle.setFont(FONT_SUBTITLE);
+        subtitle.setForeground(TEXT_SECOND);
+        subtitle.setBorder(BorderFactory.createEmptyBorder(5, 14, 0, 0));
+        subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        leftPanel.add(titleRow);
+        leftPanel.add(subtitle);
+
+        // ── Barre de recherche et boutons a droite ──
+        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         rightPanel.setOpaque(false);
 
-        // Champ de recherche
-        JPanel searchPanel = new JPanel(new BorderLayout(5, 0));
-        searchPanel.setOpaque(false);
-
-        txtRecherche = new JTextField(20);
-        txtRecherche.setFont(new Font("Arial", Font.PLAIN, 14));
+        // Champ de recherche (placeholder peint comme GestionDemande)
+        txtRecherche = new JTextField(18) {
+            @Override protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (getText().isEmpty()) {
+                    Graphics2D g2 = (Graphics2D) g;
+                    g2.setFont(FONT_FILTER);
+                    g2.setColor(TEXT_MUTED);
+                    Insets i = getInsets();
+                    g2.drawString("Rechercher un client...", i.left, getHeight() - i.bottom - 4);
+                }
+            }
+        };
+        txtRecherche.setFont(FONT_FILTER);
+        txtRecherche.setForeground(TEXT_PRIMARY);
+        txtRecherche.setBackground(BG_CARD);
+        txtRecherche.setCaretColor(RED_PRIMARY);
         txtRecherche.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(255, 255, 255, 100), 2, true),
-                BorderFactory.createEmptyBorder(8, 12, 8, 12)
-        ));
-        txtRecherche.setBackground(new Color(255, 255, 255, 30));
-        txtRecherche.setForeground(Color.WHITE);
-        txtRecherche.setCaretColor(Color.WHITE);
+                BorderFactory.createLineBorder(BORDER_LIGHT, 1),
+                BorderFactory.createEmptyBorder(7, 12, 7, 12)));
+        txtRecherche.setPreferredSize(new Dimension(220, 36));
 
-        // Recherche en temps réel
+        // Recherche en temps reel
         txtRecherche.addKeyListener(new KeyAdapter() {
             @Override
             public void keyReleased(KeyEvent e) {
@@ -83,28 +136,24 @@ public class GestionClientsPanel extends JPanel {
             }
         });
 
-        JLabel iconSearch = new JLabel("🔍");
-        iconSearch.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 18));
-
-        searchPanel.add(iconSearch, BorderLayout.WEST);
-        searchPanel.add(txtRecherche, BorderLayout.CENTER);
-
-        // Bouton Nouveau Client
-        JButton btnNouveau = createStyledButton("➕ Nouveau Client", new Color(46, 204, 113));
+        // Boutons
+        JButton btnNouveau = buildRedButton("+ Nouveau Client");
         btnNouveau.addActionListener(e -> ouvrirFormulaireNouveauClient());
 
-        // Bouton Rafraîchir
-        JButton btnRefresh = createStyledButton("🔄 Actualiser", new Color(52, 152, 219));
+        JButton btnRefresh = buildIconButton("\u21BB", "Actualiser");
         btnRefresh.addActionListener(e -> chargerClients());
 
-        // ✅ NOUVEAU : Bouton Supprimer
-        JButton btnSupprimer = createStyledButton("🗑️ Supprimer", new Color(231, 76, 60));
+        JButton btnSupprimer = buildRedButton("Supprimer");
         btnSupprimer.addActionListener(e -> supprimerClientSelectionne());
 
-        rightPanel.add(searchPanel);
+        JButton btnExport = buildIconButton("\uD83D\uDCE5", "Exporter en Excel");
+        btnExport.addActionListener(e -> exporterClientsExcel());
+
+        rightPanel.add(txtRecherche);
         rightPanel.add(btnNouveau);
         rightPanel.add(btnRefresh);
-        rightPanel.add(btnSupprimer);  // ✅ AJOUTÉ
+        rightPanel.add(btnSupprimer);
+        rightPanel.add(btnExport);
 
         panel.add(leftPanel, BorderLayout.WEST);
         panel.add(rightPanel, BorderLayout.EAST);
@@ -127,21 +176,33 @@ public class GestionClientsPanel extends JPanel {
             }
         };
 
-        tableClients = new JTable(tableModel);
-        tableClients.setFont(new Font("Arial", Font.PLAIN, 13));
-        tableClients.setRowHeight(35);
+        tableClients = new JTable(tableModel) {
+            @Override public Component prepareRenderer(javax.swing.table.TableCellRenderer r, int row, int col) {
+                Component c = super.prepareRenderer(r, row, col);
+                if (!isRowSelected(row))
+                    c.setBackground(row % 2 == 0 ? BG_CARD : new Color(249, 250, 252));
+                else c.setBackground(RED_LIGHT);
+                return c;
+            }
+        };
+        tableClients.setFont(FONT_TABLE_CELL);
+        tableClients.setRowHeight(44);
         tableClients.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        tableClients.setBackground(new Color(255, 255, 255, 250));
-        tableClients.setForeground(new Color(44, 62, 80));
-        tableClients.setGridColor(new Color(189, 195, 199));
-        tableClients.setSelectionBackground(new Color(52, 152, 219, 100));
-        tableClients.setSelectionForeground(new Color(44, 62, 80));
+        tableClients.setShowHorizontalLines(true);
+        tableClients.setShowVerticalLines(false);
+        tableClients.setGridColor(new Color(240, 242, 246));
+        tableClients.setSelectionBackground(RED_LIGHT);
+        tableClients.setSelectionForeground(TEXT_PRIMARY);
+        tableClients.setFocusable(false);
+        tableClients.getTableHeader().setReorderingAllowed(false);
 
-        // Style de l'en-tête
-        tableClients.getTableHeader().setFont(new Font("Arial", Font.BOLD, 14));
-        tableClients.getTableHeader().setBackground(new Color(52, 73, 94));
-        tableClients.getTableHeader().setForeground(Color.WHITE);
-        tableClients.getTableHeader().setPreferredSize(new Dimension(0, 40));
+        // Style de l'en-tete (matching GestionDemande)
+        JTableHeader header = tableClients.getTableHeader();
+        header.setFont(FONT_TABLE_HDR);
+        header.setBackground(new Color(248, 249, 252));
+        header.setForeground(TEXT_SECOND);
+        header.setPreferredSize(new Dimension(0, 42));
+        header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_LIGHT));
 
         // Ajuster la largeur des colonnes
         tableClients.getColumnModel().getColumn(0).setPreferredWidth(50);  // ID
@@ -167,9 +228,11 @@ public class GestionClientsPanel extends JPanel {
         });
 
         JScrollPane scrollPane = new JScrollPane(tableClients);
-        scrollPane.setBorder(BorderFactory.createLineBorder(new Color(255, 255, 255, 100), 2));
+        scrollPane.setBorder(null);
         scrollPane.setOpaque(false);
         scrollPane.getViewport().setOpaque(false);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        scrollPane.getViewport().setBackground(BG_CARD);
 
         panel.add(scrollPane, BorderLayout.CENTER);
 
@@ -202,39 +265,113 @@ public class GestionClientsPanel extends JPanel {
 
     // ==================== FOOTER ====================
     private JPanel createFooterPanel() {
-        JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 15));
+        JPanel panel = new JPanel(new BorderLayout());
         panel.setOpaque(false);
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER_LIGHT),
+                BorderFactory.createEmptyBorder(10, 32, 10, 32)));
 
         lblTotalClients = new JLabel("Total : 0 clients");
-        lblTotalClients.setFont(new Font("Arial", Font.BOLD, 14));
-        lblTotalClients.setForeground(new Color(189, 224, 254));
+        lblTotalClients.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        lblTotalClients.setForeground(TEXT_MUTED);
 
-        panel.add(lblTotalClients);
+        panel.add(lblTotalClients, BorderLayout.WEST);
 
         return panel;
     }
 
-    // ==================== BOUTON STYLISÉ ====================
-    private JButton createStyledButton(String text, Color bgColor) {
-        JButton btn = new JButton(text);
-        btn.setFont(new Font("Arial", Font.BOLD, 13));
-        btn.setForeground(Color.WHITE);
-        btn.setBackground(bgColor);
-        btn.setBorderPainted(false);
-        btn.setFocusPainted(false);
-        btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        btn.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
-
-        btn.addMouseListener(new MouseAdapter() {
-            public void mouseEntered(MouseEvent e) {
-                btn.setBackground(bgColor.darker());
+    // ==================== BOUTON ROUGE (style GestionDemande) ====================
+    private JButton buildRedButton(String text) {
+        JButton btn = new JButton(text) {
+            boolean h = false;
+            {
+                setFont(FONT_BTN); setForeground(Color.WHITE);
+                setOpaque(false); setContentAreaFilled(false);
+                setBorderPainted(false); setFocusPainted(false);
+                setCursor(new Cursor(Cursor.HAND_CURSOR));
+                setPreferredSize(new Dimension(getPreferredSize().width + 28, 38));
+                addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) { h = true;  repaint(); }
+                    public void mouseExited(MouseEvent e)  { h = false; repaint(); }
+                });
             }
-            public void mouseExited(MouseEvent e) {
-                btn.setBackground(bgColor);
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(h ? RED_DARK : RED_PRIMARY);
+                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 8, 8));
+                g2.dispose(); super.paintComponent(g);
             }
-        });
-
+        };
         return btn;
+    }
+
+    // ==================== BOUTON ICONE (style GestionDemande) ====================
+    private JButton buildIconButton(String symbol, String tooltip) {
+        JButton btn = new JButton(symbol) {
+            boolean h = false;
+            {
+                setFont(new Font("Trebuchet MS", Font.BOLD, 16)); setForeground(TEXT_SECOND);
+                setOpaque(false); setContentAreaFilled(false);
+                setBorderPainted(false); setFocusPainted(false);
+                setToolTipText(tooltip); setCursor(new Cursor(Cursor.HAND_CURSOR));
+                setPreferredSize(new Dimension(36, 36));
+                addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) { h = true;  repaint(); }
+                    public void mouseExited(MouseEvent e)  { h = false; repaint(); }
+                });
+            }
+            @Override protected void paintComponent(Graphics g) {
+                if (h) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setColor(new Color(0, 0, 0, 8));
+                    g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 8, 8));
+                    g2.dispose();
+                }
+                super.paintComponent(g);
+            }
+        };
+        return btn;
+    }
+
+    // ==================== EXPORTER CLIENTS EN EXCEL ====================
+    private void exporterClientsExcel() {
+        JFileChooser fc = new JFileChooser();
+        fc.setDialogTitle("Exporter les clients en Excel");
+        fc.setSelectedFile(new java.io.File("clients_vms.xlsx"));
+        fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Fichiers Excel (*.xlsx)", "xlsx"));
+
+        if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            String path = fc.getSelectedFile().getAbsolutePath();
+            if (!path.endsWith(".xlsx")) path += ".xlsx";
+            final String filePath = path;
+
+            SwingWorker<Void, Void> worker = new SwingWorker<>() {
+                @Override
+                protected Void doInBackground() throws Exception {
+                    String[] columns = {"ID", "Nom", "Email", "Téléphone", "Société", "Création", "Actif"};
+                    java.util.List<java.util.Map<String, Object>> data = pkg.vms.DAO.ClientDAO.getClientsForExport();
+                    ExcelExportService.exportData(filePath, "Clients", columns, data);
+                    return null;
+                }
+
+                @Override
+                protected void done() {
+                    try {
+                        get();
+                        JOptionPane.showMessageDialog(GestionClientsPanel.this,
+                                "Export réussi : " + filePath,
+                                "Export Excel", JOptionPane.INFORMATION_MESSAGE);
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(GestionClientsPanel.this,
+                                "Erreur lors de l'export : " + ex.getMessage(),
+                                "Erreur", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            };
+            worker.execute();
+        }
     }
 
     // ==================== CHARGER LES CLIENTS ====================

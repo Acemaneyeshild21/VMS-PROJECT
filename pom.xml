@@ -34,6 +34,7 @@
             <artifactId>postgresql</artifactId>
             <version>42.7.3</version>
         </dependency>
+
         <!-- ZXing : Génération QR Code & Code-barres -->
         <dependency>
             <groupId>com.google.zxing</groupId>
@@ -71,6 +72,50 @@
             <artifactId>junit-jupiter-engine</artifactId>
             <version>${junit.version}</version>
             <scope>test</scope>
+        </dependency>
+
+        <!-- HikariCP : Pool de connexions JDBC -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>5.1.0</version>
+        </dependency>
+
+        <!-- jBCrypt : Hachage sécurisé des mots de passe -->
+        <dependency>
+            <groupId>org.mindrot</groupId>
+            <artifactId>jbcrypt</artifactId>
+            <version>0.4</version>
+        </dependency>
+
+        <!--
+            Apache POI : Export Excel
+            IMPORTANT : Les deux modules sont obligatoires ensemble.
+            - poi       = le cœur commun qui définit les interfaces (Workbook, Sheet, Cell, Font...)
+            - poi-ooxml = l'implémentation concrète du format .xlsx (XSSFWorkbook, XSSFSheet...)
+            Sans poi, poi-ooxml ne peut pas compiler. Sans poi-ooxml, on ne peut pas créer de .xlsx.
+        -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+
+        <!-- SLF4J (requis par HikariCP) -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.12</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.12</version>
         </dependency>
     </dependencies>
 

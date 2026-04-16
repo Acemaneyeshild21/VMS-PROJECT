@@ -93,6 +93,12 @@ public class BonDAO {
         String sql = "SELECT * FROM sp_redimer_bon(?, ?, ?)";
         try (Connection conn = DBconnect.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
+            
+            // Timeout de verrouillage pour éviter les blocages infinis en cas de haute concurrence
+            try (Statement st = conn.createStatement()) {
+                st.execute("SET lock_timeout = '5s'");
+            }
+
             ps.setString(1, codeUnique);
             ps.setInt(2, magasinId);
             ps.setInt(3, utilisateurId);
@@ -102,9 +108,19 @@ public class BonDAO {
                     r.succes = rs.getBoolean("succes");
                     r.message = rs.getString("message");
                     r.valeur = rs.getDouble("bon_valeur");
+                    
+                    if (r.succes) {
+                        AuditDAO.logSimple("bon", -1, "UTILISATION_BON", utilisateurId, "Code: " + codeUnique + ", Magasin: " + magasinId);
+                    }
                     return r;
                 }
             }
+        } catch (SQLException e) {
+            // Code 55P03 = lock_not_available en PostgreSQL
+            if ("55P03".equals(e.getSQLState())) {
+                return new RedemptionResult(false, "Le bon est en cours de traitement ailleurs. Réessayez.", 0);
+            }
+            throw e;
         }
         return new RedemptionResult(false, "Erreur interne", 0);
     }
@@ -157,6 +173,62 @@ public class BonDAO {
             }
         }
         return 0;
+    }
+
+    /**
+     * Récupère toutes les demandes pour l'export Excel.
+     */
+    public static java.util.List<java.util.Map<String, Object>> getDemandesForExport() throws SQLException {
+        java.util.List<java.util.Map<String, Object>> list = new java.util.ArrayList<>();
+        String sql = "SELECT d.demande_id, d.reference, d.invoice_reference, c.name AS client, " +
+                     "d.montant_total, d.nombre_bons, d.statuts, d.date_creation " +
+                     "FROM demande d LEFT JOIN client c ON d.clientid = c.clientid " +
+                     "ORDER BY d.date_creation DESC";
+        try (Connection conn = DBconnect.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                java.util.Map<String, Object> row = new java.util.HashMap<>();
+                row.put("ID", rs.getInt("demande_id"));
+                row.put("Référence", rs.getString("reference"));
+                row.put("Facture", rs.getString("invoice_reference"));
+                row.put("Client", rs.getString("client"));
+                row.put("Montant", rs.getDouble("montant_total"));
+                row.put("Nb Bons", rs.getInt("nombre_bons"));
+                row.put("Statut", rs.getString("statuts"));
+                row.put("Date", rs.getString("date_creation"));
+                list.add(row);
+            }
+        }
+        return list;
+    }
+
+    /**
+     * Récupère tous les bons pour l'export Excel.
+     */
+    public static java.util.List<java.util.Map<String, Object>> getBonsForExport() throws SQLException {
+        java.util.List<java.util.Map<String, Object>> list = new java.util.ArrayList<>();
+        String sql = "SELECT b.bon_id, b.code_unique, b.valeur, b.statut, b.date_emission, " +
+                     "d.reference, c.name AS client " +
+                     "FROM bon b JOIN demande d ON b.demande_id = d.demande_id " +
+                     "LEFT JOIN client c ON d.clientid = c.clientid " +
+                     "ORDER BY b.bon_id DESC";
+        try (Connection conn = DBconnect.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                java.util.Map<String, Object> row = new java.util.HashMap<>();
+                row.put("ID", rs.getInt("bon_id"));
+                row.put("Code Unique", rs.getString("code_unique"));
+                row.put("Valeur", rs.getDouble("valeur"));
+                row.put("Statut", rs.getString("statut"));
+                row.put("Émission", rs.getString("date_emission"));
+                row.put("Réf Demande", rs.getString("reference"));
+                row.put("Client", rs.getString("client"));
+                list.add(row);
+            }
+        }
+        return list;
     }
 
     public static class RedemptionResult {
