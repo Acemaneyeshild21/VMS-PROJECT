@@ -1073,33 +1073,59 @@ class ParametresPanel extends JPanel {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 0));
         btnPanel.setOpaque(false);
 
-        // ── Bouton Test ──
+        // ── Bouton Test — envoie un vrai email de test ──
         JButton btnTest = UIUtils.buildRedButton("🧪 Tester", 120, 38);
         btnTest.addActionListener(e -> {
+            int port;
             try {
-                SettingsDAO.EmailSettings settings = new SettingsDAO.EmailSettings(
-                        serverF.getText(),
-                        Integer.parseInt(portF.getText()),
-                        userF.getText(),
-                        new String(passF.getPassword()),
-                        tlsC.isSelected(),
-                        fromEmailF.getText(),
-                        fromNameF.getText(),
-                        adminEmailF.getText()
-                );
-
-                if (SettingsDAO.testSmtpConnection(settings)) {
-                    JOptionPane.showMessageDialog(dlg,
-                            "✅ Connexion SMTP réussie!\n\nLes paramètres sont correctement configurés.",
-                            "Test Réussi", JOptionPane.INFORMATION_MESSAGE);
-                } else {
-                    JOptionPane.showMessageDialog(dlg,
-                            "❌ Erreur de connexion SMTP.\n\nVérifiez vos identifiants et paramètres.",
-                            "Erreur", JOptionPane.ERROR_MESSAGE);
-                }
+                port = Integer.parseInt(portF.getText().trim());
             } catch (NumberFormatException ex) {
                 JOptionPane.showMessageDialog(dlg, "❌ Le port doit être un nombre", "Erreur", JOptionPane.ERROR_MESSAGE);
+                return;
             }
+            SettingsDAO.EmailSettings settings = new SettingsDAO.EmailSettings(
+                    serverF.getText().trim(),
+                    port,
+                    userF.getText().trim(),
+                    new String(passF.getPassword()),
+                    tlsC.isSelected(),
+                    fromEmailF.getText().trim(),
+                    fromNameF.getText().trim(),
+                    adminEmailF.getText().trim()
+            );
+            String dest = userF.getText().trim();
+
+            btnTest.setEnabled(false);
+            btnTest.setText("Envoi...");
+
+            new SwingWorker<String, Void>() {
+                @Override
+                protected String doInBackground() {
+                    return EmailService.envoyerEmailTest(settings, dest);
+                }
+                @Override
+                protected void done() {
+                    btnTest.setEnabled(true);
+                    btnTest.setText("🧪 Tester");
+                    try {
+                        String erreur = get();
+                        if (erreur == null) {
+                            JOptionPane.showMessageDialog(dlg,
+                                    "✅ Email de test envoyé avec succès à :\n" + dest
+                                    + "\n\nVérifiez votre boîte de réception.",
+                                    "Test Réussi", JOptionPane.INFORMATION_MESSAGE);
+                        } else {
+                            JOptionPane.showMessageDialog(dlg,
+                                    "❌ Échec de l'envoi :\n\n" + erreur,
+                                    "Erreur SMTP", JOptionPane.ERROR_MESSAGE);
+                        }
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(dlg,
+                                "❌ Erreur inattendue : " + ex.getMessage(),
+                                "Erreur", JOptionPane.ERROR_MESSAGE);
+                    }
+                }
+            }.execute();
         });
 
         // ── Bouton Enregistrer ──
