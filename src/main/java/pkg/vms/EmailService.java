@@ -198,5 +198,6 @@ public class EmailService {
     }
 
     public static void sendEmail(String clientEmail, String s, String corps) {
+        envoyerNotification(clientEmail, s, corps);
     }
 }
