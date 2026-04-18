@@ -142,6 +142,29 @@ public class Dashboard extends JFrame {
                 if (!"Accueil".equals(activePage)) switchPage("Accueil");
             }
         });
+
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_K, InputEvent.CTRL_DOWN_MASK), "commandPalette");
+        am.put("commandPalette", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) { openCommandPalette(); }
+        });
+    }
+
+    private void openCommandPalette() {
+        java.util.List<CommandPalette.Command> cmds = CommandPalette.buildDefaultCommands(
+                role,
+                this::switchPage,
+                () -> {
+                    chargerStatsAsync();
+                    ToastManager.info(Dashboard.this, "Tableau de bord rafra\u00eechi");
+                },
+                this::deconnexion
+        );
+        CommandPalette.show(this, cmds);
+    }
+
+    private void deconnexion() {
+        dispose();
+        SwingUtilities.invokeLater(() -> new LoginForm().setVisible(true));
     }
 
     private static JLabel getJLabel(String username) {
@@ -476,31 +499,37 @@ public class Dashboard extends JFrame {
             }
         };
         box.setOpaque(false);
-        box.setPreferredSize(new Dimension(210,34));
-        box.setBorder(BorderFactory.createEmptyBorder(0,12,0,12));
+        box.setPreferredSize(new Dimension(230,34));
+        box.setBorder(BorderFactory.createEmptyBorder(0,12,0,8));
+        box.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        box.setToolTipText("Ouvrir la palette de commandes (Ctrl+K)");
+
         JLabel ico = new JLabel("\uD83D\uDD0D");
         ico.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 12));
-        JTextField field = getJTextField();
-        box.add(ico, BorderLayout.WEST); box.add(field, BorderLayout.CENTER);
-        return box;
-    }
 
-    private static JTextField getJTextField() {
-        JTextField field = new JTextField("Rechercher...");
-        field.setOpaque(false);
-        field.setBorder(null);
-        field.setFont(FONT_CARD_DSC);
-        field.setForeground(TEXT_MUTED);
-        field.setCaretColor(RED_PRIMARY);
-        field.addFocusListener(new FocusAdapter() {
-            public void focusGained(FocusEvent e) {
-                if (field.getText().equals("Rechercher...")) { field.setText(""); field.setForeground(TEXT_PRIMARY); }
-            }
-            public void focusLost(FocusEvent e) {
-                if (field.getText().isEmpty()) { field.setText("Rechercher..."); field.setForeground(TEXT_MUTED); }
-            }
-        });
-        return field;
+        JLabel hint = new JLabel("Rechercher\u2026");
+        hint.setFont(FONT_CARD_DSC);
+        hint.setForeground(TEXT_MUTED);
+
+        JLabel kbd = new JLabel("Ctrl K");
+        kbd.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        kbd.setForeground(TEXT_MUTED);
+        kbd.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER_LIGHT, 1, true),
+                BorderFactory.createEmptyBorder(2, 6, 2, 6)));
+
+        box.add(ico, BorderLayout.WEST);
+        box.add(hint, BorderLayout.CENTER);
+        box.add(kbd, BorderLayout.EAST);
+
+        MouseAdapter ma = new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) { openCommandPalette(); }
+        };
+        box.addMouseListener(ma);
+        ico.addMouseListener(ma);
+        hint.addMouseListener(ma);
+        kbd.addMouseListener(ma);
+        return box;
     }
 
     private JButton buildIconButton(String icon) {

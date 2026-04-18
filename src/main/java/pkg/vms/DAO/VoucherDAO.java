@@ -371,6 +371,162 @@ public class VoucherDAO {
         return out;
     }
 
+    // ── Fiche Client 360° ────────────────────────────────────────────────────
+    public static class ClientStats {
+        public int    totalDemandes;
+        public int    demandesActives;
+        public double montantTotal;
+        public int    bonsTotaux;
+        public int    bonsActifs;
+        public int    bonsUtilises;
+        public int    bonsExpires;
+        public Timestamp derniereActivite;
+    }
+
+    public static ClientStats getClientStats(int clientId) throws SQLException {
+        ClientStats s = new ClientStats();
+        String sqlD = "SELECT COUNT(*) AS total, " +
+                      "  COUNT(*) FILTER (WHERE statuts NOT IN ('REJETE','ANNULE','ARCHIVE')) AS actives, " +
+                      "  COALESCE(SUM(montant_total),0) AS montant, " +
+                      "  MAX(date_modification) AS derniere " +
+                      "FROM demande WHERE clientid = ?";
+        String sqlB = "SELECT COUNT(*) AS total, " +
+                      "  COUNT(*) FILTER (WHERE b.statut = 'ACTIF') AS actifs, " +
+                      "  COUNT(*) FILTER (WHERE b.statut = 'REDIME') AS utilises, " +
+                      "  COUNT(*) FILTER (WHERE b.statut = 'EXPIRE') AS expires " +
+                      "FROM bon b JOIN demande d ON b.demande_id = d.demande_id " +
+                      "WHERE d.clientid = ?";
+        try (Connection conn = DBconnect.getConnection()) {
+            try (PreparedStatement ps = conn.prepareStatement(sqlD)) {
+                ps.setInt(1, clientId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        s.totalDemandes   = rs.getInt("total");
+                        s.demandesActives = rs.getInt("actives");
+                        s.montantTotal    = rs.getDouble("montant");
+                        s.derniereActivite= rs.getTimestamp("derniere");
+                    }
+                }
+            }
+            try (PreparedStatement ps = conn.prepareStatement(sqlB)) {
+                ps.setInt(1, clientId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        s.bonsTotaux  = rs.getInt("total");
+                        s.bonsActifs  = rs.getInt("actifs");
+                        s.bonsUtilises= rs.getInt("utilises");
+                        s.bonsExpires = rs.getInt("expires");
+                    }
+                }
+            }
+        }
+        return s;
+    }
+
+    public static class DemandeRow {
+        public int    demandeId;
+        public String reference;
+        public String invoiceReference;
+        public int    nombreBons;
+        public double montant;
+        public String statut;
+        public Timestamp dateCreation;
+    }
+
+    public static List<DemandeRow> getDemandesByClient(int clientId) throws SQLException {
+        List<DemandeRow> out = new ArrayList<>();
+        String sql = "SELECT demande_id, reference, invoice_reference, nombre_bons, montant_total, statuts, date_creation " +
+                     "FROM demande WHERE clientid = ? ORDER BY date_creation DESC";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, clientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    DemandeRow r = new DemandeRow();
+                    r.demandeId        = rs.getInt("demande_id");
+                    r.reference        = rs.getString("reference");
+                    r.invoiceReference = rs.getString("invoice_reference");
+                    r.nombreBons       = rs.getInt("nombre_bons");
+                    r.montant          = rs.getDouble("montant_total");
+                    r.statut           = rs.getString("statuts");
+                    r.dateCreation     = rs.getTimestamp("date_creation");
+                    out.add(r);
+                }
+            }
+        }
+        return out;
+    }
+
+    public static class BonRow {
+        public int    bonId;
+        public String code;
+        public double valeur;
+        public String statut;
+        public Timestamp dateEmission;
+        public Timestamp dateExpiration;
+        public String demandeRef;
+    }
+
+    public static List<BonRow> getBonsByClient(int clientId) throws SQLException {
+        List<BonRow> out = new ArrayList<>();
+        String sql = "SELECT b.bon_id, b.code_unique, b.valeur, b.statut, b.date_emission, b.date_expiration, d.invoice_reference " +
+                     "FROM bon b JOIN demande d ON b.demande_id = d.demande_id " +
+                     "WHERE d.clientid = ? ORDER BY b.date_emission DESC";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, clientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    BonRow r = new BonRow();
+                    r.bonId          = rs.getInt("bon_id");
+                    r.code           = rs.getString("code_unique");
+                    r.valeur         = rs.getDouble("valeur");
+                    r.statut         = rs.getString("statut");
+                    r.dateEmission   = rs.getTimestamp("date_emission");
+                    r.dateExpiration = rs.getTimestamp("date_expiration");
+                    r.demandeRef     = rs.getString("invoice_reference");
+                    out.add(r);
+                }
+            }
+        }
+        return out;
+    }
+
+    public static class TimelineEvent {
+        public String action;
+        public String contexte;
+        public String username;
+        public Timestamp dateEvt;
+    }
+
+    /** Événements audit concernant les demandes de ce client (+ bons liés). */
+    public static List<TimelineEvent> getTimelineByClient(int clientId, int limit) throws SQLException {
+        List<TimelineEvent> out = new ArrayList<>();
+        String sql = "SELECT a.action, a.contexte, a.username, a.date_action " +
+                     "FROM audit_log a " +
+                     "WHERE (a.table_name = 'demande' AND a.record_id IN (SELECT demande_id FROM demande WHERE clientid = ?)) " +
+                     "   OR (a.table_name = 'bon' AND a.record_id IN " +
+                     "       (SELECT b.bon_id FROM bon b JOIN demande d ON b.demande_id = d.demande_id WHERE d.clientid = ?)) " +
+                     "ORDER BY a.date_action DESC LIMIT ?";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, clientId);
+            ps.setInt(2, clientId);
+            ps.setInt(3, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    TimelineEvent e = new TimelineEvent();
+                    e.action   = rs.getString("action");
+                    e.contexte = rs.getString("contexte");
+                    e.username = rs.getString("username");
+                    e.dateEvt  = rs.getTimestamp("date_action");
+                    out.add(e);
+                }
+            }
+        }
+        return out;
+    }
+
     /** Nombre de demandes en attente d'une action selon le rôle. */
     public static int getTachesParRole(String role) throws SQLException {
         String statut = switch (role != null ? role.toLowerCase() : "") {

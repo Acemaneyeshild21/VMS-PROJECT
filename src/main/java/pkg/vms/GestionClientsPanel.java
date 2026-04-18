@@ -139,7 +139,7 @@ public class GestionClientsPanel extends JPanel {
         tableClients.setComponentPopupMenu(createPopupMenu());
         tableClients.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) modifierClientSelectionne();
+                if (e.getClickCount() == 2) ouvrirFiche360();
             }
         });
 
@@ -194,16 +194,37 @@ public class GestionClientsPanel extends JPanel {
         itemSupprimer.setFont(new Font("Arial", Font.PLAIN, 13));
         itemSupprimer.addActionListener(e -> supprimerClientSelectionne());
 
-        JMenuItem itemDetails = new JMenuItem("ℹ️ Détails");
+        JMenuItem itemFiche = new JMenuItem("📇 Fiche 360°");
+        itemFiche.setFont(new Font("Arial", Font.PLAIN, 13));
+        itemFiche.addActionListener(e -> ouvrirFiche360());
+
+        JMenuItem itemDetails = new JMenuItem("ℹ️ Détails (rapide)");
         itemDetails.setFont(new Font("Arial", Font.PLAIN, 13));
         itemDetails.addActionListener(e -> afficherDetailsClient());
 
+        menu.add(itemFiche);
         menu.add(itemModifier);
         menu.add(itemSupprimer);
         menu.addSeparator();
         menu.add(itemDetails);
 
         return menu;
+    }
+
+    private void ouvrirFiche360() {
+        int selectedRow = tableClients.getSelectedRow();
+        if (selectedRow == -1) {
+            ToastManager.warning(this, "Veuillez sélectionner un client");
+            return;
+        }
+        int modelRow = tableClients.convertRowIndexToModel(selectedRow);
+        int clientId = (int) tableModel.getValueAt(modelRow, 0);
+        Client client = clientManager.obtenirClientParId(clientId);
+        if (client != null) {
+            FicheClient360.show(this, client);
+        } else {
+            ToastManager.error(this, "Client introuvable");
+        }
     }
 
     // ==================== FOOTER ====================
