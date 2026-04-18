@@ -309,7 +309,8 @@ public class CommandPalette extends JDialog {
     public static List<Command> buildDefaultCommands(String role,
                                                      Consumer<String> onNavigate,
                                                      Runnable onRefresh,
-                                                     Runnable onLogout) {
+                                                     Runnable onLogout,
+                                                     Runnable onAuditLog) {
         boolean isAdmin        = "Administrateur".equalsIgnoreCase(role);
         boolean isManager      = "Manager".equalsIgnoreCase(role);
         boolean isComptable    = "Comptable".equalsIgnoreCase(role);
@@ -365,6 +366,13 @@ public class CommandPalette extends JDialog {
                     "Cr\u00e9er une demande de voucher", "\u2795",
                     "new nouvelle demande creer create",
                     "Ctrl+N", () -> onNavigate.accept("Nouvelle Demande")));
+        }
+
+        if (isAdmin && onAuditLog != null) {
+            cmds.add(new Command("admin.audit", "Journal d'audit",
+                    "Consulter tous les \u00e9v\u00e9nements syst\u00e8me", "\uD83D\uDD10",
+                    "audit journal log tracabilite admin",
+                    null, onAuditLog));
         }
 
         cmds.add(new Command("action.refresh", "Rafra\u00eechir",

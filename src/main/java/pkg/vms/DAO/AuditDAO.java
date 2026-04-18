@@ -68,4 +68,65 @@ public class AuditDAO {
                                  int utilisateurId, String contexte) {
         log(tableName, recordId, action, null, null, utilisateurId, null, contexte);
     }
+
+    // ── Recherche avanc\u00e9e pour journal d'audit ──────────────────────────
+    public static List<Event> search(String action, String username, String tableName,
+                                     Timestamp dateDebut, Timestamp dateFin, int limit) {
+        List<Event> out = new ArrayList<>();
+        StringBuilder sql = new StringBuilder(
+                "SELECT audit_id, table_name, record_id, action, username, contexte, date_action " +
+                "FROM audit_log WHERE 1=1 ");
+        List<Object> params = new ArrayList<>();
+        if (action != null && !action.isEmpty()) {
+            sql.append("AND action = ? "); params.add(action);
+        }
+        if (username != null && !username.isEmpty()) {
+            sql.append("AND LOWER(COALESCE(username,'')) LIKE ? ");
+            params.add("%" + username.toLowerCase() + "%");
+        }
+        if (tableName != null && !tableName.isEmpty()) {
+            sql.append("AND table_name = ? "); params.add(tableName);
+        }
+        if (dateDebut != null) { sql.append("AND date_action >= ? "); params.add(dateDebut); }
+        if (dateFin != null)   { sql.append("AND date_action <= ? "); params.add(dateFin); }
+        sql.append("ORDER BY date_action DESC LIMIT ?");
+        params.add(limit);
+
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Event e = new Event();
+                    e.id = rs.getInt("audit_id");
+                    e.tableName = rs.getString("table_name");
+                    e.recordId = rs.getInt("record_id");
+                    e.action = rs.getString("action");
+                    e.username = rs.getString("username");
+                    e.contexte = rs.getString("contexte");
+                    e.dateEvt = rs.getTimestamp("date_action");
+                    out.add(e);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Erreur audit search : " + e.getMessage());
+        }
+        return out;
+    }
+
+    /** Liste distincte des actions trouv\u00e9es (pour filtres). */
+    public static List<String> getDistinctActions() {
+        List<String> out = new ArrayList<>();
+        String sql = "SELECT DISTINCT action FROM audit_log ORDER BY action";
+        try (Connection conn = DBconnect.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) out.add(rs.getString(1));
+        } catch (SQLException e) {
+            System.err.println("Erreur getDistinctActions : " + e.getMessage());
+        }
+        return out;
+    }
 }

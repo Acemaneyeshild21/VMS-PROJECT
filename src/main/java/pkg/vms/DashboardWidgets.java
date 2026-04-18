@@ -131,8 +131,20 @@ public final class DashboardWidgets {
     // ════════════════════════════════════════════════════════════════════════
     public static JPanel buildTimelineWidget() {
         JPanel card = PageLayout.buildCard(new BorderLayout(0, 12), 18);
+        JPanel head = new JPanel(new BorderLayout());
+        head.setOpaque(false);
         JLabel title = widgetTitle("\uD83D\uDD52  Activit\u00e9 r\u00e9cente");
-        card.add(title, BorderLayout.NORTH);
+        head.add(title, BorderLayout.WEST);
+        JButton seeAll = new JButton("Voir tout \u2192");
+        seeAll.setFont(new Font("Segoe UI", Font.BOLD, 11));
+        seeAll.setForeground(VMSStyle.ACCENT_BLUE);
+        seeAll.setBorderPainted(false);
+        seeAll.setContentAreaFilled(false);
+        seeAll.setFocusPainted(false);
+        seeAll.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+        seeAll.addActionListener(e -> AuditLogDialog.show(card));
+        head.add(seeAll, BorderLayout.EAST);
+        card.add(head, BorderLayout.NORTH);
 
         JPanel body = new JPanel();
         body.setOpaque(false);

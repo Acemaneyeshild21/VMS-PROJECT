@@ -157,7 +157,8 @@ public class Dashboard extends JFrame {
                     chargerStatsAsync();
                     ToastManager.info(Dashboard.this, "Tableau de bord rafra\u00eechi");
                 },
-                this::deconnexion
+                this::deconnexion,
+                () -> AuditLogDialog.show(Dashboard.this)
         );
         CommandPalette.show(this, cmds);
     }
