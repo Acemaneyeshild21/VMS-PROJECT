@@ -1,15 +1,12 @@
 package pkg.vms;
 
-import pkg.vms.DAO.DBconnect;
 import pkg.vms.DAO.VoucherDAO;
-import pkg.vms.UIUtils;
 
 import javax.swing.*;
-import javax.swing.border.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.awt.geom.*;
-import java.sql.*;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.RoundRectangle2D;
 
 public class Dashboard extends JFrame {
 
@@ -102,6 +99,16 @@ public class Dashboard extends JFrame {
         contentPanel.setBorder(BorderFactory.createEmptyBorder(28, 36, 28, 36));
         mainArea.add(contentPanel, BorderLayout.CENTER);
 
+        JLabel footer = getJLabel(username);
+        mainArea.add(footer, BorderLayout.SOUTH);
+
+        root.add(mainArea, BorderLayout.CENTER);
+        add(root);
+        installResizeHandler(root);
+        switchPage("Accueil");
+    }
+
+    private static JLabel getJLabel(String username) {
         JLabel footer = new JLabel(
                 "\u00a9 2026 Voucher System \u2014 Tous droits r\u00e9serv\u00e9s  |  Connect\u00e9 : " + username,
                 SwingConstants.CENTER);
@@ -112,28 +119,12 @@ public class Dashboard extends JFrame {
                 BorderFactory.createEmptyBorder(8,0,10,0)));
         footer.setOpaque(true);
         footer.setBackground(BG_TOPBAR);
-        mainArea.add(footer, BorderLayout.SOUTH);
-
-        root.add(mainArea, BorderLayout.CENTER);
-        add(root);
-        installResizeHandler(root);
-        switchPage("Accueil");
+        return footer;
     }
 
     // ── Sidebar ──────────────────────────────────────────────────────────────
     private JPanel buildSidebar() {
-        JPanel sidebar = new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setColor(BG_SIDEBAR); g2.fillRect(0,0,getWidth(),getHeight());
-                g2.setColor(BORDER_LIGHT); g2.fillRect(getWidth()-1,0,1,getHeight());
-                g2.setColor(RED_PRIMARY); g2.fillRect(0,0,getWidth(),3);
-            }
-        };
-        sidebar.setPreferredSize(new Dimension(230, 0));
-        sidebar.setLayout(new BorderLayout());
-        sidebar.setOpaque(false);
+        JPanel sidebar = getSidebar();
 
         JPanel brand = new JPanel();
         brand.setOpaque(false);
@@ -192,6 +183,22 @@ public class Dashboard extends JFrame {
         }
         sidebar.add(nav, BorderLayout.CENTER);
         sidebar.add(buildSidebarUserCard(), BorderLayout.SOUTH);
+        return sidebar;
+    }
+
+    private JPanel getSidebar() {
+        JPanel sidebar = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setColor(BG_SIDEBAR); g2.fillRect(0,0,getWidth(),getHeight());
+                g2.setColor(BORDER_LIGHT); g2.fillRect(getWidth()-1,0,1,getHeight());
+                g2.setColor(RED_PRIMARY); g2.fillRect(0,0,getWidth(),3);
+            }
+        };
+        sidebar.setPreferredSize(new Dimension(230, 0));
+        sidebar.setLayout(new BorderLayout());
+        sidebar.setOpaque(false);
         return sidebar;
     }
 
@@ -293,21 +300,7 @@ public class Dashboard extends JFrame {
         card.setOpaque(false);
         card.setBorder(BorderFactory.createEmptyBorder(14,16,18,16));
 
-        JPanel avatar = new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(RED_PRIMARY); g2.fillOval(0,0,getWidth()-1,getHeight()-1);
-                String init = username.length()>0 ? String.valueOf(username.charAt(0)).toUpperCase() : "U";
-                g2.setFont(new Font("Segoe UI", Font.BOLD, 15));
-                g2.setColor(Color.WHITE);
-                FontMetrics fm = g2.getFontMetrics();
-                g2.drawString(init,(getWidth()-fm.stringWidth(init))/2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
-            }
-            @Override public Dimension getPreferredSize() { return new Dimension(38,38); }
-            @Override public Dimension getMinimumSize()   { return getPreferredSize(); }
-        };
-        avatar.setOpaque(false);
+        JPanel avatar = getPanel();
 
         JPanel info = new JPanel();
         info.setOpaque(false);
@@ -364,6 +357,25 @@ public class Dashboard extends JFrame {
             }
         });
         return card;
+    }
+
+    private JPanel getPanel() {
+        JPanel avatar = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(RED_PRIMARY); g2.fillOval(0,0,getWidth()-1,getHeight()-1);
+                String init = username.length()>0 ? String.valueOf(username.charAt(0)).toUpperCase() : "U";
+                g2.setFont(new Font("Segoe UI", Font.BOLD, 15));
+                g2.setColor(Color.WHITE);
+                FontMetrics fm = g2.getFontMetrics();
+                g2.drawString(init,(getWidth()-fm.stringWidth(init))/2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
+            }
+            @Override public Dimension getPreferredSize() { return new Dimension(38,38); }
+            @Override public Dimension getMinimumSize()   { return getPreferredSize(); }
+        };
+        avatar.setOpaque(false);
+        return avatar;
     }
 
     // ── TopBar ───────────────────────────────────────────────────────────────
@@ -427,9 +439,17 @@ public class Dashboard extends JFrame {
         box.setBorder(BorderFactory.createEmptyBorder(0,12,0,12));
         JLabel ico = new JLabel("\uD83D\uDD0D");
         ico.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 12));
+        JTextField field = getJTextField();
+        box.add(ico, BorderLayout.WEST); box.add(field, BorderLayout.CENTER);
+        return box;
+    }
+
+    private static JTextField getJTextField() {
         JTextField field = new JTextField("Rechercher...");
-        field.setOpaque(false); field.setBorder(null);
-        field.setFont(FONT_CARD_DSC); field.setForeground(TEXT_MUTED);
+        field.setOpaque(false);
+        field.setBorder(null);
+        field.setFont(FONT_CARD_DSC);
+        field.setForeground(TEXT_MUTED);
         field.setCaretColor(RED_PRIMARY);
         field.addFocusListener(new FocusAdapter() {
             public void focusGained(FocusEvent e) {
@@ -439,8 +459,7 @@ public class Dashboard extends JFrame {
                 if (field.getText().isEmpty()) { field.setText("Rechercher..."); field.setForeground(TEXT_MUTED); }
             }
         });
-        box.add(ico, BorderLayout.WEST); box.add(field, BorderLayout.CENTER);
-        return box;
+        return field;
     }
 
     private JButton buildIconButton(String icon) {
@@ -584,6 +603,29 @@ public class Dashboard extends JFrame {
     }
 
     private JPanel buildCtaBanner() {
+        JPanel banner = getJPanel();
+
+        JPanel textBlock = new JPanel();
+        textBlock.setOpaque(false);
+        textBlock.setLayout(new BoxLayout(textBlock, BoxLayout.Y_AXIS));
+        JLabel heading = new JLabel("Cr\u00e9er un Bon d'Achat");
+        heading.setFont(VMSStyle.FONT_PAGE_TTL);
+        heading.setForeground(TEXT_PRIMARY);
+        JLabel subh = new JLabel("\u00c9mettre un nouveau bon et l'associer \u00e0 un client");
+        subh.setFont(FONT_CARD_DSC); subh.setForeground(TEXT_SECONDARY);
+        textBlock.add(heading); textBlock.add(Box.createVerticalStrut(4)); textBlock.add(subh);
+
+        JButton cta = UIUtils.buildRedButton("+ Nouveau Bon d'Achat", 218, 42);
+        cta.addActionListener(e -> ouvrirFormulaireCreationBon());
+        JPanel ctaWrap = new JPanel(new GridBagLayout());
+        ctaWrap.setOpaque(false); ctaWrap.add(cta);
+
+        banner.add(textBlock, BorderLayout.CENTER);
+        banner.add(ctaWrap,   BorderLayout.EAST);
+        return banner;
+    }
+
+    private static JPanel getJPanel() {
         JPanel banner = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
@@ -604,24 +646,6 @@ public class Dashboard extends JFrame {
         banner.setLayout(new BorderLayout(20,0));
         banner.setBorder(BorderFactory.createEmptyBorder(20,26,20,26));
         banner.setPreferredSize(new Dimension(0,84));
-
-        JPanel textBlock = new JPanel();
-        textBlock.setOpaque(false);
-        textBlock.setLayout(new BoxLayout(textBlock, BoxLayout.Y_AXIS));
-        JLabel heading = new JLabel("Cr\u00e9er un Bon d'Achat");
-        heading.setFont(VMSStyle.FONT_PAGE_TTL);
-        heading.setForeground(TEXT_PRIMARY);
-        JLabel subh = new JLabel("\u00c9mettre un nouveau bon et l'associer \u00e0 un client");
-        subh.setFont(FONT_CARD_DSC); subh.setForeground(TEXT_SECONDARY);
-        textBlock.add(heading); textBlock.add(Box.createVerticalStrut(4)); textBlock.add(subh);
-
-        JButton cta = UIUtils.buildRedButton("+ Nouveau Bon d'Achat", 218, 42);
-        cta.addActionListener(e -> ouvrirFormulaireCreationBon());
-        JPanel ctaWrap = new JPanel(new GridBagLayout());
-        ctaWrap.setOpaque(false); ctaWrap.add(cta);
-
-        banner.add(textBlock, BorderLayout.CENTER);
-        banner.add(ctaWrap,   BorderLayout.EAST);
         return banner;
     }
 
@@ -685,6 +709,20 @@ public class Dashboard extends JFrame {
         textBlock.add(trendL);
 
         // Bulle icône (48x48, rounded 12, teinte accent)
+        JPanel iconWrap = getPanel(accent, icon);
+
+        card.add(textBlock, BorderLayout.CENTER);
+        card.add(iconWrap, BorderLayout.EAST);
+
+        // Click-through : propagé à tous les enfants via MouseListener récursif
+        MouseAdapter clickNav = new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) { switchPage(targetPage); }
+        };
+        attachClickListener(card, clickNav);
+        return card;
+    }
+
+    private JPanel getPanel(Color accent, String icon) {
         JPanel iconBubble = new JPanel(new GridBagLayout()) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -706,16 +744,7 @@ public class Dashboard extends JFrame {
         JPanel iconWrap = new JPanel(new GridBagLayout());
         iconWrap.setOpaque(false);
         iconWrap.add(iconBubble);
-
-        card.add(textBlock, BorderLayout.CENTER);
-        card.add(iconWrap, BorderLayout.EAST);
-
-        // Click-through : propagé à tous les enfants via MouseListener récursif
-        MouseAdapter clickNav = new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent e) { switchPage(targetPage); }
-        };
-        attachClickListener(card, clickNav);
-        return card;
+        return iconWrap;
     }
 
     /** Propage le listener à tous les sous-composants pour qu'un clic n'importe où sur la carte navigue. */
@@ -738,7 +767,7 @@ public class Dashboard extends JFrame {
                 {"Demandes",         "\uD83D\uDCCB", ACCENT_BLUE,             "File de traitement en cours",               "Demandes"},
                 {"Clients",          "\uD83D\uDC64", SUCCESS,                 "Fiches, historiques & fid\u00e9lit\u00e9",   "Clients"},
                 {"Paiements",        "\uD83D\uDCB3", WARNING,                 "Suivi & rapprochement bancaire",             "Validation"},
-                {"Validation",       "\u2713",        new Color(20,170,190),  "Approbation des demandes",                   "Validation"},
+                {"Validation",       "✓",        new Color(20,170,190),  "Approbation des demandes",                   "Validation"},
                 {"Statistiques",     "\uD83D\uDCC8", new Color(150,80,210),   "Rapports & analyses",                        "Statistiques"},
         };
         for (Object[] m : mods)
@@ -760,7 +789,7 @@ public class Dashboard extends JFrame {
                         if (targetPage != null) switchPage(targetPage);
                         else JOptionPane.showMessageDialog(Dashboard.this,
                                 "<html><b>" + title + "</b><br><small>" + desc + "</small><br><br>" +
-                                        "<i>Module en d\u00e9veloppement</i></html>",
+                                        "<i>Module en développement</i></html>",
                                 "Voucher System", JOptionPane.INFORMATION_MESSAGE);
                     }
                 });
@@ -788,21 +817,7 @@ public class Dashboard extends JFrame {
         inner.setOpaque(false);
         inner.setLayout(new BoxLayout(inner, BoxLayout.Y_AXIS));
 
-        JPanel bubble = new JPanel(new GridBagLayout()) {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),20));
-                g2.fillOval(0,0,getWidth()-1,getHeight()-1);
-            }
-            @Override public Dimension getPreferredSize() { return new Dimension(50,50); }
-            @Override public Dimension getMinimumSize()   { return getPreferredSize(); }
-            @Override public Dimension getMaximumSize()   { return getPreferredSize(); }
-        };
-        bubble.setOpaque(false);
-        JLabel iconL = new JLabel(icon);
-        iconL.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 24));
-        bubble.add(iconL); bubble.setAlignmentX(Component.LEFT_ALIGNMENT);
+        JPanel bubble = getJPanel(icon, accent);
 
         JLabel titleL = new JLabel(title);
         titleL.setFont(FONT_CARD_TTL); titleL.setForeground(TEXT_PRIMARY);
@@ -812,20 +827,47 @@ public class Dashboard extends JFrame {
         descL.setFont(FONT_CARD_DSC); descL.setForeground(TEXT_SECONDARY);
         descL.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JPanel tag = new JPanel(new FlowLayout(FlowLayout.LEFT,0,0));
-        tag.setOpaque(false); tag.setAlignmentX(Component.LEFT_ALIGNMENT);
-        String tagText  = targetPage != null ? "\u25CF  ACTIF" : "\u25CB  BIENT\u00d4T";
-        Color  tagColor = targetPage != null
-                ? new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),200) : TEXT_MUTED;
-        JLabel dot = new JLabel(tagText);
-        dot.setFont(new Font("Segoe UI", Font.BOLD, 9)); dot.setForeground(tagColor);
-        tag.add(dot);
+        JPanel tag = getJPanel(accent, targetPage);
 
         inner.add(bubble); inner.add(Box.createVerticalStrut(12));
         inner.add(titleL); inner.add(Box.createVerticalStrut(5));
         inner.add(descL);  inner.add(Box.createVerticalStrut(10)); inner.add(tag);
         card.add(inner, BorderLayout.CENTER);
         return card;
+    }
+
+    private JPanel getJPanel(String icon, Color accent) {
+        JPanel bubble = new JPanel(new GridBagLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(),20));
+                g2.fillOval(0,0,getWidth()-1,getHeight()-1);
+            }
+            @Override public Dimension getPreferredSize() { return new Dimension(50,50); }
+            @Override public Dimension getMinimumSize()   { return getPreferredSize(); }
+            @Override public Dimension getMaximumSize()   { return getPreferredSize(); }
+        };
+        bubble.setOpaque(false);
+        JLabel iconL = new JLabel(icon);
+        iconL.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 24));
+        bubble.add(iconL);
+        bubble.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return bubble;
+    }
+
+    private static JPanel getJPanel(Color accent, String targetPage) {
+        JPanel tag = new JPanel(new FlowLayout(FlowLayout.LEFT,0,0));
+        tag.setOpaque(false);
+        tag.setAlignmentX(Component.LEFT_ALIGNMENT);
+        String tagText  = targetPage != null ? "●  ACTIF" : "○  BIENTÔT";
+        Color  tagColor = targetPage != null
+                ? new Color(accent.getRed(), accent.getGreen(), accent.getBlue(),200) : TEXT_MUTED;
+        JLabel dot = new JLabel(tagText);
+        dot.setFont(new Font("Segoe UI", Font.BOLD, 9));
+        dot.setForeground(tagColor);
+        tag.add(dot);
+        return tag;
     }
 
     // ── Profile Dialog ────────────────────────────────────────────────────────
@@ -838,23 +880,13 @@ public class Dashboard extends JFrame {
             }
         };
         root.setBorder(BorderFactory.createLineBorder(BORDER_LIGHT,1));
-        JPanel header = new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setPaint(new GradientPaint(0,0,RED_PRIMARY,getWidth(),getHeight(),RED_DARK));
-                g2.fillRect(0,0,getWidth(),getHeight());
-            }
-        };
-        header.setOpaque(false);
-        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
-        header.setPreferredSize(new Dimension(0,136));
-        header.setBorder(BorderFactory.createEmptyBorder(22,0,18,0));
+        JPanel header = getHeader();
         JPanel av = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g;
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(Color.WHITE); g2.fillOval(0,0,getWidth()-1,getHeight()-1);
-                String init = username.length()>0?String.valueOf(username.charAt(0)).toUpperCase():"U";
+                String init = !username.isEmpty() ?String.valueOf(username.charAt(0)).toUpperCase():"U";
                 g2.setFont(new Font("Segoe UI",Font.BOLD,28)); g2.setColor(RED_PRIMARY);
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(init,(getWidth()-fm.stringWidth(init))/2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
@@ -881,11 +913,11 @@ public class Dashboard extends JFrame {
         info.add(Box.createVerticalStrut(12));
         info.add(createInfoRow("\uD83D\uDCE7","Adresse e-mail",email));
         info.add(Box.createVerticalStrut(12));
-        info.add(createInfoRow("\uD83C\uDFAD","Niveau d'acc\u00e8s",role));
+        info.add(createInfoRow("\uD83C\uDFAD","Niveau d'accès",role));
 
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.CENTER,12,14));
         btns.setBackground(BG_ROOT);
-        JButton btnLogout = UIUtils.buildRedButton("D\u00e9connexion",140,38);
+        JButton btnLogout = UIUtils.buildRedButton("Déconnexion",140,38);
         btnLogout.addActionListener(e -> { dlg.dispose(); confirmLogout(); });
         JButton btnClose = UIUtils.buildOutlineButton("Fermer",140,38);
         btnClose.addActionListener(e -> dlg.dispose());
@@ -895,6 +927,21 @@ public class Dashboard extends JFrame {
         root.add(info,  BorderLayout.CENTER);
         root.add(btns,  BorderLayout.SOUTH);
         dlg.add(root); dlg.setVisible(true);
+    }
+
+    private JPanel getHeader() {
+        JPanel header = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setPaint(new GradientPaint(0,0,RED_PRIMARY,getWidth(),getHeight(),RED_DARK));
+                g2.fillRect(0,0,getWidth(),getHeight());
+            }
+        };
+        header.setOpaque(false);
+        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+        header.setPreferredSize(new Dimension(0,136));
+        header.setBorder(BorderFactory.createEmptyBorder(22,0,18,0));
+        return header;
     }
 
     private JPanel createInfoRow(String icon, String label, String value) {
@@ -985,10 +1032,10 @@ public class Dashboard extends JFrame {
     // ── Logout ────────────────────────────────────────────────────────────────
     private void confirmLogout() {
         boolean ok = UIUtils.confirmDialog(this,
-                "Confirmer la d\u00e9connexion",
+                "Confirmer la déconnexion",
                 "Vous êtes sur le point de vous déconnecter en tant que <b>" + username
                         + "</b>. Toute saisie non enregistrée sera perdue.",
-                "Se d\u00e9connecter", "Annuler");
+                "Se déconnecter", "Annuler");
         if (ok) deconnecter();
     }
 

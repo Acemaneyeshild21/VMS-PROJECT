@@ -62,28 +62,7 @@ public class InscriptionForm extends JFrame {
     //  LEFT HERO PANEL
     // =====================================================================
     private JPanel buildLeftBrand() {
-        JPanel p = new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                GradientPaint gp = new GradientPaint(0, 0, RED, getWidth(), getHeight(), RED_DK);
-                g2.setPaint(gp);
-                g2.fillRect(0, 0, getWidth(), getHeight());
-
-                g2.setColor(new Color(255, 255, 255, 10));
-                g2.fillOval(-80, -100, 320, 320);
-                g2.fillOval(getWidth() - 180, getHeight() - 240, 340, 340);
-
-                g2.setColor(new Color(255, 255, 255, 8));
-                for (int y = 0; y < getHeight(); y += 40) {
-                    g2.drawLine(0, y, getWidth(), y);
-                }
-                g2.dispose();
-            }
-        };
-        p.setPreferredSize(new Dimension(400, 0));
-        p.setLayout(new BorderLayout());
-        p.setBorder(BorderFactory.createEmptyBorder(52, 48, 40, 48));
+        JPanel p = getJPanel();
 
         // Header logo
         JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
@@ -127,22 +106,7 @@ public class InscriptionForm extends JFrame {
             row.setAlignmentX(Component.LEFT_ALIGNMENT);
             row.setMaximumSize(new Dimension(340, 28));
 
-            JPanel check = new JPanel() {
-                @Override protected void paintComponent(Graphics g) {
-                    Graphics2D g2 = (Graphics2D) g.create();
-                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                    g2.setColor(new Color(255, 255, 255, 40));
-                    g2.fillOval(0, 0, getWidth(), getHeight());
-                    g2.setColor(Color.WHITE);
-                    g2.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                    int cx = getWidth() / 2, cy = getHeight() / 2;
-                    g2.drawLine(cx - 4, cy, cx - 1, cy + 3);
-                    g2.drawLine(cx - 1, cy + 3, cx + 5, cy - 3);
-                    g2.dispose();
-                }
-                @Override public Dimension getPreferredSize() { return new Dimension(18, 18); }
-            };
-            check.setOpaque(false);
+            JPanel check = getCheck();
 
             JLabel txt = new JLabel(a);
             txt.setFont(new Font("Segoe UI", Font.PLAIN, 13));
@@ -162,6 +126,52 @@ public class InscriptionForm extends JFrame {
         copy.setForeground(new Color(255, 255, 255, 130));
         p.add(copy, BorderLayout.SOUTH);
 
+        return p;
+    }
+
+    private JPanel getCheck() {
+        JPanel check = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(255, 255, 255, 40));
+                g2.fillOval(0, 0, getWidth(), getHeight());
+                g2.setColor(Color.WHITE);
+                g2.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                int cx = getWidth() / 2, cy = getHeight() / 2;
+                g2.drawLine(cx - 4, cy, cx - 1, cy + 3);
+                g2.drawLine(cx - 1, cy + 3, cx + 5, cy - 3);
+                g2.dispose();
+            }
+            @Override public Dimension getPreferredSize() { return new Dimension(18, 18); }
+        };
+        check.setOpaque(false);
+        return check;
+    }
+
+    private JPanel getJPanel() {
+        JPanel p = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                GradientPaint gp = new GradientPaint(0, 0, RED, getWidth(), getHeight(), RED_DK);
+                g2.setPaint(gp);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+
+                g2.setColor(new Color(255, 255, 255, 10));
+                g2.fillOval(-80, -100, 320, 320);
+                g2.fillOval(getWidth() - 180, getHeight() - 240, 340, 340);
+
+                g2.setColor(new Color(255, 255, 255, 8));
+                for (int y = 0; y < getHeight(); y += 40) {
+                    g2.drawLine(0, y, getWidth(), y);
+                }
+                g2.dispose();
+            }
+        };
+        p.setPreferredSize(new Dimension(400, 0));
+        p.setLayout(new BorderLayout());
+        p.setBorder(BorderFactory.createEmptyBorder(52, 48, 40, 48));
         return p;
     }
 
@@ -275,22 +285,7 @@ public class InscriptionForm extends JFrame {
         // Link back to login
         gbc.gridy = 15;
         gbc.insets = new Insets(0, 54, 22, 54);
-        JPanel linkRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
-        linkRow.setOpaque(false);
-        JLabel lblHas = new JLabel("Déjà un compte ?");
-        lblHas.setFont(new Font("Segoe UI", Font.PLAIN, 12));
-        lblHas.setForeground(TEXT_S);
-        JLabel lblLogin = new JLabel("Se connecter");
-        lblLogin.setFont(new Font("Segoe UI", Font.BOLD, 12));
-        lblLogin.setForeground(RED);
-        lblLogin.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        lblLogin.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) { ouvrirLogin(); }
-            public void mouseEntered(MouseEvent e) { lblLogin.setForeground(RED_DK); }
-            public void mouseExited(MouseEvent e)  { lblLogin.setForeground(RED); }
-        });
-        linkRow.add(lblHas);
-        linkRow.add(lblLogin);
+        JPanel linkRow = getLinkRow();
         p.add(linkRow, gbc);
 
         txtConfirm.addActionListener(e -> actionRegister());
@@ -302,22 +297,34 @@ public class InscriptionForm extends JFrame {
         return outer;
     }
 
+    private JPanel getLinkRow() {
+        JPanel linkRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
+        linkRow.setOpaque(false);
+        JLabel lblHas = new JLabel("Déjà un compte ?");
+        lblHas.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        lblHas.setForeground(TEXT_S);
+        JLabel lblLogin = getJLabel();
+        linkRow.add(lblHas);
+        linkRow.add(lblLogin);
+        return linkRow;
+    }
+
+    private JLabel getJLabel() {
+        JLabel lblLogin = new JLabel("Se connecter");
+        lblLogin.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        lblLogin.setForeground(RED);
+        lblLogin.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        lblLogin.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) { ouvrirLogin(); }
+            public void mouseEntered(MouseEvent e) { lblLogin.setForeground(RED_DK); }
+            public void mouseExited(MouseEvent e)  { lblLogin.setForeground(RED); }
+        });
+        return lblLogin;
+    }
+
     // ── Modern ComboBox wrapper ───────────────────────────────────────────
     private JPanel wrapModernCombo(JComboBox<String> cbo) {
-        JPanel wrapper = new JPanel(new BorderLayout()) {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(VMSStyle.BG_SUBTLE);
-                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), VMSStyle.INPUT_ROUND, VMSStyle.INPUT_ROUND));
-                g2.setColor(VMSStyle.BORDER_LIGHT);
-                g2.setStroke(new BasicStroke(1f));
-                g2.draw(new RoundRectangle2D.Double(0.5, 0.5, getWidth() - 1, getHeight() - 1, VMSStyle.INPUT_ROUND, VMSStyle.INPUT_ROUND));
-                g2.dispose();
-            }
-        };
-        wrapper.setOpaque(false);
-        wrapper.setPreferredSize(new Dimension(0, 42));
+        JPanel wrapper = getPanel();
 
         cbo.setFont(VMSStyle.FONT_INPUT);
         cbo.setForeground(TEXT_P);
@@ -349,9 +356,27 @@ public class InscriptionForm extends JFrame {
         return wrapper;
     }
 
+    private JPanel getPanel() {
+        JPanel wrapper = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(VMSStyle.BG_SUBTLE);
+                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), VMSStyle.INPUT_ROUND, VMSStyle.INPUT_ROUND));
+                g2.setColor(VMSStyle.BORDER_LIGHT);
+                g2.setStroke(new BasicStroke(1f));
+                g2.draw(new RoundRectangle2D.Double(0.5, 0.5, getWidth() - 1, getHeight() - 1, VMSStyle.INPUT_ROUND, VMSStyle.INPUT_ROUND));
+                g2.dispose();
+            }
+        };
+        wrapper.setOpaque(false);
+        wrapper.setPreferredSize(new Dimension(0, 42));
+        return wrapper;
+    }
+
     // ── Close button (vectoriel) ──────────────────────────────────────────
     private JButton buildCloseBtn() {
-        JButton btn = new JButton() {
+        return new JButton() {
             boolean hov = false;
             {
                 setOpaque(false); setContentAreaFilled(false);
@@ -379,7 +404,6 @@ public class InscriptionForm extends JFrame {
                 g2.dispose();
             }
         };
-        return btn;
     }
 
     // =====================================================================
@@ -436,7 +460,7 @@ public class InscriptionForm extends JFrame {
                 try {
                     boolean ok = get();
                     if (ok) {
-                        showSuccess("Compte créé avec succès ! Redirection...");
+                        showSuccess();
                         Timer t = new Timer(1500, ev -> ouvrirLogin());
                         t.setRepeats(false);
                         t.start();
@@ -460,8 +484,8 @@ public class InscriptionForm extends JFrame {
         lblError.setForeground(RED);
     }
 
-    private void showSuccess(String msg) {
-        lblError.setText(msg);
+    private void showSuccess() {
+        lblError.setText("Compte créé avec succès ! Redirection...");
         lblError.setForeground(SUCCESS);
     }
 
