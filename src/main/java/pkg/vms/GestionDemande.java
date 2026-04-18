@@ -122,26 +122,31 @@ public class GestionDemande extends JPanel {
         JPanel outer = new JPanel(new BorderLayout(0, 10));
         outer.setOpaque(false);
 
-        // Chips
+        // Chips — Envoyées/Rejetées déplacés vers Archives
         JPanel chipsCard = PageLayout.buildCard(new FlowLayout(FlowLayout.LEFT, 8, 0), 12);
         chipsCard.add(buildChip("Toutes",    null,         "TOUTES"));
         chipsCard.add(buildChip("En attente", WARNING,     ST_ATTENTE_PAIEMENT));
         chipsCard.add(buildChip("Payées",     ACCENT_BLUE, ST_PAYE));
         chipsCard.add(buildChip("Approuvées", ACCENT_PURP, ST_APPROUVE));
         chipsCard.add(buildChip("Générées",   SUCCESS,     ST_GENERE));
-        chipsCard.add(buildChip("Envoyées",   new Color(20,170,190), ST_ENVOYE));
-        chipsCard.add(buildChip("Rejetées",   RED_PRIMARY, ST_REJETE));
         outer.add(chipsCard, BorderLayout.NORTH);
 
-        // Barre recherche + actualiser
+        // Barre recherche + réinitialiser
         PageLayout.FilterBar fb = PageLayout.buildFilterBar("Rechercher une demande (référence, client, magasin)...");
         txtSearch = fb.search();
         txtSearch.addKeyListener(new KeyAdapter() {
             public void keyReleased(KeyEvent e) { filtrerTable(); }
         });
-        JButton btnRefresh = UIUtils.buildGhostButton("Actualiser", 110, 38);
-        btnRefresh.addActionListener(e -> chargerDemandes());
+        JButton btnRefresh = UIUtils.buildGhostButton("Réinitialiser", 130, 38);
+        btnRefresh.setToolTipText("Vider les filtres et recharger (F5)");
+        btnRefresh.addActionListener(e -> reinitialiser());
         fb.addSlot(btnRefresh);
+
+        // Raccourci F5 : réinitialiser
+        registerKeyboardAction(
+                e -> reinitialiser(),
+                KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0),
+                WHEN_IN_FOCUSED_WINDOW);
 
         JPanel wrap = new JPanel(new BorderLayout(0, 10));
         wrap.setOpaque(false);
@@ -286,11 +291,13 @@ public class GestionDemande extends JPanel {
             @Override
             protected List<Object[]> doInBackground() throws Exception {
                 List<Object[]> data = new ArrayList<>();
+                // Archives exclues : ENVOYE/REJETE/ARCHIVE → gérés dans ArchivesPanel
                 String sql = "SELECT d.demande_id, d.invoice_reference, c.name AS nom_client, " +
                              "d.nombre_bons, d.valeur_unitaire, d.montant_total, m.nom_magasin, " +
                              "d.date_creation, d.validite_jours, d.statuts " +
                              "FROM demande d LEFT JOIN client c ON d.clientid = c.clientid " +
                              "LEFT JOIN magasin m ON d.magasin_id = m.magasin_id " +
+                             "WHERE d.statuts NOT IN ('ENVOYE','REJETE','ARCHIVE') " +
                              "ORDER BY d.date_creation DESC";
                 try (Connection conn = DBconnect.getConnection();
                      Statement st = conn.createStatement();
@@ -329,6 +336,14 @@ public class GestionDemande extends JPanel {
                 }
             }
         }.execute();
+    }
+
+    // ── RÉINITIALISATION (F5 / bouton) ─────────────────────────────────────
+    private void reinitialiser() {
+        txtSearch.setText("");
+        filtreStatutActif = "TOUTES";
+        chargerDemandes();
+        ToastManager.info(this, "Filtres r\u00e9initialis\u00e9s \u2014 donn\u00e9es recharg\u00e9es");
     }
 
     // ── FILTRES ─────────────────────────────────────────────────────────────

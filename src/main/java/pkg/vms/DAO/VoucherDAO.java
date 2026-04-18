@@ -242,4 +242,150 @@ public class VoucherDAO {
     public static void marquerCommeEnvoye(int demandeId, int userId) throws SQLException {
         updateVoucherStatus(demandeId, "ENVOYE", userId);
     }
+
+    // ── Widgets Dashboard ────────────────────────────────────────────────────
+
+    public static class ModuleCounters {
+        public int demandesActives;
+        public int bonsEmis;
+        public int clientsActifs;
+        public int paiementsAttente;
+        public int aValider;
+        public int bonsTotal;
+    }
+
+    /** Compteurs pour les cartes modules du dashboard. */
+    public static ModuleCounters getModuleCounters() throws SQLException {
+        ModuleCounters c = new ModuleCounters();
+        try (Connection conn = DBconnect.getConnection(); Statement st = conn.createStatement()) {
+            try (ResultSet rs = st.executeQuery(
+                    "SELECT COUNT(*) FROM demande WHERE statuts NOT IN ('ENVOYE','REJETE','ARCHIVE')")) {
+                if (rs.next()) c.demandesActives = rs.getInt(1);
+            }
+            try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM bon")) {
+                if (rs.next()) c.bonsTotal = rs.getInt(1);
+            }
+            try (ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM client WHERE actif = true")) {
+                if (rs.next()) c.clientsActifs = rs.getInt(1);
+            }
+            try (ResultSet rs = st.executeQuery(
+                    "SELECT COUNT(*) FROM demande WHERE statuts = 'EN_ATTENTE_PAIEMENT'")) {
+                if (rs.next()) c.paiementsAttente = rs.getInt(1);
+            }
+            try (ResultSet rs = st.executeQuery(
+                    "SELECT COUNT(*) FROM demande WHERE statuts = 'PAYE'")) {
+                if (rs.next()) c.aValider = rs.getInt(1);
+            }
+            try (ResultSet rs = st.executeQuery(
+                    "SELECT COUNT(*) FROM bon WHERE statut = 'ACTIF'")) {
+                if (rs.next()) c.bonsEmis = rs.getInt(1);
+            }
+        }
+        return c;
+    }
+
+    /** Série journalière du nb de demandes créées sur les 30 derniers jours (ordre chronologique). */
+    public static int[] getEmissionsLast30Days() throws SQLException {
+        int[] series = new int[30];
+        String sql = "SELECT (CURRENT_DATE - date_creation::date) AS d_ago, COUNT(*) AS n " +
+                     "FROM demande " +
+                     "WHERE date_creation >= CURRENT_DATE - INTERVAL '29 days' " +
+                     "GROUP BY d_ago";
+        try (Connection conn = DBconnect.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                int ago = rs.getInt("d_ago");
+                if (ago >= 0 && ago < 30) series[29 - ago] = rs.getInt("n");
+            }
+        }
+        return series;
+    }
+
+    public static class TopClient {
+        public String nom;
+        public int    nbDemandes;
+        public double montant;
+        public TopClient(String nom, int n, double m) { this.nom = nom; this.nbDemandes = n; this.montant = m; }
+    }
+
+    /** Top N clients par montant total sur 90 jours. */
+    public static List<TopClient> getTopClients(int limit) throws SQLException {
+        List<TopClient> top = new ArrayList<>();
+        String sql = "SELECT c.name AS nom, COUNT(d.demande_id) AS n, " +
+                     "COALESCE(SUM(d.montant_total), 0) AS total " +
+                     "FROM client c " +
+                     "LEFT JOIN demande d ON d.clientid = c.clientid " +
+                     "  AND d.date_creation >= CURRENT_DATE - INTERVAL '90 days' " +
+                     "GROUP BY c.clientid, c.name " +
+                     "HAVING COUNT(d.demande_id) > 0 " +
+                     "ORDER BY total DESC, n DESC LIMIT ?";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    top.add(new TopClient(rs.getString("nom"), rs.getInt("n"), rs.getDouble("total")));
+                }
+            }
+        }
+        return top;
+    }
+
+    public static class BonExpirant {
+        public int    demandeId;
+        public String reference;
+        public String client;
+        public int    joursRestants;
+        public double montant;
+        public BonExpirant(int id, String r, String c, int j, double m) {
+            this.demandeId = id; this.reference = r; this.client = c; this.joursRestants = j; this.montant = m;
+        }
+    }
+
+    /** Demandes GENEREes dont la validité expire dans les prochains N jours. */
+    public static List<BonExpirant> getBonsExpirantBientot(int joursMax, int limit) throws SQLException {
+        List<BonExpirant> out = new ArrayList<>();
+        String sql = "SELECT d.demande_id, d.invoice_reference, c.name AS nom, d.montant_total, " +
+                     "  (d.date_creation + (d.validite_jours || ' days')::interval)::date - CURRENT_DATE AS jours_restants " +
+                     "FROM demande d LEFT JOIN client c ON d.clientid = c.clientid " +
+                     "WHERE d.statuts IN ('GENERE','ENVOYE') AND d.validite_jours > 0 " +
+                     "  AND (d.date_creation + (d.validite_jours || ' days')::interval)::date >= CURRENT_DATE " +
+                     "  AND (d.date_creation + (d.validite_jours || ' days')::interval)::date <= CURRENT_DATE + (? || ' days')::interval " +
+                     "ORDER BY jours_restants ASC LIMIT ?";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, joursMax);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(new BonExpirant(
+                            rs.getInt("demande_id"),
+                            rs.getString("invoice_reference"),
+                            rs.getString("nom"),
+                            rs.getInt("jours_restants"),
+                            rs.getDouble("montant_total")));
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Nombre de demandes en attente d'une action selon le rôle. */
+    public static int getTachesParRole(String role) throws SQLException {
+        String statut = switch (role != null ? role.toLowerCase() : "") {
+            case "comptable"    -> "EN_ATTENTE_PAIEMENT";
+            case "approbateur"  -> "PAYE";
+            case "administrateur","manager" -> null; // toutes
+            default             -> null;
+        };
+        String sql = statut != null
+                ? "SELECT COUNT(*) FROM demande WHERE statuts = '" + statut + "'"
+                : "SELECT COUNT(*) FROM demande WHERE statuts IN ('EN_ATTENTE_PAIEMENT','PAYE','APPROUVE')";
+        try (Connection conn = DBconnect.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
 }
