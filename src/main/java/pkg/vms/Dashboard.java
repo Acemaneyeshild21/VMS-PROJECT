@@ -54,7 +54,6 @@ public class Dashboard extends JFrame {
 
     private final JButton[] navButtons = new JButton[7];
     private final String[]  navItems   = {"Accueil","Demandes","Clients","R\u00e9demption","Validation","Parametres"};
-    private final String[]  navIcons   = {"\u2302","\uD83D\uDCCB","\u25C8","\uD83D\uDCF1","\u2713","\u2699"};
 
     private static final int RESIZE_MARGIN = 8;
     private Point     dragStart;
@@ -77,7 +76,7 @@ public class Dashboard extends JFrame {
         this.role     = role;
         this.email    = email;
 
-        setTitle("Intermart \u2014 Gestion des Bons");
+        setTitle("Voucher System \u2014 Gestion des Bons");
         setSize(1280, 820);
         setMinimumSize(new Dimension(900, 600));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -104,9 +103,9 @@ public class Dashboard extends JFrame {
         mainArea.add(contentPanel, BorderLayout.CENTER);
 
         JLabel footer = new JLabel(
-                "\u00a9 2025 Intermart Maurice \u2014 Tous droits r\u00e9serv\u00e9s  |  Connect\u00e9 : " + username,
+                "\u00a9 2026 Voucher System \u2014 Tous droits r\u00e9serv\u00e9s  |  Connect\u00e9 : " + username,
                 SwingConstants.CENTER);
-        footer.setFont(new Font("Trebuchet MS", Font.PLAIN, 11));
+        footer.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         footer.setForeground(TEXT_MUTED);
         footer.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(1,0,0,0,BORDER_LIGHT),
@@ -139,33 +138,18 @@ public class Dashboard extends JFrame {
         JPanel brand = new JPanel();
         brand.setOpaque(false);
         brand.setLayout(new BoxLayout(brand, BoxLayout.Y_AXIS));
-        brand.setBorder(BorderFactory.createEmptyBorder(28,22,24,22));
+        brand.setBorder(BorderFactory.createEmptyBorder(22,20,22,20));
 
-        JPanel logoRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        logoRow.setOpaque(false); logoRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-        JLabel cartIcon = new JLabel("\uD83D\uDED2");
-        cartIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 26));
-        JLabel logoText = new JLabel("INTERMART");
-        logoText.setFont(FONT_BRAND); logoText.setForeground(RED_PRIMARY);
-        logoRow.add(cartIcon); logoRow.add(logoText);
+        IntermartLogo logo = new IntermartLogo(IntermartLogo.Variant.LIGHT, 32);
+        logo.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JPanel redLine = new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setPaint(new GradientPaint(0,0,RED_PRIMARY,getWidth(),0,new Color(210,35,45,0)));
-                g2.fillRect(0,0,getWidth(),2);
-            }
-            @Override public Dimension getPreferredSize() { return new Dimension(170,2); }
-            @Override public Dimension getMaximumSize()   { return new Dimension(170,2); }
-        };
-        redLine.setOpaque(false); redLine.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JLabel tagline = new JLabel("Syst\u00e8me de Gestion \u2022 Maurice");
+        JLabel tagline = new JLabel("Voucher Management");
         tagline.setFont(FONT_SUBTITLE); tagline.setForeground(TEXT_MUTED);
         tagline.setAlignmentX(Component.LEFT_ALIGNMENT);
+        tagline.setBorder(BorderFactory.createEmptyBorder(6, 0, 0, 0));
 
-        brand.add(logoRow); brand.add(Box.createVerticalStrut(8));
-        brand.add(redLine); brand.add(Box.createVerticalStrut(6)); brand.add(tagline);
+        brand.add(logo);
+        brand.add(tagline);
         sidebar.add(brand, BorderLayout.NORTH);
 
         JPanel nav = new JPanel();
@@ -174,7 +158,7 @@ public class Dashboard extends JFrame {
         nav.setBorder(BorderFactory.createEmptyBorder(8,14,8,14));
 
         JLabel navLabel = new JLabel("NAVIGATION");
-        navLabel.setFont(new Font("Trebuchet MS", Font.BOLD, 9));
+        navLabel.setFont(new Font("Segoe UI", Font.BOLD, 9));
         navLabel.setForeground(TEXT_MUTED);
         navLabel.setBorder(BorderFactory.createEmptyBorder(0,8,10,0));
         navLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -201,7 +185,7 @@ public class Dashboard extends JFrame {
                 continue;
             }
 
-            JButton btn = buildNavButton(page, navIcons[i]);
+            JButton btn = buildNavButton(page);
             btn.addActionListener(e -> switchPage(page));
             navButtons[i] = btn;
             nav.add(btn); nav.add(Box.createVerticalStrut(3));
@@ -211,15 +195,15 @@ public class Dashboard extends JFrame {
         return sidebar;
     }
 
-    private JButton buildNavButton(String label, String icon) {
+    private JButton buildNavButton(String label) {
         JButton btn = new JButton() {
             boolean h = false;
             {
                 setOpaque(false); setContentAreaFilled(false);
                 setBorderPainted(false); setFocusPainted(false);
                 setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
-                setPreferredSize(new Dimension(202, 44));
+                setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+                setPreferredSize(new Dimension(202, 40));
                 setHorizontalAlignment(SwingConstants.LEFT);
                 addMouseListener(new MouseAdapter() {
                     public void mouseEntered(MouseEvent e) { h=true;  repaint(); }
@@ -229,26 +213,73 @@ public class Dashboard extends JFrame {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
                 boolean active = label.equals(activePage);
                 if (active) {
                     g2.setColor(RED_LIGHT);
                     g2.fill(new RoundRectangle2D.Double(0,0,getWidth(),getHeight(),8,8));
                     g2.setColor(RED_PRIMARY);
-                    g2.fill(new RoundRectangle2D.Double(0,8,3,getHeight()-16,3,3));
+                    g2.fill(new RoundRectangle2D.Double(0,6,3,getHeight()-12,3,3));
                 } else if (h) {
-                    g2.setColor(new Color(0,0,0,5));
+                    g2.setColor(VMSStyle.BG_SUBTLE);
                     g2.fill(new RoundRectangle2D.Double(0,0,getWidth(),getHeight(),8,8));
                 }
-                g2.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 15));
-                g2.setColor(active ? RED_PRIMARY : (h ? TEXT_PRIMARY : TEXT_SECONDARY));
-                g2.drawString(icon, 14, getHeight()/2+5);
+                Color iconColor = active ? RED_PRIMARY : (h ? TEXT_PRIMARY : TEXT_SECONDARY);
+                paintNavIcon(g2, label, 14, getHeight()/2 - 9, 18, iconColor);
+
                 g2.setFont(active ? FONT_NAV_ACT : FONT_NAV);
-                g2.setColor(active ? RED_PRIMARY : (h ? TEXT_PRIMARY : TEXT_SECONDARY));
-                g2.drawString(label, 40, getHeight()/2+5);
+                g2.setColor(iconColor);
+                g2.drawString(label, 42, getHeight()/2+5);
                 g2.dispose();
             }
         };
         return btn;
+    }
+
+    /** Dessine une icône vectorielle 18x18 pour chaque page de navigation. */
+    private static void paintNavIcon(Graphics2D g2, String page, int x, int y, int s, Color c) {
+        g2.setColor(c);
+        g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        switch (page) {
+            case "Accueil" -> { // maison
+                int[] xp = {x, x + s/2, x + s};
+                int[] yp = {y + s/2, y + 2, y + s/2};
+                g2.drawPolyline(xp, yp, 3);
+                g2.drawRect(x + 2, y + s/2, s - 4, s/2 - 2);
+                g2.drawRect(x + s/2 - 2, y + s - 6, 4, 4);
+            }
+            case "Demandes" -> { // document ligné
+                g2.drawRoundRect(x + 2, y + 1, s - 4, s - 2, 3, 3);
+                g2.drawLine(x + 5, y + 5, x + s - 5, y + 5);
+                g2.drawLine(x + 5, y + 9, x + s - 5, y + 9);
+                g2.drawLine(x + 5, y + 13, x + s - 7, y + 13);
+            }
+            case "Clients" -> { // personne
+                g2.drawOval(x + s/2 - 4, y + 2, 8, 8);
+                g2.drawArc(x + 1, y + 10, s - 2, s - 2, 0, 180);
+            }
+            case "R\u00e9demption" -> { // carte / ticket
+                g2.drawRoundRect(x + 1, y + 4, s - 2, s - 8, 3, 3);
+                g2.drawLine(x + 1, y + 9, x + s - 1, y + 9);
+                g2.fillOval(x + s - 6, y + s/2 - 2, 4, 4);
+            }
+            case "Validation" -> { // check dans cercle
+                g2.drawOval(x + 1, y + 1, s - 2, s - 2);
+                int[] xp = {x + 5, x + s/2 - 1, x + s - 5};
+                int[] yp = {y + s/2, y + s - 5, y + 5};
+                g2.drawPolyline(xp, yp, 3);
+            }
+            case "Parametres" -> { // roue crantée simplifiée
+                g2.drawOval(x + 3, y + 3, s - 6, s - 6);
+                g2.drawOval(x + s/2 - 2, y + s/2 - 2, 4, 4);
+                // 4 encoches
+                g2.drawLine(x + s/2, y,     x + s/2, y + 2);
+                g2.drawLine(x + s/2, y + s - 2, x + s/2, y + s);
+                g2.drawLine(x,     y + s/2, x + 2, y + s/2);
+                g2.drawLine(x + s - 2, y + s/2, x + s, y + s/2);
+            }
+            default -> g2.drawOval(x + 4, y + 4, s - 8, s - 8);
+        }
     }
 
     private JPanel buildSidebarUserCard() {
@@ -268,7 +299,7 @@ public class Dashboard extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(RED_PRIMARY); g2.fillOval(0,0,getWidth()-1,getHeight()-1);
                 String init = username.length()>0 ? String.valueOf(username.charAt(0)).toUpperCase() : "U";
-                g2.setFont(new Font("Georgia", Font.BOLD, 15));
+                g2.setFont(new Font("Segoe UI", Font.BOLD, 15));
                 g2.setColor(Color.WHITE);
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(init,(getWidth()-fm.stringWidth(init))/2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
@@ -284,22 +315,44 @@ public class Dashboard extends JFrame {
         JLabel nameL = new JLabel(username);
         nameL.setFont(FONT_USER); nameL.setForeground(TEXT_PRIMARY);
         JLabel roleL = new JLabel(role);
-        roleL.setFont(new Font("Trebuchet MS", Font.PLAIN, 10));
+        roleL.setFont(new Font("Segoe UI", Font.PLAIN, 10));
         roleL.setForeground(getRoleColor(role));
         info.add(nameL); info.add(Box.createVerticalStrut(2)); info.add(roleL);
 
-        JButton logout = new JButton("\u21A9") {
+        JButton logout = new JButton() {
+            boolean h = false;
             {
-                setFont(new Font("Trebuchet MS", Font.BOLD, 15));
                 setOpaque(false); setContentAreaFilled(false);
                 setBorderPainted(false); setFocusPainted(false);
                 setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setForeground(TEXT_MUTED); setToolTipText("D\u00e9connexion");
+                setPreferredSize(new Dimension(32, 32));
+                setToolTipText("D\u00e9connexion");
                 addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { setForeground(RED_PRIMARY); }
-                    public void mouseExited(MouseEvent e)  { setForeground(TEXT_MUTED); }
+                    public void mouseEntered(MouseEvent e) { h = true;  repaint(); }
+                    public void mouseExited(MouseEvent e)  { h = false; repaint(); }
                 });
                 addActionListener(e -> confirmLogout());
+            }
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                if (h) {
+                    g2.setColor(VMSStyle.RED_LIGHT);
+                    g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 8, 8));
+                }
+                // Icône "logout" : flèche sortant d'une boîte
+                g2.setColor(h ? RED_PRIMARY : TEXT_MUTED);
+                g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                int cx = getWidth() / 2, cy = getHeight() / 2;
+                // boîte (côté gauche)
+                g2.drawLine(cx - 8, cy - 7, cx - 8, cy + 7);
+                g2.drawLine(cx - 8, cy - 7, cx - 2, cy - 7);
+                g2.drawLine(cx - 8, cy + 7, cx - 2, cy + 7);
+                // flèche sortant vers la droite
+                g2.drawLine(cx - 3, cy, cx + 7, cy);
+                g2.drawLine(cx + 4, cy - 3, cx + 7, cy);
+                g2.drawLine(cx + 4, cy + 3, cx + 7, cy);
+                g2.dispose();
             }
         };
         card.add(avatar, BorderLayout.WEST);
@@ -330,12 +383,14 @@ public class Dashboard extends JFrame {
         titleBlock.setOpaque(false);
         titleBlock.setLayout(new BoxLayout(titleBlock, BoxLayout.Y_AXIS));
         JLabel pageTitle  = new JLabel("Tableau de bord");
-        pageTitle.setFont(new Font("Georgia", Font.BOLD, 17));
+        pageTitle.setFont(VMSStyle.FONT_PAGE_TTL);
         pageTitle.setForeground(TEXT_PRIMARY);
         JLabel breadcrumb = new JLabel("Accueil  /  Tableau de bord");
-        breadcrumb.setFont(new Font("Trebuchet MS", Font.PLAIN, 11));
+        breadcrumb.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         breadcrumb.setForeground(TEXT_MUTED);
-        titleBlock.add(pageTitle); titleBlock.add(breadcrumb);
+        titleBlock.add(pageTitle);
+        titleBlock.add(Box.createVerticalStrut(2));
+        titleBlock.add(breadcrumb);
         bar.add(titleBlock, BorderLayout.WEST);
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT,10,0));
@@ -420,7 +475,7 @@ public class Dashboard extends JFrame {
         JButton btn = new JButton(sym) {
             boolean h = false;
             {
-                setFont(new Font("Trebuchet MS", Font.BOLD, 11));
+                setFont(new Font("Segoe UI", Font.BOLD, 11));
                 setForeground(new Color(col.getRed(),col.getGreen(),col.getBlue(),120));
                 setOpaque(false); setContentAreaFilled(false);
                 setBorderPainted(false); setFocusPainted(false);
@@ -466,7 +521,7 @@ public class Dashboard extends JFrame {
                 JPanel ph = new JPanel(new GridBagLayout());
                 ph.setOpaque(false);
                 JLabel lbl = new JLabel("Module \u00ab " + page + " \u00bb \u2014 Bient\u00f4t disponible");
-                lbl.setFont(new Font("Georgia", Font.ITALIC, 22));
+                lbl.setFont(new Font("Segoe UI", Font.PLAIN, 18));
                 lbl.setForeground(TEXT_MUTED);
                 ph.add(lbl);
                 contentPanel.add(ph, BorderLayout.CENTER);
@@ -517,9 +572,10 @@ public class Dashboard extends JFrame {
                     if (kpiDemandesVal != null) kpiDemandesVal.setText(String.valueOf(stats.pendingPayments));
                     if (kpiTauxVal != null) kpiTauxVal.setText(stats.validationRate + " %");
                     
-                    if (kpiClientsTrend != null) kpiClientsTrend.setText(stats.activeClients + " client" + (stats.activeClients > 1 ? "s" : "") + " actif" + (stats.activeClients > 1 ? "s" : ""));
-                    if (kpiBonsTrend != null) kpiBonsTrend.setText(stats.totalVouchers + " bon" + (stats.totalVouchers > 1 ? "s" : "") + " au total");
-                    if (kpiDemandesTrend != null) kpiDemandesTrend.setText(stats.pendingPayments + " en attente paiement");
+                    if (kpiClientsTrend != null) kpiClientsTrend.setText("Base complète · cliquer pour gérer");
+                    if (kpiBonsTrend != null) kpiBonsTrend.setText("Bons émis au total");
+                    if (kpiDemandesTrend != null) kpiDemandesTrend.setText(
+                            stats.pendingPayments > 0 ? "Action requise" : "Tout est à jour ✓");
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -553,9 +609,9 @@ public class Dashboard extends JFrame {
         textBlock.setOpaque(false);
         textBlock.setLayout(new BoxLayout(textBlock, BoxLayout.Y_AXIS));
         JLabel heading = new JLabel("Cr\u00e9er un Bon d'Achat");
-        heading.setFont(new Font("Georgia", Font.BOLD, 17));
+        heading.setFont(VMSStyle.FONT_PAGE_TTL);
         heading.setForeground(TEXT_PRIMARY);
-        JLabel subh = new JLabel("\u00c9mettre un nouveau bon et l'associer \u00e0 un client \u2014 Intermart Maurice");
+        JLabel subh = new JLabel("\u00c9mettre un nouveau bon et l'associer \u00e0 un client");
         subh.setFont(FONT_CARD_DSC); subh.setForeground(TEXT_SECONDARY);
         textBlock.add(heading); textBlock.add(Box.createVerticalStrut(4)); textBlock.add(subh);
 
@@ -569,37 +625,21 @@ public class Dashboard extends JFrame {
         return banner;
     }
 
-    // ── KPI Strip ─────────────────────────────────────────────────────────────
+    // ── KPI Strip (style InvoiceNinja) ───────────────────────────────────────
     // Valeurs initiales = "..." → remplacées par chargerStatsAsync()
     private JPanel buildKpiStrip() {
-        JPanel strip = new JPanel(new GridLayout(1,4,14,0));
+        JPanel strip = new JPanel(new GridLayout(1, 4, 16, 0));
         strip.setOpaque(false);
-        strip.setPreferredSize(new Dimension(0,100));
+        strip.setPreferredSize(new Dimension(0, 112));
 
-        // Clients
-        JPanel kpiClients = buildKpiPanel(
-                ACCENT_BLUE, "\uD83D\uDC64", "Clients", "Clients",
-                lv -> kpiClientsVal   = lv,
-                lt -> kpiClientsTrend = lt
-        );
-        // Bons total
-        JPanel kpiBons = buildKpiPanel(
-                RED_PRIMARY, "\uD83C\uDF81", "Bons \u00e9mis", "Demandes",
-                lv -> kpiBonsVal   = lv,
-                lt -> kpiBonsTrend = lt
-        );
-        // En attente
-        JPanel kpiDemandes = buildKpiPanel(
-                WARNING, "\u23F3", "En attente", "Demandes",
-                lv -> kpiDemandesVal   = lv,
-                lt -> kpiDemandesTrend = lt
-        );
-        // Taux validation
-        JPanel kpiTaux = buildKpiPanel(
-                SUCCESS, "\u2713", "Taux valid.", "Demandes",
-                lv -> kpiTauxVal = lv,
-                lt -> {}
-        );
+        JPanel kpiClients = buildModernKpi("CLIENTS ACTIFS", ACCENT_BLUE, "\uD83D\uDC64", "Clients",
+                lv -> kpiClientsVal = lv, lt -> kpiClientsTrend = lt);
+        JPanel kpiBons = buildModernKpi("BONS ÉMIS", RED_PRIMARY, "\uD83C\uDF81", "Demandes",
+                lv -> kpiBonsVal = lv, lt -> kpiBonsTrend = lt);
+        JPanel kpiDemandes = buildModernKpi("EN ATTENTE", WARNING, "\u23F3", "Demandes",
+                lv -> kpiDemandesVal = lv, lt -> kpiDemandesTrend = lt);
+        JPanel kpiTaux = buildModernKpi("TAUX VALIDATION", SUCCESS, "\u2713", "Demandes",
+                lv -> kpiTauxVal = lv, lt -> {});
 
         strip.add(kpiClients);
         strip.add(kpiBons);
@@ -610,72 +650,81 @@ public class Dashboard extends JFrame {
 
     @FunctionalInterface interface LabelConsumer { void accept(JLabel l); }
 
-    private JPanel buildKpiPanel(Color accent, String icon, String label, String targetPage,
-                                 LabelConsumer valRef, LabelConsumer trendRef) {
-        // valeur dynamique
-        JLabel valL = new JLabel("...");
-        valL.setFont(FONT_KPI_VAL); valL.setForeground(accent);
-        valRef.accept(valL);
+    private JPanel buildModernKpi(String label, Color accent, String icon, String targetPage,
+                                  LabelConsumer valRef, LabelConsumer trendRef) {
+        // Carte au style InvoiceNinja (PageLayout.buildCard)
+        JPanel card = PageLayout.buildCard(new BorderLayout(14, 0), 20);
+        card.setCursor(new Cursor(Cursor.HAND_CURSOR));
+
+        // Bloc texte (label, valeur, trend)
+        JPanel textBlock = new JPanel();
+        textBlock.setOpaque(false);
+        textBlock.setLayout(new BoxLayout(textBlock, BoxLayout.Y_AXIS));
 
         JLabel lblL = new JLabel(label);
-        lblL.setFont(FONT_KPI_LBL); lblL.setForeground(TEXT_SECONDARY);
+        lblL.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        lblL.setForeground(TEXT_MUTED);
+        lblL.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel valL = new JLabel("...");
+        valL.setFont(new Font("Segoe UI", Font.BOLD, 28));
+        valL.setForeground(TEXT_PRIMARY);
+        valL.setAlignmentX(Component.LEFT_ALIGNMENT);
+        valRef.accept(valL);
 
         JLabel trendL = new JLabel("Chargement...");
-        trendL.setFont(new Font("Trebuchet MS", Font.PLAIN, 10));
-        trendL.setForeground(TEXT_MUTED);
+        trendL.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        trendL.setForeground(TEXT_SECONDARY);
+        trendL.setAlignmentX(Component.LEFT_ALIGNMENT);
         trendRef.accept(trendL);
 
-        JPanel left = new JPanel();
-        left.setOpaque(false);
-        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
-        left.setBorder(BorderFactory.createEmptyBorder(0,0,0,8));
-        left.add(valL); left.add(Box.createVerticalStrut(2));
-        left.add(lblL); left.add(Box.createVerticalStrut(4)); left.add(trendL);
+        textBlock.add(lblL);
+        textBlock.add(Box.createVerticalStrut(8));
+        textBlock.add(valL);
+        textBlock.add(Box.createVerticalStrut(4));
+        textBlock.add(trendL);
 
+        // Bulle icône (48x48, rounded 12, teinte accent)
         JPanel iconBubble = new JPanel(new GridBagLayout()) {
             @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g;
+                Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),18));
-                g2.fillOval(0,0,getWidth()-1,getHeight()-1);
+                g2.setColor(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 30));
+                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 12, 12));
+                g2.dispose();
             }
-            @Override public Dimension getPreferredSize() { return new Dimension(44,44); }
+            @Override public Dimension getPreferredSize() { return new Dimension(48, 48); }
+            @Override public Dimension getMinimumSize()   { return getPreferredSize(); }
+            @Override public Dimension getMaximumSize()   { return getPreferredSize(); }
         };
         iconBubble.setOpaque(false);
         JLabel iconL = new JLabel(icon);
-        iconL.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 20));
+        iconL.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 22));
+        iconL.setForeground(accent);
         iconBubble.add(iconL);
 
-        JPanel kpi = new JPanel() {
-            boolean h = false;
-            {
-                setOpaque(false); setCursor(new Cursor(Cursor.HAND_CURSOR));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { h=true;  repaint(); }
-                    public void mouseExited(MouseEvent e)  { h=false; repaint(); }
-                    public void mouseClicked(MouseEvent e) { switchPage(targetPage); }
-                });
-                setLayout(new BorderLayout());
-                setBorder(BorderFactory.createEmptyBorder(16,18,16,18));
-            }
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(SHADOW_COLOR);
-                g2.fill(new RoundRectangle2D.Double(2,3,getWidth()-4,getHeight()-2,12,12));
-                g2.setColor(h ? BG_CARD_HOVER : BG_CARD);
-                g2.fill(new RoundRectangle2D.Double(0,0,getWidth()-2,getHeight()-2,12,12));
-                g2.setColor(accent);
-                g2.fill(new RoundRectangle2D.Double(0,0,getWidth()-2,3,3,3));
-                g2.setColor(h ? new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),50) : BORDER_LIGHT);
-                g2.setStroke(new BasicStroke(1f));
-                g2.draw(new RoundRectangle2D.Double(0,0,getWidth()-2,getHeight()-2,12,12));
-            }
+        JPanel iconWrap = new JPanel(new GridBagLayout());
+        iconWrap.setOpaque(false);
+        iconWrap.add(iconBubble);
+
+        card.add(textBlock, BorderLayout.CENTER);
+        card.add(iconWrap, BorderLayout.EAST);
+
+        // Click-through : propagé à tous les enfants via MouseListener récursif
+        MouseAdapter clickNav = new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) { switchPage(targetPage); }
         };
-        kpi.add(left,       BorderLayout.CENTER);
-        kpi.add(iconBubble, BorderLayout.EAST);
-        return kpi;
+        attachClickListener(card, clickNav);
+        return card;
+    }
+
+    /** Propage le listener à tous les sous-composants pour qu'un clic n'importe où sur la carte navigue. */
+    private static void attachClickListener(Container c, MouseAdapter ml) {
+        c.addMouseListener(ml);
+        for (Component child : c.getComponents()) {
+            if (child instanceof Container sub) attachClickListener(sub, ml);
+            else child.addMouseListener(ml);
+        }
     }
 
     // ── Module Grid ──────────────────────────────────────────────────────────
@@ -712,7 +761,7 @@ public class Dashboard extends JFrame {
                         else JOptionPane.showMessageDialog(Dashboard.this,
                                 "<html><b>" + title + "</b><br><small>" + desc + "</small><br><br>" +
                                         "<i>Module en d\u00e9veloppement</i></html>",
-                                "Intermart", JOptionPane.INFORMATION_MESSAGE);
+                                "Voucher System", JOptionPane.INFORMATION_MESSAGE);
                     }
                 });
             }
@@ -769,7 +818,7 @@ public class Dashboard extends JFrame {
         Color  tagColor = targetPage != null
                 ? new Color(accent.getRed(),accent.getGreen(),accent.getBlue(),200) : TEXT_MUTED;
         JLabel dot = new JLabel(tagText);
-        dot.setFont(new Font("Trebuchet MS", Font.BOLD, 9)); dot.setForeground(tagColor);
+        dot.setFont(new Font("Segoe UI", Font.BOLD, 9)); dot.setForeground(tagColor);
         tag.add(dot);
 
         inner.add(bubble); inner.add(Box.createVerticalStrut(12));
@@ -806,7 +855,7 @@ public class Dashboard extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(Color.WHITE); g2.fillOval(0,0,getWidth()-1,getHeight()-1);
                 String init = username.length()>0?String.valueOf(username.charAt(0)).toUpperCase():"U";
-                g2.setFont(new Font("Georgia",Font.BOLD,28)); g2.setColor(RED_PRIMARY);
+                g2.setFont(new Font("Segoe UI",Font.BOLD,28)); g2.setColor(RED_PRIMARY);
                 FontMetrics fm = g2.getFontMetrics();
                 g2.drawString(init,(getWidth()-fm.stringWidth(init))/2,(getHeight()+fm.getAscent()-fm.getDescent())/2);
             }
@@ -816,7 +865,7 @@ public class Dashboard extends JFrame {
         };
         av.setOpaque(false); av.setAlignmentX(Component.CENTER_ALIGNMENT);
         JLabel nameL = new JLabel(username);
-        nameL.setFont(new Font("Georgia",Font.BOLD,18)); nameL.setForeground(Color.WHITE);
+        nameL.setFont(new Font("Segoe UI",Font.BOLD,18)); nameL.setForeground(Color.WHITE);
         nameL.setAlignmentX(Component.CENTER_ALIGNMENT);
         JLabel roleL = new JLabel(role);
         roleL.setFont(FONT_BADGE); roleL.setForeground(new Color(255,255,255,200));
@@ -855,9 +904,9 @@ public class Dashboard extends JFrame {
         JPanel texts = new JPanel(); texts.setOpaque(false);
         texts.setLayout(new BoxLayout(texts, BoxLayout.Y_AXIS));
         JLabel lbl = new JLabel(label);
-        lbl.setFont(new Font("Trebuchet MS",Font.PLAIN,10)); lbl.setForeground(TEXT_MUTED);
+        lbl.setFont(new Font("Segoe UI",Font.PLAIN,10)); lbl.setForeground(TEXT_MUTED);
         JLabel val = new JLabel(value);
-        val.setFont(new Font("Trebuchet MS",Font.BOLD,13)); val.setForeground(TEXT_PRIMARY);
+        val.setFont(new Font("Segoe UI",Font.BOLD,13)); val.setForeground(TEXT_PRIMARY);
         texts.add(lbl); texts.add(val);
         row.add(ico,BorderLayout.WEST); row.add(texts,BorderLayout.CENTER);
         JPanel sep = new JPanel(new BorderLayout()) {
@@ -935,10 +984,12 @@ public class Dashboard extends JFrame {
 
     // ── Logout ────────────────────────────────────────────────────────────────
     private void confirmLogout() {
-        int c = JOptionPane.showConfirmDialog(this,
-                "Confirmer la d\u00e9connexion de " + username + " ?",
-                "D\u00e9connexion", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-        if (c==JOptionPane.YES_OPTION) deconnecter();
+        boolean ok = UIUtils.confirmDialog(this,
+                "Confirmer la d\u00e9connexion",
+                "Vous êtes sur le point de vous déconnecter en tant que <b>" + username
+                        + "</b>. Toute saisie non enregistrée sera perdue.",
+                "Se d\u00e9connecter", "Annuler");
+        if (ok) deconnecter();
     }
 
     private void deconnecter() {

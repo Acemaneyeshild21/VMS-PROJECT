@@ -68,7 +68,7 @@ public class RedemptionPanel extends JPanel {
         titleRow.add(title);
 
         JLabel sub = new JLabel("Scannez ou saisissez le code du bon pour le valider");
-        sub.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
+        sub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         sub.setForeground(TEXT_S);
 
         titleBlock.add(titleRow);
@@ -89,7 +89,7 @@ public class RedemptionPanel extends JPanel {
         magasinCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 80));
 
         JLabel lblMagasin = new JLabel("POINT DE VENTE");
-        lblMagasin.setFont(new Font("Trebuchet MS", Font.BOLD, 9));
+        lblMagasin.setFont(new Font("Segoe UI", Font.BOLD, 9));
         lblMagasin.setForeground(TEXT_M);
         cbMagasin = new JComboBox<>();
         cbMagasin.setFont(VMSStyle.FONT_CARD_DSC);
@@ -108,7 +108,7 @@ public class RedemptionPanel extends JPanel {
         scanCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 160));
 
         JLabel lblScan = new JLabel("CODE DU BON");
-        lblScan.setFont(new Font("Trebuchet MS", Font.BOLD, 9));
+        lblScan.setFont(new Font("Segoe UI", Font.BOLD, 9));
         lblScan.setForeground(TEXT_M);
 
         JPanel inputRow = new JPanel(new BorderLayout(10, 0));
@@ -154,7 +154,7 @@ public class RedemptionPanel extends JPanel {
         inputRow.add(btnValider, BorderLayout.EAST);
 
         JLabel hint = new JLabel("\uD83D\uDD0D Saisissez le code ou scannez le QR code avec un lecteur USB");
-        hint.setFont(new Font("Trebuchet MS", Font.ITALIC, 11));
+        hint.setFont(new Font("Segoe UI", Font.ITALIC, 11));
         hint.setForeground(TEXT_M);
 
         scanCard.add(lblScan, BorderLayout.NORTH);
@@ -170,7 +170,7 @@ public class RedemptionPanel extends JPanel {
         resultPanel.setPreferredSize(new Dimension(0, 200));
 
         JLabel placeholder = new JLabel("Le résultat de la validation apparaîtra ici");
-        placeholder.setFont(new Font("Trebuchet MS", Font.ITALIC, 13));
+        placeholder.setFont(new Font("Segoe UI", Font.ITALIC, 13));
         placeholder.setForeground(TEXT_M);
         placeholder.setHorizontalAlignment(SwingConstants.CENTER);
         resultPanel.add(placeholder, BorderLayout.CENTER);
@@ -250,7 +250,7 @@ public class RedemptionPanel extends JPanel {
 
         // Message
         JLabel msgLbl = new JLabel(message);
-        msgLbl.setFont(new Font("Trebuchet MS", Font.PLAIN, 14));
+        msgLbl.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         msgLbl.setForeground(TEXT_P);
         msgLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
 
@@ -273,7 +273,7 @@ public class RedemptionPanel extends JPanel {
         // Horodatage
         JLabel timeLbl = new JLabel(new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
                 .format(new java.util.Date()));
-        timeLbl.setFont(new Font("Trebuchet MS", Font.PLAIN, 11));
+        timeLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         timeLbl.setForeground(TEXT_M);
         timeLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
         resultPanel.add(Box.createVerticalStrut(8));

@@ -41,10 +41,10 @@ public class GestionDemande extends JPanel {
     private static final Font FONT_PAGE_TITLE = VMSStyle.FONT_BRAND.deriveFont(24f);
     private static final Font FONT_SECTION    = VMSStyle.FONT_BADGE.deriveFont(9f);
     private static final Font FONT_TABLE_HDR  = VMSStyle.FONT_BADGE.deriveFont(12f);
-    private static final Font FONT_TABLE_CELL = new Font("Trebuchet MS", Font.PLAIN, 12);
-    private static final Font FONT_BADGE      = new Font("Trebuchet MS", Font.BOLD,  10);
-    private static final Font FONT_BTN        = new Font("Trebuchet MS", Font.BOLD,  12);
-    private static final Font FONT_FILTER     = new Font("Trebuchet MS", Font.PLAIN, 12);
+    private static final Font FONT_TABLE_CELL = new Font("Segoe UI", Font.PLAIN, 12);
+    private static final Font FONT_BADGE      = new Font("Segoe UI", Font.BOLD,  10);
+    private static final Font FONT_BTN        = new Font("Segoe UI", Font.BOLD,  12);
+    private static final Font FONT_FILTER     = new Font("Segoe UI", Font.PLAIN, 12);
 
     // Colonnes tableau
     private static final String[] COLS = {
@@ -72,17 +72,20 @@ public class GestionDemande extends JPanel {
     private JTextField        txtSearch;
     private JLabel            lblTotal;
     private String            filtreStatutActif = "TOUTES";
+    private CardLayout        tableCards;
+    private JPanel            tableCardHolder;
+    private boolean           canCreate;
 
     public GestionDemande(String role, int userId) {
         this.role   = role;
         this.userId = userId;
-        boolean canCreate = "Administrateur".equalsIgnoreCase(role) || "Manager".equalsIgnoreCase(role) 
+        this.canCreate = "Administrateur".equalsIgnoreCase(role) || "Manager".equalsIgnoreCase(role)
                             || "Collaborateur".equalsIgnoreCase(role);
         setLayout(new BorderLayout());
         setOpaque(false);
         initComponents();
         chargerDemandes();
-        
+
         // Cacher le bouton "Nouvelle Demande" si pas autorisé
         if (!canCreate && btnNouveau != null) {
             btnNouveau.setVisible(false);
@@ -90,106 +93,61 @@ public class GestionDemande extends JPanel {
     }
 
     private void initComponents() {
-        JPanel wrapper = new JPanel(new BorderLayout(0, 0));
+        JPanel wrapper = new JPanel(new BorderLayout(0, 14));
         wrapper.setOpaque(false);
-        wrapper.setBorder(BorderFactory.createEmptyBorder(28, 32, 28, 32));
+        wrapper.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         wrapper.add(buildHeader(), BorderLayout.NORTH);
 
-        JPanel mid = new JPanel(new BorderLayout(0, 12));
+        JPanel mid = new JPanel(new BorderLayout(0, 14));
         mid.setOpaque(false);
-        mid.setBorder(BorderFactory.createEmptyBorder(18, 0, 0, 0));
         mid.add(buildToolbar(),   BorderLayout.NORTH);
         mid.add(buildTableCard(), BorderLayout.CENTER);
         wrapper.add(mid, BorderLayout.CENTER);
         add(wrapper, BorderLayout.CENTER);
     }
 
-    // ── HEADER ──────────────────────────────────────────────────────────────
+    // ── HEADER (PageLayout) ────────────────────────────────────────────────
     private JPanel buildHeader() {
-        JPanel h = new JPanel(new BorderLayout());
-        h.setOpaque(false);
-
-        JPanel left = new JPanel();
-        left.setOpaque(false);
-        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
-
-        JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0)) {
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                g.setColor(RED_PRIMARY);
-                g.fillRoundRect(0, 3, 4, getHeight() - 6, 4, 4);
-            }
-        };
-        titleRow.setOpaque(false);
-        titleRow.setBorder(BorderFactory.createEmptyBorder(0, 14, 0, 0));
-        JLabel icon  = new JLabel("\uD83D\uDCCB");
-        icon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 26));
-        JLabel title = new JLabel("  Gestion des Demandes");
-        title.setFont(FONT_PAGE_TITLE);
-        title.setForeground(TEXT_PRIMARY);
-        titleRow.add(icon); titleRow.add(title);
-        titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JLabel sub = new JLabel("Suivi complet du cycle de vie des demandes de bons cadeau");
-        sub.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
-        sub.setForeground(TEXT_SECOND);
-        sub.setBorder(BorderFactory.createEmptyBorder(5, 14, 0, 0));
-        sub.setAlignmentX(Component.LEFT_ALIGNMENT);
-        left.add(titleRow); left.add(sub);
-
-        btnNouveau = UIUtils.buildRedButton("+ Nouvelle Demande");
+        btnNouveau = UIUtils.buildPrimaryButton("+ Nouvelle Demande", 200, 40);
         btnNouveau.addActionListener(e -> ouvrirNouvelledemande());
-        h.add(left,   BorderLayout.CENTER);
-        h.add(btnNouveau, BorderLayout.EAST);
-        return h;
+        return PageLayout.buildPageHeader(
+                "Demandes",
+                "Suivi complet du cycle de vie des demandes de bons cadeau",
+                btnNouveau
+        );
     }
 
-    // ── TOOLBAR ─────────────────────────────────────────────────────────────
+    // ── TOOLBAR (chips de statut + filter bar) ──────────────────────────────
     private JPanel buildToolbar() {
-        JPanel bar = new JPanel(new BorderLayout(16, 0));
-        bar.setOpaque(false);
+        JPanel outer = new JPanel(new BorderLayout(0, 10));
+        outer.setOpaque(false);
 
-        JPanel chips = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        chips.setOpaque(false);
-        chips.add(buildChip("Toutes",    null,         "TOUTES"));
-        chips.add(buildChip("En attente", WARNING,     ST_ATTENTE_PAIEMENT));
-        chips.add(buildChip("Payées",     ACCENT_BLUE, ST_PAYE));
-        chips.add(buildChip("Approuvées", ACCENT_PURP, ST_APPROUVE));
-        chips.add(buildChip("Générées",   SUCCESS,     ST_GENERE));
-        chips.add(buildChip("Envoyées",   new Color(20,170,190), ST_ENVOYE));
-        chips.add(buildChip("Rejetées",   RED_PRIMARY, ST_REJETE));
+        // Chips
+        JPanel chipsCard = PageLayout.buildCard(new FlowLayout(FlowLayout.LEFT, 8, 0), 12);
+        chipsCard.add(buildChip("Toutes",    null,         "TOUTES"));
+        chipsCard.add(buildChip("En attente", WARNING,     ST_ATTENTE_PAIEMENT));
+        chipsCard.add(buildChip("Payées",     ACCENT_BLUE, ST_PAYE));
+        chipsCard.add(buildChip("Approuvées", ACCENT_PURP, ST_APPROUVE));
+        chipsCard.add(buildChip("Générées",   SUCCESS,     ST_GENERE));
+        chipsCard.add(buildChip("Envoyées",   new Color(20,170,190), ST_ENVOYE));
+        chipsCard.add(buildChip("Rejetées",   RED_PRIMARY, ST_REJETE));
+        outer.add(chipsCard, BorderLayout.NORTH);
 
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        right.setOpaque(false);
-        txtSearch = new JTextField(18) {
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                if (getText().isEmpty()) {
-                    Graphics2D g2 = (Graphics2D) g;
-                    g2.setFont(FONT_FILTER); g2.setColor(TEXT_MUTED);
-                    Insets i = getInsets();
-                    g2.drawString("\uD83D\uDD0D  Rechercher...", i.left, getHeight() - i.bottom - 4);
-                }
-            }
-        };
-        txtSearch.setFont(FONT_FILTER);
-        txtSearch.setForeground(TEXT_PRIMARY);
-        txtSearch.setBackground(BG_CARD);
-        txtSearch.setCaretColor(RED_PRIMARY);
-        txtSearch.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER_LIGHT, 1),
-                BorderFactory.createEmptyBorder(7, 12, 7, 12)));
-        txtSearch.setPreferredSize(new Dimension(220, 36));
+        // Barre recherche + actualiser
+        PageLayout.FilterBar fb = PageLayout.buildFilterBar("Rechercher une demande (référence, client, magasin)...");
+        txtSearch = fb.search();
         txtSearch.addKeyListener(new KeyAdapter() {
             public void keyReleased(KeyEvent e) { filtrerTable(); }
         });
-        JButton btnRefresh = buildIconButton("\u21BB", "Actualiser");
+        JButton btnRefresh = UIUtils.buildGhostButton("Actualiser", 110, 38);
         btnRefresh.addActionListener(e -> chargerDemandes());
-        right.add(txtSearch); right.add(btnRefresh);
+        fb.addSlot(btnRefresh);
 
-        bar.add(chips, BorderLayout.CENTER);
-        bar.add(right, BorderLayout.EAST);
-        return bar;
+        JPanel wrap = new JPanel(new BorderLayout(0, 10));
+        wrap.setOpaque(false);
+        wrap.add(chipsCard, BorderLayout.NORTH);
+        wrap.add(fb.panel(), BorderLayout.CENTER);
+        return wrap;
     }
 
     private JButton buildChip(String label, Color color, String statut) {
@@ -233,72 +191,35 @@ public class GestionDemande extends JPanel {
         return chip;
     }
 
-    // ── TABLE CARD ──────────────────────────────────────────────────────────
+    // ── TABLE CARD (ModernTable) ────────────────────────────────────────────
     private JPanel buildTableCard() {
-        JPanel card = new JPanel(new BorderLayout()) {
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(BG_CARD);
-                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 14, 14));
-                g2.setColor(BORDER_LIGHT); g2.setStroke(new BasicStroke(1f));
-                g2.draw(new RoundRectangle2D.Double(0.5, 0.5, getWidth()-1, getHeight()-1, 14, 14));
-                g2.dispose();
-            }
-        };
-        card.setOpaque(false);
-
         tableModel = new DefaultTableModel(COLS, 0) {
             @Override public boolean isCellEditable(int r, int c) { return c == COL_ACTIONS; }
         };
 
-        table = new JTable(tableModel) {
-            @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
-                Component c = super.prepareRenderer(r, row, col);
-                if (!isRowSelected(row))
-                    c.setBackground(row % 2 == 0 ? BG_CARD : new Color(249, 250, 252));
-                else c.setBackground(RED_LIGHT);
-                return c;
-            }
-        };
-        table.setFont(FONT_TABLE_CELL);
-        table.setRowHeight(44);
-        table.setShowHorizontalLines(true);
-        table.setShowVerticalLines(false);
-        table.setGridColor(new Color(240, 242, 246));
-        table.setSelectionBackground(RED_LIGHT);
-        table.setSelectionForeground(TEXT_PRIMARY);
-        table.setFocusable(false);
-        table.getTableHeader().setReorderingAllowed(false);
-
-        JTableHeader header = table.getTableHeader();
-        header.setFont(FONT_TABLE_HDR);
-        header.setBackground(new Color(248, 249, 252));
-        header.setForeground(TEXT_SECOND);
-        header.setPreferredSize(new Dimension(0, 42));
-        header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_LIGHT));
+        table = new JTable(tableModel);
+        ModernTable.apply(table);
+        table.setAutoCreateRowSorter(false); // Gestion via RowSorter custom plus bas
 
         int[] widths = {40, 120, 150, 55, 95, 110, 120, 110, 80, 130, 80};
         for (int i = 0; i < widths.length; i++)
-            table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
+            ModernTable.setColumnWidth(table, i, widths[i]);
         table.getColumnModel().getColumn(COL_ID).setMaxWidth(40);
 
-        table.getColumnModel().getColumn(COL_STATUT).setCellRenderer(new StatutRenderer());
+        // Renderers spécifiques (badge statut, montants)
+        ModernTable.setColumnRenderer(table, COL_REF, ModernTable.boldRenderer());
+        ModernTable.setColumnRenderer(table, COL_STATUT, new StatutRenderer());
+        ModernTable.setColumnRenderer(table, COL_NB, ModernTable.centerRenderer());
+        ModernTable.setColumnRenderer(table, COL_VU, ModernTable.moneyRenderer());
+        ModernTable.setColumnRenderer(table, COL_TOTAL, ModernTable.moneyRenderer());
         table.getColumnModel().getColumn(COL_ACTIONS).setCellRenderer(new ActionRenderer());
         table.getColumnModel().getColumn(COL_ACTIONS).setCellEditor(new ActionEditor());
 
-        DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
-        rightRenderer.setHorizontalAlignment(SwingConstants.RIGHT);
-        table.getColumnModel().getColumn(COL_NB).setCellRenderer(rightRenderer);
-        table.getColumnModel().getColumn(COL_VU).setCellRenderer(rightRenderer);
-        table.getColumnModel().getColumn(COL_TOTAL).setCellRenderer(rightRenderer);
+        // Carte contenant table + footer compteur
+        JPanel card = PageLayout.buildCard(new BorderLayout(), 0);
 
-        JScrollPane scroll = new JScrollPane(table);
-        scroll.setBorder(null); scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        scroll.getVerticalScrollBar().setUnitIncrement(16);
-        scroll.getViewport().setBackground(BG_CARD);
+        JScrollPane scroll = ModernTable.wrap(table);
+        scroll.setBorder(null);
 
         JPanel footer = new JPanel(new BorderLayout());
         footer.setOpaque(false);
@@ -306,13 +227,50 @@ public class GestionDemande extends JPanel {
                 BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER_LIGHT),
                 BorderFactory.createEmptyBorder(10, 16, 10, 16)));
         lblTotal = new JLabel("Chargement...");
-        lblTotal.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        lblTotal.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         lblTotal.setForeground(TEXT_MUTED);
         footer.add(lblTotal, BorderLayout.WEST);
 
-        card.add(scroll,  BorderLayout.CENTER);
-        card.add(footer,  BorderLayout.SOUTH);
-        return card;
+        card.add(scroll, BorderLayout.CENTER);
+        card.add(footer, BorderLayout.SOUTH);
+
+        // Empty states : table / no-data / no-result
+        JPanel emptyNoData = PageLayout.buildCard(new BorderLayout(), 0);
+        emptyNoData.add(PageLayout.buildEmptyState(
+                "Aucune demande",
+                "Les demandes apparaîtront ici dès qu'elles seront créées.",
+                canCreate ? "+ Nouvelle Demande" : null,
+                canCreate ? this::ouvrirNouvelledemande : null
+        ), BorderLayout.CENTER);
+
+        JPanel emptyNoResult = PageLayout.buildCard(new BorderLayout(), 0);
+        emptyNoResult.add(PageLayout.buildEmptyState(
+                "Aucun résultat",
+                "Aucune demande ne correspond au filtre ou à la recherche.",
+                "Réinitialiser les filtres",
+                () -> { txtSearch.setText(""); filtreStatutActif = "TOUTES"; filtrerTable(); }
+        ), BorderLayout.CENTER);
+
+        tableCards = new CardLayout();
+        tableCardHolder = new JPanel(tableCards);
+        tableCardHolder.setOpaque(false);
+        tableCardHolder.add(card, "table");
+        tableCardHolder.add(emptyNoData, "empty-no-data");
+        tableCardHolder.add(emptyNoResult, "empty-no-result");
+        return tableCardHolder;
+    }
+
+    private void updateTableView() {
+        if (tableCards == null) return;
+        int total = tableModel.getRowCount();
+        int visible = table.getRowCount();
+        if (total == 0) {
+            tableCards.show(tableCardHolder, "empty-no-data");
+        } else if (visible == 0) {
+            tableCards.show(tableCardHolder, "empty-no-result");
+        } else {
+            tableCards.show(tableCardHolder, "table");
+        }
     }
 
     // ── CHARGEMENT BD ───────────────────────────────────────────────────────
@@ -365,6 +323,7 @@ public class GestionDemande extends JPanel {
                         tableModel.addRow(row);
                     }
                     lblTotal.setText(data.size() + " demande" + (data.size() > 1 ? "s" : "") + " au total");
+                    updateTableView();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -393,6 +352,7 @@ public class GestionDemande extends JPanel {
 
         int visible = table.getRowCount();
         lblTotal.setText(visible + " demande" + (visible > 1 ? "s" : "") + " affichée" + (visible > 1 ? "s" : ""));
+        updateTableView();
     }
 
     // ── RENDERER STATUT ─────────────────────────────────────────────────────
@@ -580,7 +540,7 @@ public class GestionDemande extends JPanel {
             lblRef.setFont(new Font("Georgia", Font.BOLD, 18));
             lblRef.setForeground(Color.WHITE);
             JLabel lblSt = new JLabel(statut != null ? statut : "—");
-            lblSt.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+            lblSt.setFont(new Font("Segoe UI", Font.PLAIN, 12));
             lblSt.setForeground(new Color(255,255,255,180));
             hdrLeft.add(lblRef); hdrLeft.add(lblSt);
             hdr.add(hdrLeft, BorderLayout.CENTER);
@@ -622,7 +582,7 @@ public class GestionDemande extends JPanel {
 
         } catch (SQLException e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Erreur : " + e.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+            ToastManager.error(this, "Erreur : " + e.getMessage());
         }
     }
 
@@ -689,7 +649,7 @@ public class GestionDemande extends JPanel {
             chargerDemandes();
         } catch (SQLException e) {
             e.printStackTrace();
-            JOptionPane.showMessageDialog(this, "Erreur : " + e.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+            ToastManager.error(this, "Erreur : " + e.getMessage());
         }
     }
 
@@ -710,8 +670,7 @@ public class GestionDemande extends JPanel {
                 try {
                     java.util.List<BonDAO.BonInfo> bons = get();
                     if (bons.isEmpty()) {
-                        JOptionPane.showMessageDialog(GestionDemande.this,
-                                "Aucun bon genere.", "Info", JOptionPane.INFORMATION_MESSAGE);
+                        ToastManager.info(GestionDemande.this, "Aucun bon généré");
                         return;
                     }
 
@@ -724,9 +683,7 @@ public class GestionDemande extends JPanel {
 
                 } catch (Exception ex) {
                     ex.printStackTrace();
-                    JOptionPane.showMessageDialog(GestionDemande.this,
-                            "Erreur lors de la generation : " + ex.getMessage(),
-                            "Erreur", JOptionPane.ERROR_MESSAGE);
+                    ToastManager.error(GestionDemande.this, "Erreur génération : " + ex.getMessage());
                 }
             }
         };
@@ -760,10 +717,10 @@ public class GestionDemande extends JPanel {
         row.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
         JLabel k = new JLabel(key);
-        k.setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        k.setFont(new Font("Segoe UI", Font.BOLD, 12));
         k.setForeground(TEXT_SECOND); k.setPreferredSize(new Dimension(130, 20));
         JLabel v = new JLabel(value);
-        v.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        v.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         v.setForeground(TEXT_PRIMARY);
         row.add(k, BorderLayout.WEST); row.add(v, BorderLayout.CENTER);
         return row;
@@ -774,7 +731,7 @@ public class GestionDemande extends JPanel {
     private JButton buildIconButton(String symbol, String tooltip) {
         JButton btn = new JButton(symbol) {
             boolean h = false;
-            { setFont(new Font("Trebuchet MS", Font.BOLD, 16)); setForeground(TEXT_SECOND);
+            { setFont(new Font("Segoe UI", Font.BOLD, 16)); setForeground(TEXT_SECOND);
                 setOpaque(false); setContentAreaFilled(false);
                 setBorderPainted(false); setFocusPainted(false);
                 setToolTipText(tooltip); setCursor(new Cursor(Cursor.HAND_CURSOR));
@@ -800,7 +757,7 @@ public class GestionDemande extends JPanel {
 
     private JButton buildCloseBtn(Runnable action) {
         JButton btn = new JButton("\u2715") {
-            { setFont(new Font("Trebuchet MS", Font.BOLD, 13));
+            { setFont(new Font("Segoe UI", Font.BOLD, 13));
                 setForeground(new Color(255,255,255,180));
                 setOpaque(false); setContentAreaFilled(false);
                 setBorderPainted(false); setFocusPainted(false);

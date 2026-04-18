@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Panneau Statistiques & Rapports du VMS Intermart Maurice.
+ * Panneau Statistiques & Rapports du Voucher System.
  * Affiche les KPI, la repartition par statut, l'activite recente et le top clients.
  */
 public class StatistiquesPanel extends JPanel {
@@ -39,12 +39,12 @@ public class StatistiquesPanel extends JPanel {
     // ── Fonts (Centralisees via VMSStyle) ────────────────────────────────────
     private static final Font FONT_PAGE_TITLE = VMSStyle.FONT_BRAND.deriveFont(24f);
     private static final Font FONT_SECTION    = new Font("Georgia", Font.BOLD, 15);
-    private static final Font FONT_TABLE_HDR  = new Font("Trebuchet MS", Font.BOLD, 12);
-    private static final Font FONT_TABLE_CELL = new Font("Trebuchet MS", Font.PLAIN, 12);
-    private static final Font FONT_BADGE      = new Font("Trebuchet MS", Font.BOLD, 10);
+    private static final Font FONT_TABLE_HDR  = new Font("Segoe UI", Font.BOLD, 12);
+    private static final Font FONT_TABLE_CELL = new Font("Segoe UI", Font.PLAIN, 12);
+    private static final Font FONT_BADGE      = new Font("Segoe UI", Font.BOLD, 10);
     private static final Font FONT_KPI_VAL    = VMSStyle.FONT_KPI_VAL;
     private static final Font FONT_KPI_LBL    = VMSStyle.FONT_KPI_LBL;
-    private static final Font FONT_BTN        = new Font("Trebuchet MS", Font.BOLD, 12);
+    private static final Font FONT_BTN        = new Font("Segoe UI", Font.BOLD, 12);
 
     private static final DecimalFormat FMT_MONTANT = new DecimalFormat("#,##0.00");
     private static final DecimalFormat FMT_PERCENT = new DecimalFormat("0.0");
@@ -135,7 +135,7 @@ public class StatistiquesPanel extends JPanel {
         titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JLabel sub = new JLabel("Vue d'ensemble des indicateurs et de l'activit\u00e9 du syst\u00e8me VMS");
-        sub.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
+        sub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         sub.setForeground(TEXT_SECOND);
         sub.setBorder(BorderFactory.createEmptyBorder(5, 14, 0, 0));
         sub.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -351,7 +351,7 @@ public class StatistiquesPanel extends JPanel {
         titleL.setForeground(TEXT_PRIMARY);
 
         JLabel subtitleL = new JLabel("  (par montant total des demandes)");
-        subtitleL.setFont(new Font("Trebuchet MS", Font.ITALIC, 11));
+        subtitleL.setFont(new Font("Segoe UI", Font.ITALIC, 11));
         subtitleL.setForeground(TEXT_MUTED);
 
         JPanel headerRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
@@ -670,7 +670,7 @@ public class StatistiquesPanel extends JPanel {
         JButton btn = new JButton(symbol) {
             boolean h = false;
             {
-                setFont(new Font("Trebuchet MS", Font.BOLD, 16));
+                setFont(new Font("Segoe UI", Font.BOLD, 16));
                 setForeground(TEXT_SECOND);
                 setOpaque(false);
                 setContentAreaFilled(false);

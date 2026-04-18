@@ -6,149 +6,168 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
-import java.sql.SQLException;
 
+/**
+ * Écran de connexion — design InvoiceNinja-like.
+ * Split gauche (hero brand) / droite (formulaire clean).
+ */
 public class LoginForm extends JFrame {
 
-    private static final Color BG         = VMSStyle.BG_ROOT;
-    private static final Color RED        = VMSStyle.RED_PRIMARY;
-    private static final Color RED_DK     = VMSStyle.RED_DARK;
-    private static final Color TEXT_P     = VMSStyle.TEXT_PRIMARY;
-    private static final Color TEXT_S     = VMSStyle.TEXT_SECONDARY;
-    private static final Color TEXT_M     = VMSStyle.TEXT_MUTED;
-    private static final Color BORDER     = VMSStyle.BORDER_LIGHT;
-    private static final Color SUCCESS    = VMSStyle.SUCCESS;
+    private static final Color RED     = VMSStyle.RED_PRIMARY;
+    private static final Color RED_DK  = VMSStyle.RED_DARK;
+    private static final Color TEXT_P  = VMSStyle.TEXT_PRIMARY;
+    private static final Color TEXT_S  = VMSStyle.TEXT_SECONDARY;
+    private static final Color TEXT_M  = VMSStyle.TEXT_MUTED;
+    private static final Color BORDER  = VMSStyle.BORDER_LIGHT;
+    private static final Color SUCCESS = VMSStyle.SUCCESS;
 
-    private JTextField       txtUsername;
-    private JPasswordField   txtPassword;
-    private JLabel           lblError;
-    private JButton          btnLogin;
-    private boolean          showPassword = false;
+    private JTextField     txtUsername;
+    private JPasswordField txtPassword;
+    private JLabel         lblError;
+    private JButton        btnLogin;
 
     private int xOff, yOff;
 
     public LoginForm() {
-        setTitle("Connexion \u2014 Intermart VMS");
-        setSize(960, 580);
+        setTitle("Connexion — Voucher System");
+        setSize(980, 620);
         setUndecorated(true);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
-        JPanel root = new JPanel(new BorderLayout());
-        root.setBackground(Color.WHITE);
+        JPanel root = new JPanel(new BorderLayout()) {
+            @Override protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(Color.WHITE);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.dispose();
+            }
+        };
         root.setBorder(BorderFactory.createLineBorder(BORDER, 1));
-
         root.add(buildLeftBrand(),  BorderLayout.WEST);
-        root.add(buildRightForm(), BorderLayout.CENTER);
+        root.add(buildRightForm(),  BorderLayout.CENTER);
 
         enableDrag(root);
         setContentPane(root);
     }
 
     // =====================================================================
-    //  LEFT BRANDING PANEL
+    //  LEFT HERO PANEL
     // =====================================================================
     private JPanel buildLeftBrand() {
         JPanel p = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                GradientPaint gp = new GradientPaint(0, 0, RED, 0, getHeight(), RED_DK);
+
+                // Dégradé diagonal rouge profond
+                GradientPaint gp = new GradientPaint(0, 0, RED, getWidth(), getHeight(), RED_DK);
                 g2.setPaint(gp);
                 g2.fillRect(0, 0, getWidth(), getHeight());
 
-                // Subtle pattern
-                g2.setColor(new Color(255, 255, 255, 6));
-                for (int i = 0; i < 30; i++) {
-                    int y = i * 28;
-                    g2.fillRect(0, y, getWidth(), 1);
-                }
+                // Blobs décoratifs (formes douces)
+                g2.setColor(new Color(255, 255, 255, 10));
+                g2.fillOval(-80, -100, 320, 320);
+                g2.fillOval(getWidth() - 180, getHeight() - 240, 340, 340);
 
-                // Decorative circles
+                // Grille très subtile
                 g2.setColor(new Color(255, 255, 255, 8));
-                g2.fillOval(-60, getHeight() - 200, 260, 260);
-                g2.fillOval(getWidth() - 100, -80, 200, 200);
+                for (int y = 0; y < getHeight(); y += 40) {
+                    g2.drawLine(0, y, getWidth(), y);
+                }
                 g2.dispose();
             }
         };
-        p.setPreferredSize(new Dimension(400, 0));
+        p.setPreferredSize(new Dimension(420, 0));
         p.setLayout(new BorderLayout());
-        p.setBorder(BorderFactory.createEmptyBorder(60, 44, 48, 44));
+        p.setBorder(BorderFactory.createEmptyBorder(52, 48, 40, 48));
 
-        JPanel content = new JPanel();
-        content.setOpaque(false);
-        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        // ─── Header : logo vectoriel + nom ───
+        JPanel header = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        header.setOpaque(false);
+        IntermartLogo logo = new IntermartLogo(IntermartLogo.Variant.DARK, 42, "Voucher System", "", false);
+        header.add(logo);
+        p.add(header, BorderLayout.NORTH);
 
-        // Logo
-        JLabel cartIcon = new JLabel("\uD83D\uDED2");
-        cartIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 44));
-        cartIcon.setAlignmentX(Component.LEFT_ALIGNMENT);
-        content.add(cartIcon);
-        content.add(Box.createVerticalStrut(18));
+        // ─── Centre : pitch marketing ───
+        JPanel center = new JPanel();
+        center.setOpaque(false);
+        center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
+        center.setBorder(BorderFactory.createEmptyBorder(40, 0, 0, 0));
 
-        JLabel brand = new JLabel("INTERMART");
-        brand.setFont(new Font("Georgia", Font.BOLD, 32));
-        brand.setForeground(Color.WHITE);
-        brand.setAlignmentX(Component.LEFT_ALIGNMENT);
-        content.add(brand);
+        JLabel heroTitle = new JLabel("<html>Gérez vos bons cadeau<br/>en toute simplicité.</html>");
+        heroTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
+        heroTitle.setForeground(Color.WHITE);
+        heroTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        center.add(heroTitle);
+        center.add(Box.createVerticalStrut(14));
 
-        JLabel tagline = new JLabel("Voucher Management System");
-        tagline.setFont(new Font("Georgia", Font.ITALIC, 13));
-        tagline.setForeground(new Color(255, 255, 255, 170));
-        tagline.setAlignmentX(Component.LEFT_ALIGNMENT);
-        content.add(tagline);
+        JLabel heroSub = new JLabel("<html><body style='width:320px'>"
+                + "Plateforme complète de gestion des bons cadeau — "
+                + "émission, validation, suivi et rédemption en temps réel.</body></html>");
+        heroSub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        heroSub.setForeground(new Color(255, 255, 255, 200));
+        heroSub.setAlignmentX(Component.LEFT_ALIGNMENT);
+        center.add(heroSub);
+        center.add(Box.createVerticalStrut(32));
 
-        // Separator
-        content.add(Box.createVerticalStrut(36));
-        JPanel sep = new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g;
-                g2.setPaint(new GradientPaint(0, 0, new Color(255,255,255,100), getWidth(), 0, new Color(255,255,255,0)));
-                g2.fillRect(0, 0, getWidth(), 1);
-            }
-            @Override public Dimension getPreferredSize()  { return new Dimension(200, 1); }
-            @Override public Dimension getMaximumSize()    { return new Dimension(Integer.MAX_VALUE, 1); }
-        };
-        sep.setOpaque(false);
-        sep.setAlignmentX(Component.LEFT_ALIGNMENT);
-        content.add(sep);
-        content.add(Box.createVerticalStrut(32));
+        // Stats cards (petites cartes transparentes)
+        JPanel stats = new JPanel(new GridLayout(1, 3, 12, 0));
+        stats.setOpaque(false);
+        stats.setAlignmentX(Component.LEFT_ALIGNMENT);
+        stats.setMaximumSize(new Dimension(340, 78));
+        stats.setPreferredSize(new Dimension(340, 78));
+        stats.add(buildStatCard("6", "Rôles"));
+        stats.add(buildStatCard("100%", "Traçable"));
+        stats.add(buildStatCard("24/7", "Disponible"));
+        center.add(stats);
 
-        // Features
-        String[] features = {
-                "Gestion compl\u00e8te des bons cadeau",
-                "Suivi des demandes en temps r\u00e9el",
-                "Multi-magasins & multi-r\u00f4les",
-                "G\u00e9n\u00e9ration PDF avec QR Code",
-                "R\u00e9demption s\u00e9curis\u00e9e anti-fraude"
-        };
-        for (String f : features) {
-            JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-            row.setOpaque(false);
-            row.setAlignmentX(Component.LEFT_ALIGNMENT);
-            row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
+        p.add(center, BorderLayout.CENTER);
 
-            JLabel check = new JLabel("\u2713  ");
-            check.setFont(new Font("Trebuchet MS", Font.BOLD, 13));
-            check.setForeground(new Color(255, 255, 255, 220));
-            JLabel txt = new JLabel(f);
-            txt.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
-            txt.setForeground(new Color(255, 255, 255, 180));
-            row.add(check);
-            row.add(txt);
-            content.add(row);
-            content.add(Box.createVerticalStrut(6));
-        }
-
-        p.add(content, BorderLayout.CENTER);
-
-        // Footer
-        JLabel copy = new JLabel("\u00a9 2025 Intermart Maurice. Tous droits r\u00e9serv\u00e9s.");
-        copy.setFont(new Font("Trebuchet MS", Font.PLAIN, 10));
-        copy.setForeground(new Color(255, 255, 255, 100));
-        p.add(copy, BorderLayout.SOUTH);
+        // ─── Footer ───
+        JPanel footer = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        footer.setOpaque(false);
+        JLabel copy = new JLabel("© 2026 Voucher System");
+        copy.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        copy.setForeground(new Color(255, 255, 255, 130));
+        footer.add(copy);
+        p.add(footer, BorderLayout.SOUTH);
 
         return p;
+    }
+
+    private JPanel buildStatCard(String value, String label) {
+        JPanel card = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(255, 255, 255, 26));
+                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 10, 10));
+                g2.setColor(new Color(255, 255, 255, 40));
+                g2.draw(new RoundRectangle2D.Double(0.5, 0.5, getWidth() - 1, getHeight() - 1, 10, 10));
+                g2.dispose();
+            }
+        };
+        card.setOpaque(false);
+        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+        card.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+
+        JLabel val = new JLabel(value);
+        val.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        val.setForeground(Color.WHITE);
+        val.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        JLabel lbl = new JLabel(label);
+        lbl.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        lbl.setForeground(new Color(255, 255, 255, 180));
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        card.add(val);
+        card.add(Box.createVerticalStrut(2));
+        card.add(lbl);
+        return card;
     }
 
     // =====================================================================
@@ -162,87 +181,95 @@ public class LoginForm extends JFrame {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridx = 0;
         gbc.weightx = 1.0;
-        gbc.insets = new Insets(0, 60, 0, 60);
 
-        // Close button
+        // Close button (top-right)
         gbc.gridy = 0;
-        gbc.insets = new Insets(16, 0, 0, 16);
+        gbc.insets = new Insets(16, 0, 0, 18);
         gbc.anchor = GridBagConstraints.NORTHEAST;
         gbc.fill = GridBagConstraints.NONE;
-        JButton btnClose = buildCloseBtn();
-        p.add(btnClose, gbc);
+        p.add(buildCloseBtn(), gbc);
 
-        // Reset constraints
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.anchor = GridBagConstraints.CENTER;
-        gbc.insets = new Insets(0, 60, 0, 60);
 
-        // Welcome
+        // Titre
         gbc.gridy = 1;
-        gbc.insets = new Insets(10, 60, 4, 60);
-        JLabel lblWelcome = new JLabel("Connexion");
-        lblWelcome.setFont(new Font("Georgia", Font.BOLD, 28));
+        gbc.insets = new Insets(20, 64, 4, 64);
+        JLabel lblWelcome = new JLabel("Bon retour parmi nous");
+        lblWelcome.setFont(new Font("Segoe UI", Font.BOLD, 24));
         lblWelcome.setForeground(TEXT_P);
         p.add(lblWelcome, gbc);
 
         gbc.gridy = 2;
-        gbc.insets = new Insets(0, 60, 28, 60);
-        JLabel lblSub = new JLabel("Acc\u00e9dez \u00e0 votre espace de gestion Intermart");
-        lblSub.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
+        gbc.insets = new Insets(0, 64, 32, 64);
+        JLabel lblSub = new JLabel("Connectez-vous à votre espace Voucher System");
+        lblSub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         lblSub.setForeground(TEXT_M);
         p.add(lblSub, gbc);
 
-        // Username field
+        // Username
         gbc.gridy = 3;
-        gbc.insets = new Insets(0, 60, 4, 60);
-        JLabel lblUser = new JLabel("Nom d'utilisateur");
-        lblUser.setFont(new Font("Trebuchet MS", Font.BOLD, 12));
-        lblUser.setForeground(TEXT_S);
-        p.add(lblUser, gbc);
+        gbc.insets = new Insets(0, 64, 6, 64);
+        p.add(UIUtils.buildFormLabel("Nom d'utilisateur"), gbc);
 
         gbc.gridy = 4;
-        gbc.insets = new Insets(0, 60, 16, 60);
+        gbc.insets = new Insets(0, 64, 16, 64);
         txtUsername = new JTextField();
-        styleField(txtUsername, "\u2302  Entrez votre identifiant");
-        p.add(txtUsername, gbc);
+        UIUtils.styleModernField(txtUsername, "Entrez votre identifiant");
+        p.add(UIUtils.wrapModernField(txtUsername), gbc);
+
+        // Password label row (with forgot link)
+        gbc.gridy = 5;
+        gbc.insets = new Insets(0, 64, 6, 64);
+        JPanel pwdLabelRow = new JPanel(new BorderLayout());
+        pwdLabelRow.setOpaque(false);
+        pwdLabelRow.add(UIUtils.buildFormLabel("Mot de passe"), BorderLayout.WEST);
+        JLabel forgot = new JLabel("Mot de passe oublié ?");
+        forgot.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        forgot.setForeground(RED);
+        forgot.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        forgot.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent e) { forgot.setForeground(RED_DK); }
+            public void mouseExited(MouseEvent e)  { forgot.setForeground(RED); }
+            public void mouseClicked(MouseEvent e) {
+                ToastManager.info(LoginForm.this,
+                        "Contactez votre administrateur pour réinitialiser votre mot de passe");
+            }
+        });
+        pwdLabelRow.add(forgot, BorderLayout.EAST);
+        p.add(pwdLabelRow, gbc);
 
         // Password field
-        gbc.gridy = 5;
-        gbc.insets = new Insets(0, 60, 4, 60);
-        JLabel lblPass = new JLabel("Mot de passe");
-        lblPass.setFont(new Font("Trebuchet MS", Font.BOLD, 12));
-        lblPass.setForeground(TEXT_S);
-        p.add(lblPass, gbc);
-
         gbc.gridy = 6;
-        gbc.insets = new Insets(0, 60, 8, 60);
-        JPanel passRow = buildPasswordField();
-        p.add(passRow, gbc);
+        gbc.insets = new Insets(0, 64, 12, 64);
+        txtPassword = new JPasswordField();
+        p.add(UIUtils.wrapModernPasswordField(txtPassword), gbc);
 
         // Error message
         gbc.gridy = 7;
-        gbc.insets = new Insets(0, 60, 12, 60);
+        gbc.insets = new Insets(0, 64, 14, 64);
         lblError = new JLabel(" ");
-        lblError.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        lblError.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         lblError.setForeground(RED);
         p.add(lblError, gbc);
 
         // Login button
         gbc.gridy = 8;
-        gbc.insets = new Insets(0, 60, 16, 60);
-        btnLogin = buildLoginButton();
+        gbc.insets = new Insets(0, 64, 18, 64);
+        btnLogin = UIUtils.buildPrimaryButton("Se connecter", 0, 46);
+        btnLogin.addActionListener(e -> actionLogin());
         p.add(btnLogin, gbc);
 
         // Register link
         gbc.gridy = 9;
-        gbc.insets = new Insets(0, 60, 0, 60);
+        gbc.insets = new Insets(0, 64, 20, 64);
         JPanel linkRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
         linkRow.setOpaque(false);
         JLabel lblNoAccount = new JLabel("Pas encore de compte ?");
-        lblNoAccount.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
-        lblNoAccount.setForeground(TEXT_M);
-        JLabel lblRegister = new JLabel("S'inscrire");
-        lblRegister.setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        lblNoAccount.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        lblNoAccount.setForeground(TEXT_S);
+        JLabel lblRegister = new JLabel("Créer un compte");
+        lblRegister.setFont(new Font("Segoe UI", Font.BOLD, 12));
         lblRegister.setForeground(RED);
         lblRegister.setCursor(new Cursor(Cursor.HAND_CURSOR));
         lblRegister.addMouseListener(new MouseAdapter() {
@@ -254,127 +281,18 @@ public class LoginForm extends JFrame {
         linkRow.add(lblRegister);
         p.add(linkRow, gbc);
 
-        // Enter key
+        // Enter key bindings
         txtPassword.addActionListener(e -> actionLogin());
         txtUsername.addActionListener(e -> txtPassword.requestFocusInWindow());
 
         return p;
     }
 
-    // ── Styled text field ──────────────────────────────────────────────────
-    private void styleField(JTextField field, String placeholder) {
-        field.setFont(new Font("Trebuchet MS", Font.PLAIN, 14));
-        field.setForeground(TEXT_P);
-        field.setCaretColor(RED);
-        field.setPreferredSize(new Dimension(0, 44));
-        field.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER, 1),
-                BorderFactory.createEmptyBorder(8, 14, 8, 14)));
-
-        // Placeholder
-        field.addFocusListener(new FocusAdapter() {
-            public void focusGained(FocusEvent e) { field.repaint(); }
-            public void focusLost(FocusEvent e)   { field.repaint(); }
-        });
-
-        field.setUI(new javax.swing.plaf.basic.BasicTextFieldUI() {
-            @Override protected void paintSafely(Graphics g) {
-                super.paintSafely(g);
-                if (field.getText().isEmpty() && !field.hasFocus()) {
-                    Graphics2D g2 = (Graphics2D) g;
-                    g2.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
-                    g2.setColor(TEXT_M);
-                    Insets i = field.getInsets();
-                    g2.drawString(placeholder, i.left, field.getHeight() / 2 + 5);
-                }
-            }
-        });
-    }
-
-    // ── Password field with toggle ─────────────────────────────────────────
-    private JPanel buildPasswordField() {
-        JPanel row = new JPanel(new BorderLayout(0, 0));
-        row.setBackground(Color.WHITE);
-        row.setPreferredSize(new Dimension(0, 44));
-        row.setBorder(BorderFactory.createLineBorder(BORDER, 1));
-
-        txtPassword = new JPasswordField();
-        txtPassword.setFont(new Font("Trebuchet MS", Font.PLAIN, 14));
-        txtPassword.setForeground(TEXT_P);
-        txtPassword.setCaretColor(RED);
-        txtPassword.setBorder(BorderFactory.createEmptyBorder(8, 14, 8, 8));
-        txtPassword.setOpaque(false);
-
-        JButton btnToggle = new JButton("\u25CF") {
-            {
-                setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
-                setForeground(TEXT_M);
-                setOpaque(false);
-                setContentAreaFilled(false);
-                setBorderPainted(false);
-                setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(44, 44));
-                setToolTipText("Afficher / masquer le mot de passe");
-                addActionListener(e -> {
-                    showPassword = !showPassword;
-                    if (showPassword) {
-                        txtPassword.setEchoChar((char) 0);
-                        setText("\u25CB");
-                    } else {
-                        txtPassword.setEchoChar('\u2022');
-                        setText("\u25CF");
-                    }
-                });
-            }
-        };
-
-        row.add(txtPassword, BorderLayout.CENTER);
-        row.add(btnToggle, BorderLayout.EAST);
-        return row;
-    }
-
-    // ── Login button ───────────────────────────────────────────────────────
-    private JButton buildLoginButton() {
-        JButton btn = new JButton("Se connecter") {
-            boolean hov = false;
-            {
-                setFont(new Font("Trebuchet MS", Font.BOLD, 15));
-                setForeground(Color.WHITE);
-                setOpaque(false);
-                setContentAreaFilled(false);
-                setBorderPainted(false);
-                setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(0, 48));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { hov = true;  repaint(); }
-                    public void mouseExited(MouseEvent e)  { hov = false; repaint(); }
-                });
-                addActionListener(e -> actionLogin());
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                GradientPaint gp = hov
-                        ? new GradientPaint(0, 0, RED_DK, getWidth(), 0, RED)
-                        : new GradientPaint(0, 0, RED, getWidth(), 0, RED_DK);
-                g2.setPaint(gp);
-                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 10, 10));
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        return btn;
-    }
-
-    // ── Close button ───────────────────────────────────────────────────────
+    // ── Close button (vectoriel, style macOS-like) ────────────────────────
     private JButton buildCloseBtn() {
-        JButton btn = new JButton("\u2715") {
+        JButton btn = new JButton() {
             boolean hov = false;
             {
-                setFont(new Font("Trebuchet MS", Font.BOLD, 13));
-                setForeground(TEXT_M);
                 setOpaque(false);
                 setContentAreaFilled(false);
                 setBorderPainted(false);
@@ -382,26 +300,30 @@ public class LoginForm extends JFrame {
                 setCursor(new Cursor(Cursor.HAND_CURSOR));
                 setPreferredSize(new Dimension(32, 32));
                 addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { hov = true; setForeground(RED); repaint(); }
-                    public void mouseExited(MouseEvent e)  { hov = false; setForeground(TEXT_M); repaint(); }
+                    public void mouseEntered(MouseEvent e) { hov = true;  repaint(); }
+                    public void mouseExited(MouseEvent e)  { hov = false; repaint(); }
                 });
                 addActionListener(e -> System.exit(0));
             }
             @Override protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 if (hov) {
-                    Graphics2D g2 = (Graphics2D) g.create();
-                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                    g2.setColor(new Color(RED.getRed(), RED.getGreen(), RED.getBlue(), 12));
-                    g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 6, 6));
-                    g2.dispose();
+                    g2.setColor(VMSStyle.RED_LIGHT);
+                    g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 8, 8));
                 }
-                super.paintComponent(g);
+                g2.setColor(hov ? RED : TEXT_M);
+                g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                int pad = 11;
+                g2.drawLine(pad, pad, getWidth() - pad, getHeight() - pad);
+                g2.drawLine(getWidth() - pad, pad, pad, getHeight() - pad);
+                g2.dispose();
             }
         };
         return btn;
     }
 
-    // ── LOGIN ACTION ───────────────────────────────────────────────────────
+    // ── LOGIN ACTION ──────────────────────────────────────────────────────
     private void actionLogin() {
         String user = txtUsername.getText().trim();
         String pass = new String(txtPassword.getPassword());
@@ -419,23 +341,21 @@ public class LoginForm extends JFrame {
             @Override protected AuthDAO.UserSession doInBackground() throws Exception {
                 return AuthDAO.authenticate(user, pass);
             }
-
             @Override protected void done() {
                 try {
                     AuthDAO.UserSession session = get();
                     if (session != null) {
                         dispose();
-                        SwingUtilities.invokeLater(() -> {
-                            new Dashboard(session.userId, session.username, session.role, session.email)
-                                    .setVisible(true);
-                        });
+                        SwingUtilities.invokeLater(() ->
+                                new Dashboard(session.userId, session.username, session.role, session.email)
+                                        .setVisible(true));
                     } else {
-                        showError("Identifiants incorrects. V\u00e9rifiez votre nom d'utilisateur et mot de passe.");
+                        showError("Identifiants incorrects. Vérifiez votre nom d'utilisateur et mot de passe.");
                         btnLogin.setEnabled(true);
                         btnLogin.setText("Se connecter");
                     }
                 } catch (Exception ex) {
-                    showError("Erreur de connexion \u00e0 la base de donn\u00e9es.");
+                    showError("Erreur de connexion à la base de données.");
                     btnLogin.setEnabled(true);
                     btnLogin.setText("Se connecter");
                     ex.printStackTrace();
@@ -449,15 +369,12 @@ public class LoginForm extends JFrame {
         lblError.setForeground(RED);
     }
 
-    // ── INSCRIPTION ────────────────────────────────────────────────────────
     private void ouvrirInscription() {
         dispose();
-        SwingUtilities.invokeLater(() -> {
-            new InscriptionForm().setVisible(true);
-        });
+        SwingUtilities.invokeLater(() -> new InscriptionForm().setVisible(true));
     }
 
-    // ── DRAG ───────────────────────────────────────────────────────────────
+    // ── DRAG ──────────────────────────────────────────────────────────────
     private void enableDrag(JPanel panel) {
         panel.addMouseListener(new MouseAdapter() {
             public void mousePressed(MouseEvent e) { xOff = e.getX(); yOff = e.getY(); }

@@ -42,7 +42,7 @@ public class NotificationService {
                     "</table>" +
                     "<p style='color: #DC143C; margin-top: 15px;'><strong>⚠️ Action requise:</strong> Veuillez consulter l'application pour valider cette demande.</p>";
 
-            EmailService.sendEmail(comptableEmail, "🔔 Nouvelle Demande à Valider - " + reference, corps);
+            EmailService.envoyerNotification(comptableEmail, "🔔 Nouvelle Demande à Valider - " + reference, corps);
             System.out.println("✅ Notification comptable envoyée pour " + reference);
         } catch (Exception e) {
             System.err.println("❌ Erreur envoi notification comptable: " + e.getMessage());
@@ -79,7 +79,7 @@ public class NotificationService {
                     "</table>" +
                     "<p style='color: #10B981; margin-top: 15px;'><strong>✓ Action recommandée:</strong> Approuvez cette demande pour procéder à la génération des bons.</p>";
 
-            EmailService.sendEmail(approbateurEmail, "🔔 Approbation Requise - " + reference, corps);
+            EmailService.envoyerNotification(approbateurEmail, "🔔 Approbation Requise - " + reference, corps);
             System.out.println("✅ Notification approbation envoyée");
         } catch (Exception e) {
             System.err.println("❌ Erreur envoi notification approbation: " + e.getMessage());
@@ -110,7 +110,7 @@ public class NotificationService {
                     "</table>" +
                     "<p style='color: #10B981; margin-top: 15px;'><strong>✓ Status:</strong> Les bons sont maintenant disponibles pour rédemption en magasin.</p>";
 
-            EmailService.sendEmail(superviseurEmail, "🎁 Bons Générés avec Succès - " + reference, corps);
+            EmailService.envoyerNotification(superviseurEmail, "🎁 Bons Générés avec Succès - " + reference, corps);
             System.out.println("✅ Notification génération envoyée");
         } catch (Exception e) {
             System.err.println("❌ Erreur envoi notification génération: " + e.getMessage());
@@ -139,7 +139,7 @@ public class NotificationService {
                     "<p style='margin-top: 15px;'><strong>✓ Action suggérée:</strong> Veuillez utiliser ce bon avant la date limite dans nos points de vente partenaires.</p>" +
                     "<p style='color: #666; font-size: 12px;'>Si vous avez des questions, contactez-nous directement.</p>";
 
-            EmailService.sendEmail(clientEmail, "⏰ Rappel: Bon Cadeau Expirant - " + codeUnique, corps);
+            EmailService.envoyerNotification(clientEmail, "⏰ Rappel: Bon Cadeau Expirant - " + codeUnique, corps);
             System.out.println("✅ Alerte expiration envoyée à " + clientNom);
         } catch (Exception e) {
             System.err.println("❌ Erreur envoi alerte expiration: " + e.getMessage());
@@ -176,7 +176,7 @@ public class NotificationService {
                     "</table>" +
                     "<p style='color: #10B981; margin-top: 15px;'><strong>✓ Status:</strong> Rédemption enregistrée avec succès.</p>";
 
-            EmailService.sendEmail(managerEmail, "✅ Bon Cadeau Rédimé - " + codeBon, corps);
+            EmailService.envoyerNotification(managerEmail, "✅ Bon Cadeau Rédimé - " + codeBon, corps);
             System.out.println("✅ Notification rédemption envoyée");
         } catch (Exception e) {
             System.err.println("❌ Erreur envoi notification rédemption: " + e.getMessage());
@@ -209,7 +209,7 @@ public class NotificationService {
                     "<p style='margin-top: 15px;'><strong>✓ Prochaine étape:</strong> Vous recevrez sous peu un email contenant vos bons en pièce jointe (format PDF).</p>" +
                     "<p style='color: #666; font-size: 12px;'>Chaque bon est à usage unique et doit être présenté en magasin pour validation.</p>";
 
-            EmailService.sendEmail(clientEmail, "🎁 Vos Bons Cadeau Intermart - " + reference, corps);
+            EmailService.envoyerNotification(clientEmail, "🎁 Vos Bons Cadeau Intermart - " + reference, corps);
             System.out.println("✅ Notification envoi bons envoyée au client");
         } catch (Exception e) {
             System.err.println("❌ Erreur envoi notification client: " + e.getMessage());

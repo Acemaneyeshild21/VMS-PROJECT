@@ -103,7 +103,7 @@ public class VoucherTemplateChooser extends JDialog {
         String info = bons.size() + " bon(s)  |  "
                 + (bons.isEmpty() ? "" : String.format("Rs %,.0f x %d", bons.get(0).valeur, bons.size()));
         JLabel lblInfo = new JLabel(info);
-        lblInfo.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        lblInfo.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         lblInfo.setForeground(TXT_G);
         header.add(lblInfo, BorderLayout.EAST);
 
@@ -145,7 +145,7 @@ public class VoucherTemplateChooser extends JDialog {
         footer.setBorder(BorderFactory.createEmptyBorder(12, 24, 14, 24));
 
         // Description du template selectionne
-        lblDescription.setFont(new Font("Trebuchet MS", Font.ITALIC, 12));
+        lblDescription.setFont(new Font("Segoe UI", Font.ITALIC, 12));
         lblDescription.setForeground(TXT_G);
         footer.add(lblDescription, BorderLayout.WEST);
 
@@ -201,7 +201,7 @@ public class VoucherTemplateChooser extends JDialog {
 
             // Label nom en bas
             JLabel lblName = new JLabel(template.label, SwingConstants.CENTER);
-            lblName.setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+            lblName.setFont(new Font("Segoe UI", Font.BOLD, 12));
             lblName.setForeground(TXT_D);
             lblName.setBorder(BorderFactory.createEmptyBorder(6, 4, 6, 4));
 
@@ -329,7 +329,7 @@ public class VoucherTemplateChooser extends JDialog {
             // Logo dans header
             g.setColor(new Color(201,168,76));
             g.setFont(new Font("Georgia",Font.BOLD,8));
-            g.drawString("INTERMART",5,18);
+            g.drawString("VOUCHER SYSTEM",5,18);
             // "BON CADEAU" en blanc
             g.setColor(Color.WHITE);
             g.setFont(new Font("Georgia",Font.BOLD,10));
@@ -362,7 +362,7 @@ public class VoucherTemplateChooser extends JDialog {
             // Logo
             g.setColor(new Color(201,168,76));
             g.setFont(new Font("Georgia",Font.BOLD,8));
-            g.drawString("INTERMART",5,22);
+            g.drawString("VOUCHER SYSTEM",5,22);
             // "BON CADEAU" en or
             g.setColor(new Color(201,168,76));
             g.setFont(new Font("Georgia",Font.BOLD,11));
@@ -495,8 +495,7 @@ public class VoucherTemplateChooser extends JDialog {
                             ? bons.size() + " bon(s) genere(s) et envoyes par email !"
                             : bons.size() + " bon(s) genere(s) dans " +
                               System.getProperty("user.home") + "/VMS_Bons";
-                    JOptionPane.showMessageDialog(owner, msg,
-                            "Generation terminee", JOptionPane.INFORMATION_MESSAGE);
+                    ToastManager.success(owner, msg);
 
                     // Ouvrir le dossier si telechargement
                     if (chooser.result == Result.DOWNLOAD) {
@@ -505,8 +504,7 @@ public class VoucherTemplateChooser extends JDialog {
                         } catch (Exception ignored) {}
                     }
                 } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(owner,
-                            "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    ToastManager.error(owner, "Erreur : " + ex.getMessage());
                 }
             }
         };

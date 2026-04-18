@@ -38,10 +38,10 @@ public class ValidationPanel extends JPanel {
     // ── Fonts (Centralisees via VMSStyle) ────────────────────────────────────
     private static final Font FONT_PAGE_TITLE = VMSStyle.FONT_BRAND.deriveFont(24f);
     private static final Font FONT_TABLE_HDR  = VMSStyle.FONT_BADGE.deriveFont(12f);
-    private static final Font FONT_TABLE_CELL = new Font("Trebuchet MS", Font.PLAIN, 12);
-    private static final Font FONT_BADGE      = new Font("Trebuchet MS", Font.BOLD,  10);
-    private static final Font FONT_BTN        = new Font("Trebuchet MS", Font.BOLD,  12);
-    private static final Font FONT_TAB        = new Font("Trebuchet MS", Font.BOLD,  13);
+    private static final Font FONT_TABLE_CELL = new Font("Segoe UI", Font.PLAIN, 12);
+    private static final Font FONT_BADGE      = new Font("Segoe UI", Font.BOLD,  10);
+    private static final Font FONT_BTN        = new Font("Segoe UI", Font.BOLD,  12);
+    private static final Font FONT_TAB        = new Font("Segoe UI", Font.BOLD,  13);
 
     // Colonnes tableau
     private static final String[] COLS = {
@@ -65,6 +65,8 @@ public class ValidationPanel extends JPanel {
     private JLabel            badgePaiements;
     private JLabel            badgeApprobations;
     private String            activeTab; // "PAIEMENTS" ou "APPROBATIONS"
+    private CardLayout        tableCards;
+    private JPanel            tableCardHolder;
 
     private final boolean canPaiement;
     private final boolean canApprobation;
@@ -92,7 +94,7 @@ public class ValidationPanel extends JPanel {
         JPanel center = new JPanel(new GridBagLayout());
         center.setOpaque(false);
         JLabel msg = new JLabel("Vous n'avez pas les permissions nécessaires");
-        msg.setFont(new Font("Trebuchet MS", Font.PLAIN, 15));
+        msg.setFont(new Font("Segoe UI", Font.PLAIN, 15));
         msg.setForeground(TEXT_MUTED);
         center.add(msg);
         add(center, BorderLayout.CENTER);
@@ -100,63 +102,28 @@ public class ValidationPanel extends JPanel {
 
     // ── INIT ───────────────────────────────────────────────────────────────
     private void initComponents() {
-        JPanel wrapper = new JPanel(new BorderLayout(0, 0));
+        JPanel wrapper = new JPanel(new BorderLayout(0, 14));
         wrapper.setOpaque(false);
-        wrapper.setBorder(BorderFactory.createEmptyBorder(28, 32, 28, 32));
+        wrapper.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         wrapper.add(buildHeader(), BorderLayout.NORTH);
 
-        JPanel mid = new JPanel(new BorderLayout(0, 12));
+        JPanel mid = new JPanel(new BorderLayout(0, 14));
         mid.setOpaque(false);
-        mid.setBorder(BorderFactory.createEmptyBorder(18, 0, 0, 0));
         mid.add(buildTabBar(),     BorderLayout.NORTH);
         mid.add(buildTableCard(),  BorderLayout.CENTER);
         wrapper.add(mid, BorderLayout.CENTER);
         add(wrapper, BorderLayout.CENTER);
     }
 
-    // ── HEADER ─────────────────────────────────────────────────────────────
+    // ── HEADER (PageLayout) ────────────────────────────────────────────────
     private JPanel buildHeader() {
-        JPanel h = new JPanel(new BorderLayout());
-        h.setOpaque(false);
-
-        JPanel left = new JPanel();
-        left.setOpaque(false);
-        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
-
-        JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0)) {
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                g.setColor(RED_PRIMARY);
-                g.fillRoundRect(0, 3, 4, getHeight() - 6, 4, 4);
-            }
-        };
-        titleRow.setOpaque(false);
-        titleRow.setBorder(BorderFactory.createEmptyBorder(0, 14, 0, 0));
-        JLabel icon  = new JLabel("✓");
-        icon.setFont(new Font("Trebuchet MS", Font.BOLD, 26));
-        icon.setForeground(RED_PRIMARY);
-        JLabel title = new JLabel("  Validation");
-        title.setFont(FONT_PAGE_TITLE);
-        title.setForeground(TEXT_PRIMARY);
-        titleRow.add(icon);
-        titleRow.add(title);
-        titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        String subtitleText = buildSubtitle();
-        JLabel sub = new JLabel(subtitleText);
-        sub.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
-        sub.setForeground(TEXT_SECOND);
-        sub.setBorder(BorderFactory.createEmptyBorder(5, 14, 0, 0));
-        sub.setAlignmentX(Component.LEFT_ALIGNMENT);
-        left.add(titleRow);
-        left.add(sub);
-
-        JButton btnRefresh = buildIconButton("↻", "Actualiser");
+        JButton btnRefresh = UIUtils.buildGhostButton("Actualiser", 120, 40);
         btnRefresh.addActionListener(e -> chargerDonnees());
-
-        h.add(left,       BorderLayout.CENTER);
-        h.add(btnRefresh, BorderLayout.EAST);
-        return h;
+        return PageLayout.buildPageHeader(
+                "Validation",
+                buildSubtitle(),
+                btnRefresh
+        );
     }
 
     private String buildSubtitle() {
@@ -169,10 +136,9 @@ public class ValidationPanel extends JPanel {
         }
     }
 
-    // ── TAB BAR ────────────────────────────────────────────────────────────
+    // ── TAB BAR (dans une carte blanche) ───────────────────────────────────
     private JPanel buildTabBar() {
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        bar.setOpaque(false);
+        JPanel bar = PageLayout.buildCard(new FlowLayout(FlowLayout.LEFT, 8, 0), 10);
 
         if (canPaiement) {
             badgePaiements = buildBadgeLabel();
@@ -286,73 +252,31 @@ public class ValidationPanel extends JPanel {
         chargerDonnees();
     }
 
-    // ── TABLE CARD ─────────────────────────────────────────────────────────
+    // ── TABLE CARD (ModernTable) ───────────────────────────────────────────
     private JPanel buildTableCard() {
-        JPanel card = new JPanel(new BorderLayout()) {
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(BG_CARD);
-                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 14, 14));
-                g2.setColor(BORDER_LIGHT);
-                g2.setStroke(new BasicStroke(1f));
-                g2.draw(new RoundRectangle2D.Double(0.5, 0.5, getWidth()-1, getHeight()-1, 14, 14));
-                g2.dispose();
-            }
-        };
-        card.setOpaque(false);
-
         tableModel = new DefaultTableModel(COLS, 0) {
             @Override public boolean isCellEditable(int r, int c) { return c == COL_ACTIONS; }
         };
 
-        table = new JTable(tableModel) {
-            @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
-                Component c = super.prepareRenderer(r, row, col);
-                if (!isRowSelected(row))
-                    c.setBackground(row % 2 == 0 ? BG_CARD : new Color(249, 250, 252));
-                else c.setBackground(RED_LIGHT);
-                return c;
-            }
-        };
-        table.setFont(FONT_TABLE_CELL);
-        table.setRowHeight(44);
-        table.setShowHorizontalLines(true);
-        table.setShowVerticalLines(false);
-        table.setGridColor(new Color(240, 242, 246));
-        table.setSelectionBackground(RED_LIGHT);
-        table.setSelectionForeground(TEXT_PRIMARY);
-        table.setFocusable(false);
-        table.getTableHeader().setReorderingAllowed(false);
+        table = new JTable(tableModel);
+        ModernTable.apply(table);
+        table.setAutoCreateRowSorter(false);
 
-        JTableHeader header = table.getTableHeader();
-        header.setFont(FONT_TABLE_HDR);
-        header.setBackground(new Color(248, 249, 252));
-        header.setForeground(TEXT_SECOND);
-        header.setPreferredSize(new Dimension(0, 42));
-        header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_LIGHT));
-
-        int[] widths = {40, 130, 160, 70, 100, 120, 120, 160};
+        int[] widths = {40, 130, 160, 70, 100, 120, 120, 180};
         for (int i = 0; i < widths.length; i++)
-            table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
+            ModernTable.setColumnWidth(table, i, widths[i]);
         table.getColumnModel().getColumn(COL_ID).setMaxWidth(40);
 
+        ModernTable.setColumnRenderer(table, COL_REF, ModernTable.boldRenderer());
+        ModernTable.setColumnRenderer(table, COL_NB, ModernTable.centerRenderer());
+        ModernTable.setColumnRenderer(table, COL_VU, ModernTable.moneyRenderer());
+        ModernTable.setColumnRenderer(table, COL_TOTAL, ModernTable.moneyRenderer());
         table.getColumnModel().getColumn(COL_ACTIONS).setCellRenderer(new ActionRenderer());
         table.getColumnModel().getColumn(COL_ACTIONS).setCellEditor(new ActionEditor());
 
-        DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
-        rightRenderer.setHorizontalAlignment(SwingConstants.RIGHT);
-        table.getColumnModel().getColumn(COL_NB).setCellRenderer(rightRenderer);
-        table.getColumnModel().getColumn(COL_VU).setCellRenderer(rightRenderer);
-        table.getColumnModel().getColumn(COL_TOTAL).setCellRenderer(rightRenderer);
-
-        JScrollPane scroll = new JScrollPane(table);
+        JPanel card = PageLayout.buildCard(new BorderLayout(), 0);
+        JScrollPane scroll = ModernTable.wrap(table);
         scroll.setBorder(null);
-        scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        scroll.getVerticalScrollBar().setUnitIncrement(16);
-        scroll.getViewport().setBackground(BG_CARD);
 
         JPanel footer = new JPanel(new BorderLayout());
         footer.setOpaque(false);
@@ -360,13 +284,32 @@ public class ValidationPanel extends JPanel {
                 BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER_LIGHT),
                 BorderFactory.createEmptyBorder(10, 16, 10, 16)));
         lblTotal = new JLabel("Chargement...");
-        lblTotal.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        lblTotal.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         lblTotal.setForeground(TEXT_MUTED);
         footer.add(lblTotal, BorderLayout.WEST);
 
         card.add(scroll, BorderLayout.CENTER);
         card.add(footer, BorderLayout.SOUTH);
-        return card;
+
+        // Empty state unique (pas de recherche ici — juste un filtre d'onglet)
+        JPanel emptyNoData = PageLayout.buildCard(new BorderLayout(), 0);
+        emptyNoData.add(PageLayout.buildEmptyState(
+                "Aucune demande à traiter",
+                "Tout est à jour — aucune demande n'est en attente pour cet onglet.",
+                null, null
+        ), BorderLayout.CENTER);
+
+        tableCards = new CardLayout();
+        tableCardHolder = new JPanel(tableCards);
+        tableCardHolder.setOpaque(false);
+        tableCardHolder.add(card, "table");
+        tableCardHolder.add(emptyNoData, "empty");
+        return tableCardHolder;
+    }
+
+    private void updateTableView() {
+        if (tableCards == null) return;
+        tableCards.show(tableCardHolder, tableModel.getRowCount() > 0 ? "table" : "empty");
     }
 
     // ── CHARGEMENT BD ──────────────────────────────────────────────────────
@@ -416,6 +359,7 @@ public class ValidationPanel extends JPanel {
                     lblTotal.setText(count + " " + label + (count > 1 ? "s" : "")
                             + " en attente");
                     updateBadgeCounts(statut, count);
+                    updateTableView();
                 } catch (Exception e) {
                     e.printStackTrace();
                     lblTotal.setText("Erreur lors du chargement");
@@ -540,8 +484,7 @@ public class ValidationPanel extends JPanel {
                     chargerDonnees();
                 } catch (SQLException ex) {
                     ex.printStackTrace();
-                    JOptionPane.showMessageDialog(ValidationPanel.this,
-                            "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    ToastManager.error(ValidationPanel.this, "Erreur : " + ex.getMessage());
                 }
             }
         }
@@ -561,8 +504,7 @@ public class ValidationPanel extends JPanel {
                     chargerDonnees();
                 } catch (SQLException ex) {
                     ex.printStackTrace();
-                    JOptionPane.showMessageDialog(ValidationPanel.this,
-                            "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    ToastManager.error(ValidationPanel.this, "Erreur : " + ex.getMessage());
                 }
             }
         }
@@ -583,8 +525,7 @@ public class ValidationPanel extends JPanel {
                     chargerDonnees();
                 } catch (SQLException ex) {
                     ex.printStackTrace();
-                    JOptionPane.showMessageDialog(ValidationPanel.this,
-                            "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    ToastManager.error(ValidationPanel.this, "Erreur : " + ex.getMessage());
                 }
             }
         }
@@ -685,7 +626,7 @@ public class ValidationPanel extends JPanel {
         JButton btn = new JButton(symbol) {
             boolean h = false;
             {
-                setFont(new Font("Trebuchet MS", Font.BOLD, 16));
+                setFont(new Font("Segoe UI", Font.BOLD, 16));
                 setForeground(TEXT_SECOND);
                 setOpaque(false);
                 setContentAreaFilled(false);

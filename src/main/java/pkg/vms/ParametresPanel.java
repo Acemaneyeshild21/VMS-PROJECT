@@ -251,7 +251,7 @@ class ParametresPanel extends JPanel {
         textBlock.add(descLbl);
 
         JLabel arrow = new JLabel("›");
-        arrow.setFont(new Font("Trebuchet MS", Font.BOLD, 20));
+        arrow.setFont(new Font("Segoe UI", Font.BOLD, 20));
         arrow.setForeground(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), 140));
         arrow.setPreferredSize(new Dimension(20, 20));
 
@@ -360,7 +360,7 @@ class ParametresPanel extends JPanel {
         keyLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JLabel valLbl = new JLabel(value);
-        valLbl.setFont(new Font("Trebuchet MS", Font.BOLD, 14));
+        valLbl.setFont(new Font("Segoe UI", Font.BOLD, 14));
         valLbl.setForeground(TEXT_PRIMARY);
         valLbl.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -384,7 +384,7 @@ class ParametresPanel extends JPanel {
             case "config_bons":   afficherConfigBons();             break;
             case "rapports":      afficherConfigRapports();         break;
             default:
-                JOptionPane.showMessageDialog(this, "Fonctionnalité en cours de développement", "Information", JOptionPane.INFORMATION_MESSAGE);
+                ToastManager.info(this, "Fonctionnalité en cours de développement");
         }
     }
 
@@ -453,13 +453,13 @@ class ParametresPanel extends JPanel {
                 protected void done() {
                     try {
                         if (get()) {
-                            JOptionPane.showMessageDialog(dlg, "Profil mis à jour avec succès!", "Succès", JOptionPane.INFORMATION_MESSAGE);
                             dlg.dispose();
+                            ToastManager.success(ParametresPanel.this, "Profil mis à jour avec succès");
                         } else {
-                            JOptionPane.showMessageDialog(dlg, "Erreur lors de la mise à jour", "Erreur", JOptionPane.ERROR_MESSAGE);
+                            ToastManager.error(dlg, "Erreur lors de la mise à jour");
                         }
                     } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(dlg, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                        ToastManager.error(dlg, "Erreur: " + ex.getMessage());
                     }
                 }
             }.execute();
@@ -524,17 +524,17 @@ class ParametresPanel extends JPanel {
             String confirm = new String(confirmF.getPassword());
 
             if (ancien.isEmpty() || nouveau.isEmpty() || confirm.isEmpty()) {
-                JOptionPane.showMessageDialog(dlg, "Tous les champs sont obligatoires", "Erreur", JOptionPane.ERROR_MESSAGE);
+                ToastManager.warning(dlg, "Tous les champs sont obligatoires");
                 return;
             }
 
             if (!nouveau.equals(confirm)) {
-                JOptionPane.showMessageDialog(dlg, "Les mots de passe ne correspondent pas!", "Erreur", JOptionPane.ERROR_MESSAGE);
+                ToastManager.warning(dlg, "Les mots de passe ne correspondent pas");
                 return;
             }
 
             if (nouveau.length() < 6) {
-                JOptionPane.showMessageDialog(dlg, "Le mot de passe doit contenir au moins 6 caractères", "Erreur", JOptionPane.ERROR_MESSAGE);
+                ToastManager.warning(dlg, "Le mot de passe doit contenir au moins 6 caractères");
                 return;
             }
 
@@ -548,13 +548,13 @@ class ParametresPanel extends JPanel {
                 protected void done() {
                     try {
                         if (get()) {
-                            JOptionPane.showMessageDialog(dlg, "Mot de passe changé avec succès!", "Succès", JOptionPane.INFORMATION_MESSAGE);
                             dlg.dispose();
+                            ToastManager.success(ParametresPanel.this, "Mot de passe changé avec succès");
                         } else {
-                            JOptionPane.showMessageDialog(dlg, "Ancien mot de passe incorrect", "Erreur", JOptionPane.ERROR_MESSAGE);
+                            ToastManager.error(dlg, "Ancien mot de passe incorrect");
                         }
                     } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(dlg, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                        ToastManager.error(dlg, "Erreur: " + ex.getMessage());
                     }
                 }
             }.execute();
@@ -591,12 +591,12 @@ class ParametresPanel extends JPanel {
         };
 
         JTable table = new JTable(model);
-        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         table.setRowHeight(32);
         table.setShowHorizontalLines(true);
         table.setShowVerticalLines(false);
         table.setGridColor(new Color(240, 242, 246));
-        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
         table.getTableHeader().setBackground(new Color(248, 249, 252));
         table.getTableHeader().setForeground(TEXT_SECOND);
 
@@ -714,7 +714,7 @@ class ParametresPanel extends JPanel {
             String role = (String) roleC.getSelectedItem();
 
             if (username.isEmpty() || email.isEmpty() || password.isEmpty()) {
-                JOptionPane.showMessageDialog(dlg, "Tous les champs sont obligatoires", "Erreur", JOptionPane.ERROR_MESSAGE);
+                ToastManager.warning(dlg, "Tous les champs sont obligatoires");
                 return;
             }
 
@@ -728,13 +728,13 @@ class ParametresPanel extends JPanel {
                 protected void done() {
                     try {
                         if (get()) {
-                            JOptionPane.showMessageDialog(dlg, "Utilisateur créé avec succès!", "Succès", JOptionPane.INFORMATION_MESSAGE);
                             dlg.dispose();
+                            ToastManager.success(ParametresPanel.this, "Utilisateur créé avec succès");
                         } else {
-                            JOptionPane.showMessageDialog(dlg, "Erreur lors de la création", "Erreur", JOptionPane.ERROR_MESSAGE);
+                            ToastManager.error(dlg, "Erreur lors de la création");
                         }
                     } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(dlg, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                        ToastManager.error(dlg, "Erreur: " + ex.getMessage());
                     }
                 }
             }.execute();
@@ -771,11 +771,11 @@ class ParametresPanel extends JPanel {
         };
 
         JTable table = new JTable(model);
-        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         table.setRowHeight(32);
         table.setShowHorizontalLines(true);
         table.setGridColor(new Color(240, 242, 246));
-        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
         table.getTableHeader().setBackground(new Color(248, 249, 252));
 
         // Charger les utilisateurs depuis la BD
@@ -811,7 +811,7 @@ class ParametresPanel extends JPanel {
         btnChanger.addActionListener(e -> {
             int row = table.getSelectedRow();
             if (row < 0) {
-                JOptionPane.showMessageDialog(dlg, "Sélectionnez un utilisateur", "Info", JOptionPane.INFORMATION_MESSAGE);
+                ToastManager.warning(dlg, "Sélectionnez un utilisateur");
                 return;
             }
             int uid = (int) model.getValueAt(row, 0);
@@ -828,9 +828,9 @@ class ParametresPanel extends JPanel {
                     model.setValueAt(newRole, row, 3);
                     AuditDAO.logSimple("utilisateur", uid, "MODIFICATION", userId,
                         "Rôle changé: " + currentRole + " → " + newRole);
-                    JOptionPane.showMessageDialog(dlg, "Rôle mis à jour avec succès !", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                    ToastManager.success(dlg, "Rôle mis à jour avec succès");
                 } catch (SQLException ex) {
-                    JOptionPane.showMessageDialog(dlg, "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    ToastManager.error(dlg, "Erreur : " + ex.getMessage());
                 }
             }
         });
@@ -866,11 +866,11 @@ class ParametresPanel extends JPanel {
             @Override public boolean isCellEditable(int r, int c) { return false; }
         };
         JTable table = new JTable(model);
-        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         table.setRowHeight(30);
         table.setShowHorizontalLines(true);
         table.setGridColor(new Color(240, 242, 246));
-        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
 
         JLabel lblInfo = new JLabel("Chargement...");
         lblInfo.setFont(FONT_SUBTITLE);
@@ -937,8 +937,8 @@ class ParametresPanel extends JPanel {
                     return null;
                 }
                 @Override protected void done() {
-                    try { get(); JOptionPane.showMessageDialog(dlg, "Optimisation VACUUM ANALYZE terminée !", "Succès", JOptionPane.INFORMATION_MESSAGE); }
-                    catch (Exception ex) { JOptionPane.showMessageDialog(dlg, "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE); }
+                    try { get(); ToastManager.success(dlg, "Optimisation VACUUM ANALYZE terminée"); }
+                    catch (Exception ex) { ToastManager.error(dlg, "Erreur : " + ex.getMessage()); }
                 }
             }.execute();
         });
@@ -946,10 +946,10 @@ class ParametresPanel extends JPanel {
         JButton btnTest = UIUtils.buildRedButton("Tester connexion", 160, 36);
         btnTest.addActionListener(e -> {
             try { boolean ok = DBconnect.testConnection();
-                JOptionPane.showMessageDialog(dlg, ok ? "Connexion OK !" : "Connexion échouée", ok ? "Succès" : "Erreur",
-                    ok ? JOptionPane.INFORMATION_MESSAGE : JOptionPane.ERROR_MESSAGE);
+                if (ok) ToastManager.success(dlg, "Connexion OK");
+                else    ToastManager.error(dlg, "Connexion échouée");
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(dlg, "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                ToastManager.error(dlg, "Erreur : " + ex.getMessage());
             }
         });
 
@@ -1089,16 +1089,12 @@ class ParametresPanel extends JPanel {
                 );
 
                 if (SettingsDAO.testSmtpConnection(settings)) {
-                    JOptionPane.showMessageDialog(dlg,
-                            "✅ Connexion SMTP réussie!\n\nLes paramètres sont correctement configurés.",
-                            "Test Réussi", JOptionPane.INFORMATION_MESSAGE);
+                    ToastManager.success(dlg, "Connexion SMTP réussie");
                 } else {
-                    JOptionPane.showMessageDialog(dlg,
-                            "❌ Erreur de connexion SMTP.\n\nVérifiez vos identifiants et paramètres.",
-                            "Erreur", JOptionPane.ERROR_MESSAGE);
+                    ToastManager.error(dlg, "Erreur connexion SMTP — vérifiez les identifiants");
                 }
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(dlg, "❌ Le port doit être un nombre", "Erreur", JOptionPane.ERROR_MESSAGE);
+                ToastManager.error(dlg, "Le port doit être un nombre");
             }
         });
 
@@ -1127,20 +1123,16 @@ class ParametresPanel extends JPanel {
                     protected void done() {
                         try {
                             if (get()) {
-                                JOptionPane.showMessageDialog(dlg,
-                                        "✅ Configuration email enregistrée avec succès!",
-                                        "Succès", JOptionPane.INFORMATION_MESSAGE);
                                 dlg.dispose();
+                                ToastManager.success(ParametresPanel.this, "Configuration email enregistrée");
                             }
                         } catch (Exception ex) {
-                            JOptionPane.showMessageDialog(dlg,
-                                    "❌ Erreur: " + ex.getMessage(),
-                                    "Erreur", JOptionPane.ERROR_MESSAGE);
+                            ToastManager.error(dlg, "Erreur: " + ex.getMessage());
                         }
                     }
                 }.execute();
             } catch (NumberFormatException ex) {
-                JOptionPane.showMessageDialog(dlg, "❌ Le port doit être un nombre", "Erreur", JOptionPane.ERROR_MESSAGE);
+                ToastManager.error(dlg, "Le port doit être un nombre");
             }
         });
 
@@ -1176,12 +1168,12 @@ class ParametresPanel extends JPanel {
         };
 
         JTable table = new JTable(model);
-        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         table.setRowHeight(32);
         table.setShowHorizontalLines(true);
         table.setShowVerticalLines(false);
         table.setGridColor(new Color(240, 242, 246));
-        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
         table.getTableHeader().setBackground(new Color(248, 249, 252));
         table.getTableHeader().setForeground(TEXT_SECOND);
 
@@ -1239,11 +1231,11 @@ class ParametresPanel extends JPanel {
         };
 
         JTable table = new JTable(model);
-        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         table.setRowHeight(32);
         table.setShowHorizontalLines(true);
         table.setGridColor(new Color(240, 242, 246));
-        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
 
         Runnable chargerSocietes = () -> {
             model.setRowCount(0);
@@ -1278,9 +1270,9 @@ class ParametresPanel extends JPanel {
                 try {
                     SocieteDAO.addSociete(fNom.getText().trim(), fAdresse.getText().trim(), fTel.getText().trim(), fEmail.getText().trim());
                     chargerSocietes.run();
-                    JOptionPane.showMessageDialog(dlg, "Société ajoutée !", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                    ToastManager.success(dlg, "Société ajoutée");
                 } catch (SQLException ex) {
-                    JOptionPane.showMessageDialog(dlg, "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    ToastManager.error(dlg, "Erreur : " + ex.getMessage());
                 }
             }
         });
@@ -1288,12 +1280,12 @@ class ParametresPanel extends JPanel {
         JButton btnDelete = UIUtils.buildRedButton("Supprimer", 120, 36);
         btnDelete.addActionListener(e -> {
             int row = table.getSelectedRow();
-            if (row < 0) { JOptionPane.showMessageDialog(dlg, "Sélectionnez une société"); return; }
+            if (row < 0) { ToastManager.warning(dlg, "Sélectionnez une société"); return; }
             int id = (int) model.getValueAt(row, 0);
             int conf = JOptionPane.showConfirmDialog(dlg, "Supprimer cette société ?", "Confirmation", JOptionPane.YES_NO_OPTION);
             if (conf == JOptionPane.YES_OPTION) {
                 try { SocieteDAO.deleteSociete(id); chargerSocietes.run(); }
-                catch (SQLException ex) { JOptionPane.showMessageDialog(dlg, "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE); }
+                catch (SQLException ex) { ToastManager.error(dlg, "Erreur : " + ex.getMessage()); }
             }
         });
 
@@ -1318,7 +1310,7 @@ class ParametresPanel extends JPanel {
         root.setBackground(BG_ROOT);
         root.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
 
-        JLabel title = new JLabel("🏪 Points de vente Intermart");
+        JLabel title = new JLabel("🏪 Points de vente");
         title.setFont(FONT_PAGE_TITLE.deriveFont(20f));
         title.setForeground(TEXT_PRIMARY);
         root.add(title, BorderLayout.NORTH);
@@ -1329,12 +1321,12 @@ class ParametresPanel extends JPanel {
         };
 
         JTable table = new JTable(model);
-        table.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         table.setRowHeight(36);
         table.setShowHorizontalLines(true);
         table.setShowVerticalLines(false);
         table.setGridColor(new Color(240, 242, 246));
-        table.getTableHeader().setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 12));
         table.getTableHeader().setBackground(new Color(248, 249, 252));
         table.getTableHeader().setForeground(TEXT_SECOND);
 
@@ -1431,7 +1423,7 @@ class ParametresPanel extends JPanel {
             String adresse = adresseF.getText();
 
             if (nom.isEmpty() || adresse.isEmpty()) {
-                JOptionPane.showMessageDialog(dlg, "Tous les champs sont obligatoires", "Erreur", JOptionPane.ERROR_MESSAGE);
+                ToastManager.warning(dlg, "Tous les champs sont obligatoires");
                 return;
             }
 
@@ -1445,11 +1437,11 @@ class ParametresPanel extends JPanel {
                 protected void done() {
                     try {
                         if (get()) {
-                            JOptionPane.showMessageDialog(dlg, "Magasin créé avec succès!", "Succès", JOptionPane.INFORMATION_MESSAGE);
                             dlg.dispose();
+                            ToastManager.success(ParametresPanel.this, "Magasin créé avec succès");
                         }
                     } catch (Exception ex) {
-                        JOptionPane.showMessageDialog(dlg, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                        ToastManager.error(dlg, "Erreur: " + ex.getMessage());
                     }
                 }
             }.execute();
@@ -1529,8 +1521,8 @@ class ParametresPanel extends JPanel {
                     return null;
                 }
                 @Override protected void done() {
-                    try { get(); JOptionPane.showMessageDialog(dlg, "Configuration sauvegardée !", "Succès", JOptionPane.INFORMATION_MESSAGE); dlg.dispose(); }
-                    catch (Exception ex) { JOptionPane.showMessageDialog(dlg, "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE); }
+                    try { get(); dlg.dispose(); ToastManager.success(ParametresPanel.this, "Configuration sauvegardée"); }
+                    catch (Exception ex) { ToastManager.error(dlg, "Erreur : " + ex.getMessage()); }
                 }
             }.execute();
         });
@@ -1560,9 +1552,9 @@ class ParametresPanel extends JPanel {
                     java.util.List<java.util.Map<String, Object>> data = pkg.vms.DAO.BonDAO.getDemandesForExport();
                     String[] cols = {"ID", "Référence", "Facture", "Client", "Montant", "Nb Bons", "Statut", "Date"};
                     ExcelExportService.exportData(chooser.getSelectedFile().getAbsolutePath(), "Demandes", cols, data);
-                    JOptionPane.showMessageDialog(this, "Export des demandes réussi !");
+                    ToastManager.success(this, "Export des demandes réussi");
                 } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(this, "Erreur export : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    ToastManager.error(this, "Erreur export : " + ex.getMessage());
                 }
             }
         });
@@ -1575,9 +1567,9 @@ class ParametresPanel extends JPanel {
                     java.util.List<java.util.Map<String, Object>> data = pkg.vms.DAO.BonDAO.getBonsForExport();
                     String[] cols = {"ID", "Code Unique", "Valeur", "Statut", "Émission", "Réf Demande", "Client"};
                     ExcelExportService.exportData(chooser.getSelectedFile().getAbsolutePath(), "Bons", cols, data);
-                    JOptionPane.showMessageDialog(this, "Export des bons réussi !");
+                    ToastManager.success(this, "Export des bons réussi");
                 } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(this, "Erreur export : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    ToastManager.error(this, "Erreur export : " + ex.getMessage());
                 }
             }
         });
@@ -1590,9 +1582,9 @@ class ParametresPanel extends JPanel {
                     java.util.List<java.util.Map<String, Object>> data = pkg.vms.DAO.ClientDAO.getClientsForExport();
                     String[] cols = {"ID", "Nom", "Email", "Téléphone", "Société", "Création", "Actif"};
                     ExcelExportService.exportData(chooser.getSelectedFile().getAbsolutePath(), "Clients", cols, data);
-                    JOptionPane.showMessageDialog(this, "Export des clients réussi !");
+                    ToastManager.success(this, "Export des clients réussi");
                 } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(this, "Erreur export : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                    ToastManager.error(this, "Erreur export : " + ex.getMessage());
                 }
             }
         });
