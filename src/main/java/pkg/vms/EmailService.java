@@ -1,6 +1,7 @@
 package pkg.vms;
 
 import pkg.vms.DAO.BonDAO;
+import pkg.vms.DAO.EmailLogDAO;
 import pkg.vms.DAO.SettingsDAO;
 
 import jakarta.mail.*;
@@ -108,7 +109,7 @@ public class EmailService {
         // 1. Envoyer les bons au client
         String sujet = "Vos bons cadeau Intermart — " + reference;
         String corps = buildCorpsEmailClient(clientNom, reference, bons);
-        envoyerEmail(cfg, emailDest, null, sujet, corps, bons);
+        envoyerEmail(cfg, emailDest, null, sujet, corps, bons, demandeId, userId);
 
         // 2. Recapitulatif a l'admin
         if (cfg.adminEmail() != null && !cfg.adminEmail().isEmpty()) {
@@ -117,7 +118,7 @@ public class EmailService {
             String corpsAdmin  = buildCorpsEmailAdmin(reference, bons);
             BonDAO.BonInfo recap = new BonDAO.BonInfo();
             recap.pdfPath = recapPath;
-            envoyerEmail(cfg, cfg.adminEmail(), null, sujetAdmin, corpsAdmin, List.of(recap));
+            envoyerEmail(cfg, cfg.adminEmail(), null, sujetAdmin, corpsAdmin, List.of(recap), demandeId, userId);
         }
 
         // 3. Marquer comme envoye
@@ -131,7 +132,7 @@ public class EmailService {
     public static void envoyerNotification(String destinataire, String sujet, String corps) {
         try {
             SmtpConfig cfg = loadConfig();
-            envoyerEmail(cfg, destinataire, null, sujet, corps, null);
+            envoyerEmail(cfg, destinataire, null, sujet, corps, null, null, null);
         } catch (Exception e) {
             System.err.println("[EmailService] Notification non envoyee : " + e.getMessage());
         }
@@ -157,7 +158,7 @@ public class EmailService {
             );
             if (!cfg.isConfigured()) return "Configuration SMTP incomplete (serveur, utilisateur ou mot de passe manquant)";
             String corps = buildCorpsEmailTest(destinataire);
-            envoyerEmail(cfg, destinataire, null, "[VMS] Test de configuration email", corps, null);
+            envoyerEmail(cfg, destinataire, null, "[VMS] Test de configuration email", corps, null, null, null);
             return null; // succes
         } catch (AuthenticationFailedException e) {
             return "Authentification echouee. Verifiez le mot de passe SMTP (Gmail : utilisez un App Password).";
@@ -175,7 +176,10 @@ public class EmailService {
     private static void envoyerEmail(SmtpConfig cfg,
                                       String to, String cc,
                                       String subject, String body,
-                                      List<BonDAO.BonInfo> attachments) throws Exception {
+                                      List<BonDAO.BonInfo> attachments,
+                                      Integer demandeId, Integer userId) throws Exception {
+        int nbPJ = attachments != null ? attachments.size() : 0;
+
         // Mode simulation si SMTP non configure
         if (!cfg.isConfigured()) {
             System.out.println("══════════════════════════════════════════════════");
@@ -183,10 +187,12 @@ public class EmailService {
             System.out.println("  A       : " + to);
             if (cc != null) System.out.println("  CC      : " + cc);
             System.out.println("  Sujet   : " + subject);
-            System.out.println("  PJ      : " + (attachments != null ? attachments.size() : 0) + " fichier(s)");
+            System.out.println("  PJ      : " + nbPJ + " fichier(s)");
             System.out.println("══════════════════════════════════════════════════");
             System.out.println("[VMS] Pour activer l'envoi reel :");
             System.out.println("      Parametres > Configuration Email > renseigner SMTP");
+            EmailLogDAO.log(demandeId, to, cc, subject, EmailLogDAO.STATUT_SIMULATION,
+                    "SMTP non configure", nbPJ, userId);
             return;
         }
 
@@ -207,40 +213,48 @@ public class EmailService {
             }
         });
 
-        MimeMessage message = new MimeMessage(session);
-        message.setFrom(new InternetAddress(cfg.fromEmail(),
-                MimeUtility.encodeText(cfg.fromName(), "UTF-8", "B"), "UTF-8"));
-        message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
-        if (cc != null && !cc.isEmpty()) {
-            message.setRecipients(Message.RecipientType.CC, InternetAddress.parse(cc));
-        }
-        message.setSubject(MimeUtility.encodeText(subject, "UTF-8", "B"));
-        message.setSentDate(new java.util.Date());
+        try {
+            MimeMessage message = new MimeMessage(session);
+            message.setFrom(new InternetAddress(cfg.fromEmail(),
+                    MimeUtility.encodeText(cfg.fromName(), "UTF-8", "B"), "UTF-8"));
+            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
+            if (cc != null && !cc.isEmpty()) {
+                message.setRecipients(Message.RecipientType.CC, InternetAddress.parse(cc));
+            }
+            message.setSubject(MimeUtility.encodeText(subject, "UTF-8", "B"));
+            message.setSentDate(new java.util.Date());
 
-        // Corps HTML + pieces jointes
-        Multipart multipart = new MimeMultipart();
+            // Corps HTML + pieces jointes
+            Multipart multipart = new MimeMultipart();
 
-        MimeBodyPart htmlPart = new MimeBodyPart();
-        htmlPart.setContent(body, "text/html; charset=UTF-8");
-        multipart.addBodyPart(htmlPart);
+            MimeBodyPart htmlPart = new MimeBodyPart();
+            htmlPart.setContent(body, "text/html; charset=UTF-8");
+            multipart.addBodyPart(htmlPart);
 
-        if (attachments != null) {
-            for (BonDAO.BonInfo bon : attachments) {
-                if (bon.pdfPath != null) {
-                    File pdfFile = new File(bon.pdfPath);
-                    if (pdfFile.exists()) {
-                        MimeBodyPart part = new MimeBodyPart();
-                        part.attachFile(pdfFile);
-                        part.setFileName(MimeUtility.encodeText(pdfFile.getName(), "UTF-8", "B"));
-                        multipart.addBodyPart(part);
+            if (attachments != null) {
+                for (BonDAO.BonInfo bon : attachments) {
+                    if (bon.pdfPath != null) {
+                        File pdfFile = new File(bon.pdfPath);
+                        if (pdfFile.exists()) {
+                            MimeBodyPart part = new MimeBodyPart();
+                            part.attachFile(pdfFile);
+                            part.setFileName(MimeUtility.encodeText(pdfFile.getName(), "UTF-8", "B"));
+                            multipart.addBodyPart(part);
+                        }
                     }
                 }
             }
-        }
 
-        message.setContent(multipart);
-        Transport.send(message);
-        System.out.println("[VMS] Email envoye avec succes a : " + to);
+            message.setContent(multipart);
+            Transport.send(message);
+            System.out.println("[VMS] Email envoye avec succes a : " + to);
+            EmailLogDAO.log(demandeId, to, cc, subject, EmailLogDAO.STATUT_ENVOYE,
+                    null, nbPJ, userId);
+        } catch (Exception ex) {
+            EmailLogDAO.log(demandeId, to, cc, subject, EmailLogDAO.STATUT_ECHEC,
+                    ex.getMessage(), nbPJ, userId);
+            throw ex;
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════

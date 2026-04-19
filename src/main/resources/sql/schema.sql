@@ -168,6 +168,27 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS idx_audit_table ON audit_log(table_name, record_id);
 CREATE INDEX IF NOT EXISTS idx_audit_date ON audit_log(date_action);
 
+-- Journal des emails envoyés (historique + debug des envois SMTP)
+CREATE TABLE IF NOT EXISTS email_log (
+    email_id          SERIAL PRIMARY KEY,
+    demande_id        INT REFERENCES demande(demande_id) ON DELETE SET NULL,
+    destinataire      VARCHAR(255) NOT NULL,
+    cc                VARCHAR(255),
+    sujet             VARCHAR(500),
+    statut            VARCHAR(20) NOT NULL,  -- ENVOYE, ECHEC, SIMULATION
+    erreur            TEXT,
+    nb_pieces_jointes INT DEFAULT 0,
+    utilisateur_id    INT REFERENCES utilisateur(userid),
+    date_envoi        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_email_statut CHECK (statut IN ('ENVOYE','ECHEC','SIMULATION'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_log_date       ON email_log(date_envoi DESC);
+CREATE INDEX IF NOT EXISTS idx_email_log_statut     ON email_log(statut);
+CREATE INDEX IF NOT EXISTS idx_email_log_demande    ON email_log(demande_id);
+CREATE INDEX IF NOT EXISTS idx_email_log_destinataire ON email_log(destinataire);
+
 -- Paramètres applicatifs (configuration email, bons, etc.)
 CREATE TABLE IF NOT EXISTS app_settings (
     setting_id    SERIAL PRIMARY KEY,

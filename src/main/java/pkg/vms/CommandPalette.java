@@ -312,7 +312,8 @@ public class CommandPalette extends JDialog {
                                                      Runnable onLogout,
                                                      Runnable onAuditLog,
                                                      Runnable onSessions,
-                                                     Runnable onVerifBon) {
+                                                     Runnable onVerifBon,
+                                                     Runnable onEmailHistory) {
         boolean isAdmin        = "Administrateur".equalsIgnoreCase(role);
         boolean isManager      = "Manager".equalsIgnoreCase(role);
         boolean isComptable    = "Comptable".equalsIgnoreCase(role);
@@ -382,6 +383,13 @@ public class CommandPalette extends JDialog {
                     "Voir les utilisateurs connect\u00e9s r\u00e9cemment", "\uD83D\uDC65",
                     "sessions actives connexions utilisateurs admin",
                     null, onSessions));
+        }
+
+        if (isAdmin && onEmailHistory != null) {
+            cmds.add(new Command("admin.emails", "Historique emails",
+                    "Journal des envois SMTP (succ\u00e8s et \u00e9checs)", "\u2709\uFE0F",
+                    "historique email smtp envoi echec log admin",
+                    null, onEmailHistory));
         }
 
         if (onVerifBon != null) {
