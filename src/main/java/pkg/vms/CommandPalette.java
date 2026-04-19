@@ -310,7 +310,8 @@ public class CommandPalette extends JDialog {
                                                      Consumer<String> onNavigate,
                                                      Runnable onRefresh,
                                                      Runnable onLogout,
-                                                     Runnable onAuditLog) {
+                                                     Runnable onAuditLog,
+                                                     Runnable onSessions) {
         boolean isAdmin        = "Administrateur".equalsIgnoreCase(role);
         boolean isManager      = "Manager".equalsIgnoreCase(role);
         boolean isComptable    = "Comptable".equalsIgnoreCase(role);
@@ -373,6 +374,13 @@ public class CommandPalette extends JDialog {
                     "Consulter tous les \u00e9v\u00e9nements syst\u00e8me", "\uD83D\uDD10",
                     "audit journal log tracabilite admin",
                     null, onAuditLog));
+        }
+
+        if (isAdmin && onSessions != null) {
+            cmds.add(new Command("admin.sessions", "Sessions actives",
+                    "Voir les utilisateurs connect\u00e9s r\u00e9cemment", "\uD83D\uDC65",
+                    "sessions actives connexions utilisateurs admin",
+                    null, onSessions));
         }
 
         cmds.add(new Command("action.refresh", "Rafra\u00eechir",

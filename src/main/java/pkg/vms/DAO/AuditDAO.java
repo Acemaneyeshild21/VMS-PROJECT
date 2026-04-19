@@ -116,6 +116,48 @@ public class AuditDAO {
         return out;
     }
 
+    public static class Session {
+        public String username;
+        public Timestamp derniereConnexion;
+        public int       nbConnexions;
+        public int       echecs;
+    }
+
+    /** Sessions \"actives\" = utilisateurs connect\u00e9s r\u00e9cemment (derni\u00e8res N heures). */
+    public static List<Session> getSessionsActives(int heures) {
+        List<Session> out = new ArrayList<>();
+        // username est souvent NULL dans les logs simples => on JOIN avec utilisateur.
+        String sql =
+            "SELECT COALESCE(u.username, a.username) AS name, " +
+            "  MAX(a.date_action) FILTER (WHERE a.action = 'CONNEXION') AS derniere, " +
+            "  COUNT(*) FILTER (WHERE a.action = 'CONNEXION')           AS nb_ok, " +
+            "  COUNT(*) FILTER (WHERE a.action = 'CONNEXION_ECHOUEE')   AS nb_ko " +
+            "FROM audit_log a LEFT JOIN utilisateur u ON a.utilisateur_id = u.userid " +
+            "WHERE a.action IN ('CONNEXION','CONNEXION_ECHOUEE') " +
+            "  AND a.date_action >= CURRENT_TIMESTAMP - (? || ' hours')::interval " +
+            "  AND COALESCE(u.username, a.username) IS NOT NULL " +
+            "GROUP BY COALESCE(u.username, a.username) " +
+            "HAVING MAX(a.date_action) FILTER (WHERE a.action = 'CONNEXION') IS NOT NULL " +
+            "ORDER BY derniere DESC";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, heures);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Session s = new Session();
+                    s.username          = rs.getString("name");
+                    s.derniereConnexion = rs.getTimestamp("derniere");
+                    s.nbConnexions      = rs.getInt("nb_ok");
+                    s.echecs            = rs.getInt("nb_ko");
+                    out.add(s);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Erreur getSessionsActives : " + e.getMessage());
+        }
+        return out;
+    }
+
     /** Liste distincte des actions trouv\u00e9es (pour filtres). */
     public static List<String> getDistinctActions() {
         List<String> out = new ArrayList<>();
