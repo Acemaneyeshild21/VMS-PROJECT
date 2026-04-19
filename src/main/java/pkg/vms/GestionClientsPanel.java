@@ -77,11 +77,16 @@ public class GestionClientsPanel extends JPanel {
         JButton btnImport = UIUtils.buildGhostButton("Importer CSV", 130, 40);
         btnImport.addActionListener(e -> ouvrirImportCsv());
 
+        JButton btnDoublons = UIUtils.buildGhostButton("Doublons", 110, 40);
+        btnDoublons.setToolTipText("Scanner la base \u00e0 la recherche de clients en doublon");
+        btnDoublons.addActionListener(e -> ouvrirDoublons());
+
         JButton btnExport = UIUtils.buildGhostButton("Exporter", 110, 40);
         btnExport.addActionListener(e -> exporterClientsExcel());
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         right.setOpaque(false);
+        right.add(btnDoublons);
         right.add(btnImport);
         right.add(btnExport);
         right.add(btnNouveau);
@@ -217,6 +222,10 @@ public class GestionClientsPanel extends JPanel {
 
     private void ouvrirImportCsv() {
         ImportClientsDialog.show(this, clientManager, this::chargerClients);
+    }
+
+    private void ouvrirDoublons() {
+        DoublonsDialog.show(this, clientManager, this::chargerClients);
     }
 
     private void ouvrirFiche360() {
