@@ -139,6 +139,28 @@ public class EmailService {
     }
 
     /**
+     * Envoie un code OTP de r\u00e9initialisation de mot de passe.
+     * Utilise la config BD/fichier standard. Ne l\u00e8ve pas d'exception.
+     *
+     * @return null si succ\u00e8s, message d'erreur sinon
+     */
+    public static String envoyerCodeReset(String destinataire, String username, String code) {
+        try {
+            SmtpConfig cfg = loadConfig();
+            String sujet = "[Intermart VMS] Code de r\u00e9initialisation : " + code;
+            String corps = buildCorpsEmailReset(username, code);
+            envoyerEmail(cfg, destinataire, null, sujet, corps, null, null, null);
+            return null; // succ\u00e8s
+        } catch (AuthenticationFailedException e) {
+            return "Authentification SMTP \u00e9chou\u00e9e. Contactez l'administrateur.";
+        } catch (MessagingException e) {
+            return "Erreur SMTP : " + e.getMessage();
+        } catch (Exception e) {
+            return "Erreur : " + e.getMessage();
+        }
+    }
+
+    /**
      * Envoie un email de test a l'adresse indiquee.
      * Utilise la config passee en parametre (depuis le dialog de parametres).
      *
@@ -349,6 +371,54 @@ public class EmailService {
              + "<p style='color:#5A6478;font-size:12px;'>Le recapitulatif PDF est en piece jointe.</p>"
              + "<p style='color:#A0A8B9;font-size:11px;'>Email automatique — VMS Intermart</p>"
              + "</div></body></html>";
+    }
+
+    private static String buildCorpsEmailReset(String username, String code) {
+        // Espacement visuel du code : "123456" -> "1 2 3 4 5 6"
+        StringBuilder codeSpaced = new StringBuilder();
+        for (int i = 0; i < code.length(); i++) {
+            if (i > 0) codeSpaced.append(" ");
+            codeSpaced.append(code.charAt(i));
+        }
+        return "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>"
+             + "<body style='margin:0;padding:0;background:#f5f6fa;font-family:Trebuchet MS,Arial,sans-serif;'>"
+             + "<table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f6fa;'><tr><td align='center' style='padding:30px 10px;'>"
+             + "<table width='520' cellpadding='0' cellspacing='0' style='background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);'>"
+             // Header
+             + "<tr><td style='background:#D2232D;padding:28px 36px;text-align:center;'>"
+             + "<h1 style='color:#ffffff;margin:0;font-family:Georgia,serif;font-size:26px;letter-spacing:2px;'>INTERMART</h1>"
+             + "<p style='color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px;'>R\u00e9initialisation de mot de passe</p>"
+             + "</td></tr>"
+             // Salutation
+             + "<tr><td style='padding:30px 36px 0;'>"
+             + "<p style='color:#161C2D;font-size:15px;margin:0 0 12px;'>Bonjour <strong>" + esc(username) + "</strong>,</p>"
+             + "<p style='color:#5A6478;font-size:14px;line-height:1.6;margin:0 0 20px;'>"
+             + "Une demande de r\u00e9initialisation de mot de passe a \u00e9t\u00e9 enregistr\u00e9e pour votre compte VMS. "
+             + "Utilisez le code ci-dessous dans l'application pour cr\u00e9er un nouveau mot de passe :</p>"
+             // Code
+             + "<table width='100%' cellpadding='0' cellspacing='0' style='margin:0 0 24px;'>"
+             + "<tr><td style='background:#fff8f8;border:2px dashed #D2232D;border-radius:10px;padding:22px;text-align:center;'>"
+             + "<div style='color:#5A6478;font-size:11px;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;'>Votre code</div>"
+             + "<div style='color:#D2232D;font-family:Consolas,Menlo,monospace;font-size:34px;font-weight:bold;letter-spacing:6px;'>"
+             + codeSpaced + "</div>"
+             + "<div style='color:#A0A8B9;font-size:11px;margin-top:8px;'>Valable 15 minutes \u2014 usage unique</div>"
+             + "</td></tr></table>"
+             // S\u00e9curit\u00e9
+             + "<table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:24px;'>"
+             + "<tr><td style='background:#f8f9fc;border-left:4px solid #A0A8B9;padding:14px;border-radius:4px;'>"
+             + "<p style='color:#5A6478;font-size:12px;line-height:1.6;margin:0;'>"
+             + "<strong>Vous n'avez pas fait cette demande ?</strong><br>"
+             + "Ignorez simplement ce message. Votre mot de passe reste inchang\u00e9. "
+             + "Si vous recevez plusieurs de ces emails, contactez votre administrateur."
+             + "</p></td></tr></table>"
+             + "<p style='color:#A0A8B9;font-size:11px;line-height:1.6;'>Pour votre s\u00e9curit\u00e9, ne partagez jamais ce code.</p>"
+             + "<p style='color:#161C2D;font-size:14px;margin:20px 0 0;'>Cordialement,<br/><strong>L'\u00e9quipe Intermart Maurice</strong></p>"
+             + "</td></tr>"
+             // Footer
+             + "<tr><td style='background:#f8f9fc;padding:16px 36px;text-align:center;border-top:1px solid #e4e6ec;'>"
+             + "<p style='color:#A0A8B9;font-size:11px;margin:0;'>\u00a9 2026 Intermart Maurice \u2014 VMS</p>"
+             + "</td></tr>"
+             + "</table></td></tr></table></body></html>";
     }
 
     private static String buildCorpsEmailTest(String destinataire) {
