@@ -159,7 +159,8 @@ public class Dashboard extends JFrame {
                 },
                 this::deconnexion,
                 () -> AuditLogDialog.show(Dashboard.this),
-                () -> SessionsActivesDialog.show(Dashboard.this)
+                () -> SessionsActivesDialog.show(Dashboard.this),
+                () -> VerificationBonDialog.show(Dashboard.this)
         );
         CommandPalette.show(this, cmds);
     }

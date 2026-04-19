@@ -311,7 +311,8 @@ public class CommandPalette extends JDialog {
                                                      Runnable onRefresh,
                                                      Runnable onLogout,
                                                      Runnable onAuditLog,
-                                                     Runnable onSessions) {
+                                                     Runnable onSessions,
+                                                     Runnable onVerifBon) {
         boolean isAdmin        = "Administrateur".equalsIgnoreCase(role);
         boolean isManager      = "Manager".equalsIgnoreCase(role);
         boolean isComptable    = "Comptable".equalsIgnoreCase(role);
@@ -381,6 +382,13 @@ public class CommandPalette extends JDialog {
                     "Voir les utilisateurs connect\u00e9s r\u00e9cemment", "\uD83D\uDC65",
                     "sessions actives connexions utilisateurs admin",
                     null, onSessions));
+        }
+
+        if (onVerifBon != null) {
+            cmds.add(new Command("action.verify", "V\u00e9rifier un bon",
+                    "Contr\u00f4ler le statut d'un bon par son code", "\uD83D\uDD0D",
+                    "verifier bon code qr scan valide utilise",
+                    null, onVerifBon));
         }
 
         cmds.add(new Command("action.refresh", "Rafra\u00eechir",
