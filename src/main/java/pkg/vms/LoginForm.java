@@ -232,8 +232,7 @@ public class LoginForm extends JFrame {
             public void mouseEntered(MouseEvent e) { forgot.setForeground(RED_DK); }
             public void mouseExited(MouseEvent e)  { forgot.setForeground(RED); }
             public void mouseClicked(MouseEvent e) {
-                ToastManager.info(LoginForm.this,
-                        "Contactez votre administrateur pour réinitialiser votre mot de passe");
+                ResetPasswordDialog.show(LoginForm.this);
             }
         });
         pwdLabelRow.add(forgot, BorderLayout.EAST);
@@ -387,6 +386,7 @@ public class LoginForm extends JFrame {
     }
 
     public static void main(String[] args) {
+        ThemeManager.loadAndApply();
         SwingUtilities.invokeLater(() -> new LoginForm().setVisible(true));
     }
 }

@@ -160,6 +160,49 @@ public class BonDAO {
         return null;
     }
 
+    public static class VerifInfo {
+        public BonInfo bon;
+        public String  redemptionDate;   // null si non rachet\u00e9
+        public String  redemptionMagasin;
+        public String  redemptionUtilisateur;
+        public boolean expired;          // date_expiration < now
+    }
+
+    /** V\u00e9rification riche : bon + info redemption + flag expir\u00e9. */
+    public static VerifInfo verifierBon(String codeUnique) throws SQLException {
+        BonInfo bi = getBonByCode(codeUnique);
+        if (bi == null) return null;
+        VerifInfo v = new VerifInfo();
+        v.bon = bi;
+        // Expir\u00e9 si date_expiration < now et statut != REDIME
+        String sqlExp = "SELECT (date_expiration < CURRENT_TIMESTAMP) AS expired FROM bon WHERE bon_id = ?";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sqlExp)) {
+            ps.setInt(1, bi.bonId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) v.expired = rs.getBoolean("expired");
+            }
+        }
+        // Infos redemption si existe
+        String sqlR = "SELECT r.date_redemption, m.nom_magasin, u.username " +
+                      "FROM redemption r " +
+                      "LEFT JOIN magasin m ON r.magasin_id = m.magasin_id " +
+                      "LEFT JOIN utilisateur u ON r.utilisateur_id = u.userid " +
+                      "WHERE r.bon_id = ?";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sqlR)) {
+            ps.setInt(1, bi.bonId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    v.redemptionDate       = rs.getString("date_redemption");
+                    v.redemptionMagasin    = rs.getString("nom_magasin");
+                    v.redemptionUtilisateur= rs.getString("username");
+                }
+            }
+        }
+        return v;
+    }
+
     /**
      * Compte les bons par statut pour le dashboard.
      */

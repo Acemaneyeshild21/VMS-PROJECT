@@ -10,23 +10,25 @@ import java.awt.geom.RoundRectangle2D;
 
 public class Dashboard extends JFrame {
 
-    // ── Palette (Centralisée via VMSStyle) ──────────────────────────────────
-    private static final Color BG_ROOT        = VMSStyle.BG_ROOT;
-    private static final Color BG_SIDEBAR     = VMSStyle.BG_SIDEBAR;
-    private static final Color BG_TOPBAR      = VMSStyle.BG_TOPBAR;
-    private static final Color BG_CARD        = VMSStyle.BG_CARD;
-    private static final Color BG_CARD_HOVER  = VMSStyle.BG_CARD_HOVER;
-    private static final Color RED_PRIMARY    = VMSStyle.RED_PRIMARY;
-    private static final Color RED_DARK       = VMSStyle.RED_DARK;
-    private static final Color RED_LIGHT      = VMSStyle.RED_LIGHT;
-    private static final Color BORDER_LIGHT   = VMSStyle.BORDER_LIGHT;
-    private static final Color TEXT_PRIMARY   = VMSStyle.TEXT_PRIMARY;
-    private static final Color TEXT_SECONDARY = VMSStyle.TEXT_SECONDARY;
-    private static final Color TEXT_MUTED     = VMSStyle.TEXT_MUTED;
-    private static final Color ACCENT_BLUE    = VMSStyle.ACCENT_BLUE;
-    private static final Color SUCCESS        = VMSStyle.SUCCESS;
-    private static final Color WARNING        = VMSStyle.WARNING;
-    private static final Color SHADOW_COLOR   = VMSStyle.SHADOW_COLOR;
+    // ── Palette (Centralis\u00e9e via VMSStyle) ──────────────────────────────────
+    // Champs d'instance (non-static) : lus \u00e0 chaque construction pour refl\u00e9ter
+    // le th\u00e8me courant (clair/sombre). Voir ThemeManager.toggle().
+    private final Color BG_ROOT        = VMSStyle.BG_ROOT;
+    private final Color BG_SIDEBAR     = VMSStyle.BG_SIDEBAR;
+    private final Color BG_TOPBAR      = VMSStyle.BG_TOPBAR;
+    private final Color BG_CARD        = VMSStyle.BG_CARD;
+    private final Color BG_CARD_HOVER  = VMSStyle.BG_CARD_HOVER;
+    private final Color RED_PRIMARY    = VMSStyle.RED_PRIMARY;
+    private final Color RED_DARK       = VMSStyle.RED_DARK;
+    private final Color RED_LIGHT      = VMSStyle.RED_LIGHT;
+    private final Color BORDER_LIGHT   = VMSStyle.BORDER_LIGHT;
+    private final Color TEXT_PRIMARY   = VMSStyle.TEXT_PRIMARY;
+    private final Color TEXT_SECONDARY = VMSStyle.TEXT_SECONDARY;
+    private final Color TEXT_MUTED     = VMSStyle.TEXT_MUTED;
+    private final Color ACCENT_BLUE    = VMSStyle.ACCENT_BLUE;
+    private final Color SUCCESS        = VMSStyle.SUCCESS;
+    private final Color WARNING        = VMSStyle.WARNING;
+    private final Color SHADOW_COLOR   = VMSStyle.SHADOW_COLOR;
 
     // ── Fonts (Centralisées via VMSStyle) ────────────────────────────────────
     private static final Font FONT_BRAND    = VMSStyle.FONT_BRAND;
@@ -49,8 +51,8 @@ public class Dashboard extends JFrame {
     private final String  email;
     private String        activePage = "Accueil";
 
-    private final JButton[] navButtons = new JButton[7];
-    private final String[]  navItems   = {"Accueil","Demandes","Clients","R\u00e9demption","Validation","Parametres"};
+    private final JButton[] navButtons = new JButton[8];
+    private final String[]  navItems   = {"Accueil","Demandes","Archives","Clients","R\u00e9demption","Validation","Parametres"};
 
     private static final int RESIZE_MARGIN = 8;
     private Point     dragStart;
@@ -105,10 +107,74 @@ public class Dashboard extends JFrame {
         root.add(mainArea, BorderLayout.CENTER);
         add(root);
         installResizeHandler(root);
+        installGlobalShortcuts(root);
         switchPage("Accueil");
     }
 
-    private static JLabel getJLabel(String username) {
+    // ── Raccourcis clavier globaux ───────────────────────────────────────────
+    private void installGlobalShortcuts(JPanel root) {
+        InputMap  im = root.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap am = root.getActionMap();
+
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK), "newRequest");
+        am.put("newRequest", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                if (canCreateDemande()) switchPage("Nouvelle Demande");
+            }
+        });
+
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_HOME, InputEvent.CTRL_DOWN_MASK), "home");
+        am.put("home", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) { switchPage("Accueil"); }
+        });
+
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0), "refresh");
+        am.put("refresh", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                if ("Accueil".equals(activePage)) {
+                    chargerStatsAsync();
+                    ToastManager.info(Dashboard.this, "Tableau de bord rafra\u00eechi");
+                }
+            }
+        });
+
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "escape");
+        am.put("escape", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                if (!"Accueil".equals(activePage)) switchPage("Accueil");
+            }
+        });
+
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_K, InputEvent.CTRL_DOWN_MASK), "commandPalette");
+        am.put("commandPalette", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) { openCommandPalette(); }
+        });
+    }
+
+    private void openCommandPalette() {
+        java.util.List<CommandPalette.Command> cmds = CommandPalette.buildDefaultCommands(
+                role,
+                this::switchPage,
+                () -> {
+                    chargerStatsAsync();
+                    ToastManager.info(Dashboard.this, "Tableau de bord rafra\u00eechi");
+                },
+                this::deconnexion,
+                () -> AuditLogDialog.show(Dashboard.this),
+                () -> SessionsActivesDialog.show(Dashboard.this),
+                () -> VerificationBonDialog.show(Dashboard.this),
+                () -> EmailHistoryDialog.show(Dashboard.this),
+                () -> ThemeManager.toggle(Dashboard.this, userId, username, role, email)
+        );
+        CommandPalette.show(this, cmds);
+    }
+
+    private void deconnexion() {
+        dispose();
+        SwingUtilities.invokeLater(() -> new LoginForm().setVisible(true));
+    }
+
+    private JLabel getJLabel(String username) {
         JLabel footer = new JLabel(
                 "\u00a9 2026 Voucher System \u2014 Tous droits r\u00e9serv\u00e9s  |  Connect\u00e9 : " + username,
                 SwingConstants.CENTER);
@@ -285,6 +351,11 @@ public class Dashboard extends JFrame {
                 g2.drawLine(x,     y + s/2, x + 2, y + s/2);
                 g2.drawLine(x + s - 2, y + s/2, x + s, y + s/2);
             }
+            case "Archives" -> { // boîte archive (toit + corps + poignée)
+                g2.drawRect(x + 1, y + 3, s - 2, 4);              // couvercle
+                g2.drawRect(x + 2, y + 7, s - 4, s - 9);          // corps
+                g2.drawLine(x + s/2 - 3, y + 11, x + s/2 + 3, y + 11); // poignée
+            }
             default -> g2.drawOval(x + 4, y + 4, s - 8, s - 8);
         }
     }
@@ -408,7 +479,8 @@ public class Dashboard extends JFrame {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT,10,0));
         right.setOpaque(false);
         right.add(buildSearchBox());
-        right.add(buildIconButton("\uD83D\uDD14"));
+        right.add(buildThemeToggle());
+        right.add(DashboardWidgets.buildNotificationBell(this::switchPage));
         JSeparator sep = new JSeparator(JSeparator.VERTICAL);
         sep.setPreferredSize(new Dimension(1,24)); sep.setForeground(BORDER_LIGHT);
         right.add(sep);
@@ -435,31 +507,50 @@ public class Dashboard extends JFrame {
             }
         };
         box.setOpaque(false);
-        box.setPreferredSize(new Dimension(210,34));
-        box.setBorder(BorderFactory.createEmptyBorder(0,12,0,12));
+        box.setPreferredSize(new Dimension(230,34));
+        box.setBorder(BorderFactory.createEmptyBorder(0,12,0,8));
+        box.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        box.setToolTipText("Ouvrir la palette de commandes (Ctrl+K)");
+
         JLabel ico = new JLabel("\uD83D\uDD0D");
         ico.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 12));
-        JTextField field = getJTextField();
-        box.add(ico, BorderLayout.WEST); box.add(field, BorderLayout.CENTER);
+
+        JLabel hint = new JLabel("Rechercher\u2026");
+        hint.setFont(FONT_CARD_DSC);
+        hint.setForeground(TEXT_MUTED);
+
+        JLabel kbd = new JLabel("Ctrl K");
+        kbd.setFont(new Font("Segoe UI", Font.BOLD, 10));
+        kbd.setForeground(TEXT_MUTED);
+        kbd.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER_LIGHT, 1, true),
+                BorderFactory.createEmptyBorder(2, 6, 2, 6)));
+
+        box.add(ico, BorderLayout.WEST);
+        box.add(hint, BorderLayout.CENTER);
+        box.add(kbd, BorderLayout.EAST);
+
+        MouseAdapter ma = new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) { openCommandPalette(); }
+        };
+        box.addMouseListener(ma);
+        ico.addMouseListener(ma);
+        hint.addMouseListener(ma);
+        kbd.addMouseListener(ma);
         return box;
     }
 
-    private static JTextField getJTextField() {
-        JTextField field = new JTextField("Rechercher...");
-        field.setOpaque(false);
-        field.setBorder(null);
-        field.setFont(FONT_CARD_DSC);
-        field.setForeground(TEXT_MUTED);
-        field.setCaretColor(RED_PRIMARY);
-        field.addFocusListener(new FocusAdapter() {
-            public void focusGained(FocusEvent e) {
-                if (field.getText().equals("Rechercher...")) { field.setText(""); field.setForeground(TEXT_PRIMARY); }
-            }
-            public void focusLost(FocusEvent e) {
-                if (field.getText().isEmpty()) { field.setText("Rechercher..."); field.setForeground(TEXT_MUTED); }
-            }
+    /** Bouton soleil/lune pour basculer entre th\u00e8me clair et sombre. */
+    private JButton buildThemeToggle() {
+        boolean dark = VMSStyle.isDark();
+        String icon = dark ? "\u2600\uFE0F" : "\uD83C\uDF19"; // soleil si sombre, lune si clair
+        JButton btn = buildIconButton(icon);
+        btn.setToolTipText(dark ? "Passer en mode clair" : "Passer en mode sombre");
+        btn.addActionListener(e -> {
+            ToastManager.info(this, VMSStyle.isDark() ? "Passage au mode clair\u2026" : "Passage au mode sombre\u2026");
+            ThemeManager.toggle(this, userId, username, role, email);
         });
-        return field;
+        return btn;
     }
 
     private JButton buildIconButton(String icon) {
@@ -530,6 +621,7 @@ public class Dashboard extends JFrame {
             case "Accueil"         -> contentPanel.add(buildHomePage(),                    BorderLayout.CENTER);
             case "Clients"         -> contentPanel.add(new GestionClientsPanel(),           BorderLayout.CENTER);
             case "Demandes"        -> contentPanel.add(new GestionDemande(role, userId),    BorderLayout.CENTER);
+            case "Archives"        -> contentPanel.add(new ArchivesPanel(role, userId, username), BorderLayout.CENTER);
             case "Bons"            -> contentPanel.add(new GestionBons(role, userId),       BorderLayout.CENTER);
             case "R\u00e9demption" -> contentPanel.add(new RedemptionPanel(userId, username, role), BorderLayout.CENTER);
             case "Validation"      -> contentPanel.add(new ValidationPanel(role, userId),   BorderLayout.CENTER);
@@ -558,43 +650,132 @@ public class Dashboard extends JFrame {
     }
 
     // ── Home Page ────────────────────────────────────────────────────────────
-    private JPanel buildHomePage() {
-        JPanel home = new JPanel(new BorderLayout(0, 22));
+    private JComponent buildHomePage() {
+        JPanel home = new JPanel();
         home.setOpaque(false);
-        home.add(buildCtaBanner(), BorderLayout.NORTH);
+        home.setLayout(new BoxLayout(home, BoxLayout.Y_AXIS));
 
-        JPanel body = new JPanel(new BorderLayout(0, 22));
-        body.setOpaque(false);
-        body.add(buildKpiStrip(),   BorderLayout.NORTH);
-        body.add(buildModuleGrid(), BorderLayout.CENTER);
-        home.add(body, BorderLayout.CENTER);
+        JPanel cta = buildCtaBanner();
+        cta.setAlignmentX(Component.LEFT_ALIGNMENT);
+        home.add(cta);
+        home.add(Box.createVerticalStrut(22));
 
-        // Charger les stats en arrière-plan
+        JPanel kpiStrip = buildKpiStrip();
+        kpiStrip.setAlignmentX(Component.LEFT_ALIGNMENT);
+        home.add(kpiStrip);
+        home.add(Box.createVerticalStrut(22));
+
+        // Rangée widgets intelligents — À faire + Timeline + Météo
+        JPanel smartRow = new JPanel(new GridLayout(1, 3, 14, 0));
+        smartRow.setOpaque(false);
+        smartRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        smartRow.add(DashboardWidgets.buildAFaireWidget(role, this::switchPage));
+        smartRow.add(DashboardWidgets.buildTimelineWidget());
+        smartRow.add(DashboardWidgets.buildMeteoWidget());
+        smartRow.setPreferredSize(new Dimension(0, 260));
+        smartRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 260));
+        home.add(smartRow);
+        home.add(Box.createVerticalStrut(14));
+
+        // Rangée analytique — Sparkline + Top clients + Expirants
+        JPanel analyticsRow = new JPanel(new GridLayout(1, 3, 14, 0));
+        analyticsRow.setOpaque(false);
+        analyticsRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        analyticsRow.add(DashboardWidgets.buildSparklineWidget());
+        analyticsRow.add(DashboardWidgets.buildTopClientsWidget(this::switchPage));
+        analyticsRow.add(DashboardWidgets.buildExpiringWidget(this::switchPage));
+        analyticsRow.setPreferredSize(new Dimension(0, 280));
+        analyticsRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 280));
+        home.add(analyticsRow);
+        home.add(Box.createVerticalStrut(22));
+
+        // Titre section modules
+        JLabel modTitle = new JLabel("Modules");
+        modTitle.setFont(new Font("Segoe UI", Font.BOLD, 15));
+        modTitle.setForeground(TEXT_PRIMARY);
+        modTitle.setAlignmentX(Component.LEFT_ALIGNMENT);
+        modTitle.setBorder(BorderFactory.createEmptyBorder(0, 2, 6, 0));
+        home.add(modTitle);
+
+        JPanel modGrid = buildModuleGrid();
+        modGrid.setAlignmentX(Component.LEFT_ALIGNMENT);
+        home.add(modGrid);
+        home.add(Box.createVerticalStrut(20));
+
+        // Stats + counters live
         chargerStatsAsync();
-        return home;
+
+        // Wrapper scroll + overlay FAB
+        JScrollPane sc = new JScrollPane(home);
+        sc.setOpaque(false);
+        sc.setBorder(null);
+        sc.getViewport().setOpaque(false);
+        sc.getVerticalScrollBar().setUnitIncrement(16);
+
+        if (!canCreateDemande()) return sc;
+
+        JButton fab = DashboardWidgets.buildFab(
+                "Nouvelle demande (Ctrl+N)",
+                () -> switchPage("Nouvelle Demande"));
+
+        JLayeredPane layered = new JLayeredPane();
+        layered.setLayout(new LayoutManager() {
+            public void addLayoutComponent(String name, Component comp) {}
+            public void removeLayoutComponent(Component comp) {}
+            public Dimension preferredLayoutSize(Container parent) { return sc.getPreferredSize(); }
+            public Dimension minimumLayoutSize(Container parent)   { return sc.getMinimumSize(); }
+            public void layoutContainer(Container parent) {
+                sc.setBounds(0, 0, parent.getWidth(), parent.getHeight());
+                Dimension d = fab.getPreferredSize();
+                fab.setBounds(parent.getWidth() - d.width - 24,
+                              parent.getHeight() - d.height - 24,
+                              d.width, d.height);
+            }
+        });
+        layered.add(sc,  JLayeredPane.DEFAULT_LAYER);
+        layered.add(fab, JLayeredPane.PALETTE_LAYER);
+        return layered;
+    }
+
+    private boolean canCreateDemande() {
+        return "Administrateur".equalsIgnoreCase(role) || "Manager".equalsIgnoreCase(role)
+                || "Collaborateur".equalsIgnoreCase(role);
     }
 
     // ── Stats depuis BD (async) ───────────────────────────────────────────────
     private void chargerStatsAsync() {
-        new SwingWorker<VoucherDAO.VoucherStats, Void>() {
+        new SwingWorker<Object[], Void>() {
             @Override
-            protected VoucherDAO.VoucherStats doInBackground() throws Exception {
-                return VoucherDAO.getDashboardStats();
+            protected Object[] doInBackground() throws Exception {
+                return new Object[]{
+                        VoucherDAO.getDashboardStats(),
+                        VoucherDAO.getModuleCounters()
+                };
             }
 
             @Override
             protected void done() {
                 try {
-                    VoucherDAO.VoucherStats stats = get();
+                    Object[] res = get();
+                    VoucherDAO.VoucherStats stats = (VoucherDAO.VoucherStats) res[0];
+                    VoucherDAO.ModuleCounters cnt  = (VoucherDAO.ModuleCounters) res[1];
+
                     if (kpiClientsVal != null) kpiClientsVal.setText(String.valueOf(stats.activeClients));
                     if (kpiBonsVal != null) kpiBonsVal.setText(String.valueOf(stats.totalVouchers));
                     if (kpiDemandesVal != null) kpiDemandesVal.setText(String.valueOf(stats.pendingPayments));
                     if (kpiTauxVal != null) kpiTauxVal.setText(stats.validationRate + " %");
-                    
+
                     if (kpiClientsTrend != null) kpiClientsTrend.setText("Base complète · cliquer pour gérer");
                     if (kpiBonsTrend != null) kpiBonsTrend.setText("Bons émis au total");
                     if (kpiDemandesTrend != null) kpiDemandesTrend.setText(
-                            stats.pendingPayments > 0 ? "Action requise" : "Tout est à jour ✓");
+                            stats.pendingPayments > 0 ? "Action requise" : "Tout est à jour \u2713");
+
+                    // Compteurs live sur les cartes modules
+                    if (modCountBons       != null) modCountBons.setText(cnt.bonsTotal + " bons");
+                    if (modCountDemandes   != null) modCountDemandes.setText(cnt.demandesActives + " actives");
+                    if (modCountClients    != null) modCountClients.setText(cnt.clientsActifs + " clients");
+                    if (modCountPaiements  != null) modCountPaiements.setText(cnt.paiementsAttente + " en attente");
+                    if (modCountValidation != null) modCountValidation.setText(cnt.aValider + " à approuver");
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -625,7 +806,7 @@ public class Dashboard extends JFrame {
         return banner;
     }
 
-    private static JPanel getJPanel() {
+    private JPanel getJPanel() {
         JPanel banner = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
@@ -654,7 +835,9 @@ public class Dashboard extends JFrame {
     private JPanel buildKpiStrip() {
         JPanel strip = new JPanel(new GridLayout(1, 4, 16, 0));
         strip.setOpaque(false);
-        strip.setPreferredSize(new Dimension(0, 112));
+        // Hauteur augmentée pour accueillir le trend sans clipping
+        strip.setPreferredSize(new Dimension(0, 130));
+        strip.setMaximumSize(new Dimension(Integer.MAX_VALUE, 130));
 
         JPanel kpiClients = buildModernKpi("CLIENTS ACTIFS", ACCENT_BLUE, "\uD83D\uDC64", "Clients",
                 lv -> kpiClientsVal = lv, lt -> kpiClientsTrend = lt);
@@ -757,25 +940,38 @@ public class Dashboard extends JFrame {
     }
 
     // ── Module Grid ──────────────────────────────────────────────────────────
+    private JLabel modCountBons, modCountDemandes, modCountClients, modCountPaiements, modCountValidation;
+
     private JPanel buildModuleGrid() {
         JPanel grid = new JPanel(new GridLayout(2,3,14,14));
         grid.setOpaque(false);
+        grid.setPreferredSize(new Dimension(0, 320));
+        grid.setMaximumSize(new Dimension(Integer.MAX_VALUE, 320));
 
-        // targetPage = null → bientôt disponible
+        JLabel[] refs = new JLabel[6];
         Object[][] mods = {
                 {"Gestion des Bons", "\uD83C\uDF81", RED_PRIMARY,             "\u00c9mettre, modifier, archiver",          "Bons"},
                 {"Demandes",         "\uD83D\uDCCB", ACCENT_BLUE,             "File de traitement en cours",               "Demandes"},
                 {"Clients",          "\uD83D\uDC64", SUCCESS,                 "Fiches, historiques & fid\u00e9lit\u00e9",   "Clients"},
                 {"Paiements",        "\uD83D\uDCB3", WARNING,                 "Suivi & rapprochement bancaire",             "Validation"},
-                {"Validation",       "✓",        new Color(20,170,190),  "Approbation des demandes",                   "Validation"},
+                {"Validation",       "\u2713",        new Color(20,170,190),  "Approbation des demandes",                   "Validation"},
                 {"Statistiques",     "\uD83D\uDCC8", new Color(150,80,210),   "Rapports & analyses",                        "Statistiques"},
         };
-        for (Object[] m : mods)
-            grid.add(buildModuleCard((String)m[0],(String)m[1],(Color)m[2],(String)m[3],(String)m[4]));
+        for (int i = 0; i < mods.length; i++) {
+            Object[] m = mods[i];
+            JLabel[] holder = new JLabel[1];
+            grid.add(buildModuleCard((String)m[0],(String)m[1],(Color)m[2],(String)m[3],(String)m[4], holder));
+            refs[i] = holder[0];
+        }
+        modCountBons       = refs[0];
+        modCountDemandes   = refs[1];
+        modCountClients    = refs[2];
+        modCountPaiements  = refs[3];
+        modCountValidation = refs[4];
         return grid;
     }
 
-    private JPanel buildModuleCard(String title, String icon, Color accent, String desc, String targetPage) {
+    private JPanel buildModuleCard(String title, String icon, Color accent, String desc, String targetPage, JLabel[] counterHolder) {
         JPanel card = new JPanel() {
             boolean h = false;
             {
@@ -827,11 +1023,19 @@ public class Dashboard extends JFrame {
         descL.setFont(FONT_CARD_DSC); descL.setForeground(TEXT_SECONDARY);
         descL.setAlignmentX(Component.LEFT_ALIGNMENT);
 
+        // Compteur live (rempli par chargerStatsAsync)
+        JLabel counterL = new JLabel("\u2026");
+        counterL.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        counterL.setForeground(accent);
+        counterL.setAlignmentX(Component.LEFT_ALIGNMENT);
+        if (counterHolder != null) counterHolder[0] = counterL;
+
         JPanel tag = getJPanel(accent, targetPage);
 
-        inner.add(bubble); inner.add(Box.createVerticalStrut(12));
-        inner.add(titleL); inner.add(Box.createVerticalStrut(5));
-        inner.add(descL);  inner.add(Box.createVerticalStrut(10)); inner.add(tag);
+        inner.add(bubble); inner.add(Box.createVerticalStrut(10));
+        inner.add(titleL); inner.add(Box.createVerticalStrut(3));
+        inner.add(counterL); inner.add(Box.createVerticalStrut(3));
+        inner.add(descL);  inner.add(Box.createVerticalStrut(8)); inner.add(tag);
         card.add(inner, BorderLayout.CENTER);
         return card;
     }
@@ -856,7 +1060,7 @@ public class Dashboard extends JFrame {
         return bubble;
     }
 
-    private static JPanel getJPanel(Color accent, String targetPage) {
+    private JPanel getJPanel(Color accent, String targetPage) {
         JPanel tag = new JPanel(new FlowLayout(FlowLayout.LEFT,0,0));
         tag.setOpaque(false);
         tag.setAlignmentX(Component.LEFT_ALIGNMENT);

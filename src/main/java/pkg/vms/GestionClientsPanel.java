@@ -74,11 +74,20 @@ public class GestionClientsPanel extends JPanel {
         JButton btnNouveau = UIUtils.buildPrimaryButton("+ Nouveau Client", 170, 40);
         btnNouveau.addActionListener(e -> ouvrirFormulaireNouveauClient());
 
+        JButton btnImport = UIUtils.buildGhostButton("Importer CSV", 130, 40);
+        btnImport.addActionListener(e -> ouvrirImportCsv());
+
+        JButton btnDoublons = UIUtils.buildGhostButton("Doublons", 110, 40);
+        btnDoublons.setToolTipText("Scanner la base \u00e0 la recherche de clients en doublon");
+        btnDoublons.addActionListener(e -> ouvrirDoublons());
+
         JButton btnExport = UIUtils.buildGhostButton("Exporter", 110, 40);
         btnExport.addActionListener(e -> exporterClientsExcel());
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         right.setOpaque(false);
+        right.add(btnDoublons);
+        right.add(btnImport);
         right.add(btnExport);
         right.add(btnNouveau);
 
@@ -139,7 +148,7 @@ public class GestionClientsPanel extends JPanel {
         tableClients.setComponentPopupMenu(createPopupMenu());
         tableClients.addMouseListener(new MouseAdapter() {
             @Override public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) modifierClientSelectionne();
+                if (e.getClickCount() == 2) ouvrirFiche360();
             }
         });
 
@@ -194,16 +203,45 @@ public class GestionClientsPanel extends JPanel {
         itemSupprimer.setFont(new Font("Arial", Font.PLAIN, 13));
         itemSupprimer.addActionListener(e -> supprimerClientSelectionne());
 
-        JMenuItem itemDetails = new JMenuItem("ℹ️ Détails");
+        JMenuItem itemFiche = new JMenuItem("📇 Fiche 360°");
+        itemFiche.setFont(new Font("Arial", Font.PLAIN, 13));
+        itemFiche.addActionListener(e -> ouvrirFiche360());
+
+        JMenuItem itemDetails = new JMenuItem("ℹ️ Détails (rapide)");
         itemDetails.setFont(new Font("Arial", Font.PLAIN, 13));
         itemDetails.addActionListener(e -> afficherDetailsClient());
 
+        menu.add(itemFiche);
         menu.add(itemModifier);
         menu.add(itemSupprimer);
         menu.addSeparator();
         menu.add(itemDetails);
 
         return menu;
+    }
+
+    private void ouvrirImportCsv() {
+        ImportClientsDialog.show(this, clientManager, this::chargerClients);
+    }
+
+    private void ouvrirDoublons() {
+        DoublonsDialog.show(this, clientManager, this::chargerClients);
+    }
+
+    private void ouvrirFiche360() {
+        int selectedRow = tableClients.getSelectedRow();
+        if (selectedRow == -1) {
+            ToastManager.warning(this, "Veuillez sélectionner un client");
+            return;
+        }
+        int modelRow = tableClients.convertRowIndexToModel(selectedRow);
+        int clientId = (int) tableModel.getValueAt(modelRow, 0);
+        Client client = clientManager.obtenirClientParId(clientId);
+        if (client != null) {
+            FicheClient360.show(this, client);
+        } else {
+            ToastManager.error(this, "Client introuvable");
+        }
     }
 
     // ==================== FOOTER ====================

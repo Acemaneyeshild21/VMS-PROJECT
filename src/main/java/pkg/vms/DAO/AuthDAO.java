@@ -79,4 +79,57 @@ public class AuthDAO {
             System.err.println("Erreur migration mot de passe : " + e.getMessage());
         }
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // RESET MOT DE PASSE
+    // ════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Recherche un utilisateur par email (pour le flux de réinitialisation).
+     * Retourne null si aucun compte ne correspond OU si le compte est inactif.
+     */
+    public static UserSession findByEmail(String email) throws SQLException {
+        if (email == null || email.isBlank()) return null;
+        String sql = "SELECT userid, username, role, email FROM utilisateur " +
+                     "WHERE LOWER(email) = LOWER(?) AND actif = TRUE";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, email.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new UserSession(
+                            rs.getInt("userid"),
+                            rs.getString("username"),
+                            rs.getString("role"),
+                            rs.getString("email"));
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Met à jour le mot de passe d'un utilisateur (BCrypt).
+     * Utilisé par le flux de réinitialisation après validation du code OTP.
+     * Log audit RESET_PASSWORD_SUCCES.
+     */
+    public static boolean updatePassword(int userId, String newPassword) throws SQLException {
+        if (newPassword == null || newPassword.length() < 8) {
+            throw new IllegalArgumentException("Le mot de passe doit contenir au moins 8 caractères");
+        }
+        String hashed = BCrypt.hashpw(newPassword, BCrypt.gensalt(10));
+        String sql = "UPDATE utilisateur SET password = ? WHERE userid = ?";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, hashed);
+            ps.setInt(2, userId);
+            int rows = ps.executeUpdate();
+            if (rows > 0) {
+                AuditDAO.logSimple("utilisateur", userId, "RESET_PASSWORD_SUCCES", userId,
+                        "Mot de passe réinitialisé via code OTP");
+                return true;
+            }
+        }
+        return false;
+    }
 }

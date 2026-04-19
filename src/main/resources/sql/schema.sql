@@ -161,12 +161,49 @@ CREATE TABLE IF NOT EXISTS audit_log (
         'GENERATION','ENVOI','REDEMPTION','REJET','ANNULATION',
         'CONNEXION','CONNEXION_ECHOUEE','INSCRIPTION',
         'CHANGEMENT_STATUT','ARCHIVAGE_MASSIF','UTILISATION_BON',
-        'UPDATE_EMAIL'
+        'UPDATE_EMAIL',
+        'RESET_PASSWORD_DEMANDE','RESET_PASSWORD_SUCCES','RESET_PASSWORD_ECHEC'
     ))
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_table ON audit_log(table_name, record_id);
 CREATE INDEX IF NOT EXISTS idx_audit_date ON audit_log(date_action);
+
+-- Journal des emails envoyés (historique + debug des envois SMTP)
+CREATE TABLE IF NOT EXISTS email_log (
+    email_id          SERIAL PRIMARY KEY,
+    demande_id        INT REFERENCES demande(demande_id) ON DELETE SET NULL,
+    destinataire      VARCHAR(255) NOT NULL,
+    cc                VARCHAR(255),
+    sujet             VARCHAR(500),
+    statut            VARCHAR(20) NOT NULL,  -- ENVOYE, ECHEC, SIMULATION
+    erreur            TEXT,
+    nb_pieces_jointes INT DEFAULT 0,
+    utilisateur_id    INT REFERENCES utilisateur(userid),
+    date_envoi        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_email_statut CHECK (statut IN ('ENVOYE','ECHEC','SIMULATION'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_log_date       ON email_log(date_envoi DESC);
+CREATE INDEX IF NOT EXISTS idx_email_log_statut     ON email_log(statut);
+CREATE INDEX IF NOT EXISTS idx_email_log_demande    ON email_log(demande_id);
+CREATE INDEX IF NOT EXISTS idx_email_log_destinataire ON email_log(destinataire);
+
+-- Demandes de réinitialisation de mot de passe (OTP 6 chiffres par email)
+CREATE TABLE IF NOT EXISTS password_reset (
+    reset_id      SERIAL PRIMARY KEY,
+    user_id       INT NOT NULL REFERENCES utilisateur(userid) ON DELETE CASCADE,
+    code_hash     VARCHAR(255) NOT NULL,  -- BCrypt du code (jamais en clair)
+    expires_at    TIMESTAMP NOT NULL,      -- now + 15 minutes
+    used          BOOLEAN DEFAULT FALSE,
+    tentatives    INT DEFAULT 0,           -- compteur d'essais (max 3)
+    date_demande  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_address    VARCHAR(45)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pwdreset_user    ON password_reset(user_id, used, expires_at);
+CREATE INDEX IF NOT EXISTS idx_pwdreset_expires ON password_reset(expires_at);
 
 -- Paramètres applicatifs (configuration email, bons, etc.)
 CREATE TABLE IF NOT EXISTS app_settings (
