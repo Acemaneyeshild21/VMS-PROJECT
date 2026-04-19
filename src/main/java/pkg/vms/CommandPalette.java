@@ -313,7 +313,8 @@ public class CommandPalette extends JDialog {
                                                      Runnable onAuditLog,
                                                      Runnable onSessions,
                                                      Runnable onVerifBon,
-                                                     Runnable onEmailHistory) {
+                                                     Runnable onEmailHistory,
+                                                     Runnable onToggleTheme) {
         boolean isAdmin        = "Administrateur".equalsIgnoreCase(role);
         boolean isManager      = "Manager".equalsIgnoreCase(role);
         boolean isComptable    = "Comptable".equalsIgnoreCase(role);
@@ -397,6 +398,16 @@ public class CommandPalette extends JDialog {
                     "Contr\u00f4ler le statut d'un bon par son code", "\uD83D\uDD0D",
                     "verifier bon code qr scan valide utilise",
                     null, onVerifBon));
+        }
+
+        if (onToggleTheme != null) {
+            boolean dark = VMSStyle.isDark();
+            String label = dark ? "Mode clair" : "Mode sombre";
+            String desc  = dark ? "Basculer l'interface en mode clair" : "Basculer l'interface en mode sombre";
+            String icon  = dark ? "\u2600\uFE0F" : "\uD83C\uDF19";
+            cmds.add(new Command("action.theme", label, desc, icon,
+                    "theme mode sombre clair dark light toggle",
+                    null, onToggleTheme));
         }
 
         cmds.add(new Command("action.refresh", "Rafra\u00eechir",

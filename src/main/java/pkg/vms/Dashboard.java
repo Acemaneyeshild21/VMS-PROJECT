@@ -10,23 +10,25 @@ import java.awt.geom.RoundRectangle2D;
 
 public class Dashboard extends JFrame {
 
-    // ── Palette (Centralisée via VMSStyle) ──────────────────────────────────
-    private static final Color BG_ROOT        = VMSStyle.BG_ROOT;
-    private static final Color BG_SIDEBAR     = VMSStyle.BG_SIDEBAR;
-    private static final Color BG_TOPBAR      = VMSStyle.BG_TOPBAR;
-    private static final Color BG_CARD        = VMSStyle.BG_CARD;
-    private static final Color BG_CARD_HOVER  = VMSStyle.BG_CARD_HOVER;
-    private static final Color RED_PRIMARY    = VMSStyle.RED_PRIMARY;
-    private static final Color RED_DARK       = VMSStyle.RED_DARK;
-    private static final Color RED_LIGHT      = VMSStyle.RED_LIGHT;
-    private static final Color BORDER_LIGHT   = VMSStyle.BORDER_LIGHT;
-    private static final Color TEXT_PRIMARY   = VMSStyle.TEXT_PRIMARY;
-    private static final Color TEXT_SECONDARY = VMSStyle.TEXT_SECONDARY;
-    private static final Color TEXT_MUTED     = VMSStyle.TEXT_MUTED;
-    private static final Color ACCENT_BLUE    = VMSStyle.ACCENT_BLUE;
-    private static final Color SUCCESS        = VMSStyle.SUCCESS;
-    private static final Color WARNING        = VMSStyle.WARNING;
-    private static final Color SHADOW_COLOR   = VMSStyle.SHADOW_COLOR;
+    // ── Palette (Centralis\u00e9e via VMSStyle) ──────────────────────────────────
+    // Champs d'instance (non-static) : lus \u00e0 chaque construction pour refl\u00e9ter
+    // le th\u00e8me courant (clair/sombre). Voir ThemeManager.toggle().
+    private final Color BG_ROOT        = VMSStyle.BG_ROOT;
+    private final Color BG_SIDEBAR     = VMSStyle.BG_SIDEBAR;
+    private final Color BG_TOPBAR      = VMSStyle.BG_TOPBAR;
+    private final Color BG_CARD        = VMSStyle.BG_CARD;
+    private final Color BG_CARD_HOVER  = VMSStyle.BG_CARD_HOVER;
+    private final Color RED_PRIMARY    = VMSStyle.RED_PRIMARY;
+    private final Color RED_DARK       = VMSStyle.RED_DARK;
+    private final Color RED_LIGHT      = VMSStyle.RED_LIGHT;
+    private final Color BORDER_LIGHT   = VMSStyle.BORDER_LIGHT;
+    private final Color TEXT_PRIMARY   = VMSStyle.TEXT_PRIMARY;
+    private final Color TEXT_SECONDARY = VMSStyle.TEXT_SECONDARY;
+    private final Color TEXT_MUTED     = VMSStyle.TEXT_MUTED;
+    private final Color ACCENT_BLUE    = VMSStyle.ACCENT_BLUE;
+    private final Color SUCCESS        = VMSStyle.SUCCESS;
+    private final Color WARNING        = VMSStyle.WARNING;
+    private final Color SHADOW_COLOR   = VMSStyle.SHADOW_COLOR;
 
     // ── Fonts (Centralisées via VMSStyle) ────────────────────────────────────
     private static final Font FONT_BRAND    = VMSStyle.FONT_BRAND;
@@ -161,7 +163,8 @@ public class Dashboard extends JFrame {
                 () -> AuditLogDialog.show(Dashboard.this),
                 () -> SessionsActivesDialog.show(Dashboard.this),
                 () -> VerificationBonDialog.show(Dashboard.this),
-                () -> EmailHistoryDialog.show(Dashboard.this)
+                () -> EmailHistoryDialog.show(Dashboard.this),
+                () -> ThemeManager.toggle(Dashboard.this, userId, username, role, email)
         );
         CommandPalette.show(this, cmds);
     }
@@ -171,7 +174,7 @@ public class Dashboard extends JFrame {
         SwingUtilities.invokeLater(() -> new LoginForm().setVisible(true));
     }
 
-    private static JLabel getJLabel(String username) {
+    private JLabel getJLabel(String username) {
         JLabel footer = new JLabel(
                 "\u00a9 2026 Voucher System \u2014 Tous droits r\u00e9serv\u00e9s  |  Connect\u00e9 : " + username,
                 SwingConstants.CENTER);
@@ -476,6 +479,7 @@ public class Dashboard extends JFrame {
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT,10,0));
         right.setOpaque(false);
         right.add(buildSearchBox());
+        right.add(buildThemeToggle());
         right.add(DashboardWidgets.buildNotificationBell(this::switchPage));
         JSeparator sep = new JSeparator(JSeparator.VERTICAL);
         sep.setPreferredSize(new Dimension(1,24)); sep.setForeground(BORDER_LIGHT);
@@ -534,6 +538,19 @@ public class Dashboard extends JFrame {
         hint.addMouseListener(ma);
         kbd.addMouseListener(ma);
         return box;
+    }
+
+    /** Bouton soleil/lune pour basculer entre th\u00e8me clair et sombre. */
+    private JButton buildThemeToggle() {
+        boolean dark = VMSStyle.isDark();
+        String icon = dark ? "\u2600\uFE0F" : "\uD83C\uDF19"; // soleil si sombre, lune si clair
+        JButton btn = buildIconButton(icon);
+        btn.setToolTipText(dark ? "Passer en mode clair" : "Passer en mode sombre");
+        btn.addActionListener(e -> {
+            ToastManager.info(this, VMSStyle.isDark() ? "Passage au mode clair\u2026" : "Passage au mode sombre\u2026");
+            ThemeManager.toggle(this, userId, username, role, email);
+        });
+        return btn;
     }
 
     private JButton buildIconButton(String icon) {
@@ -789,7 +806,7 @@ public class Dashboard extends JFrame {
         return banner;
     }
 
-    private static JPanel getJPanel() {
+    private JPanel getJPanel() {
         JPanel banner = new JPanel() {
             @Override protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
@@ -1043,7 +1060,7 @@ public class Dashboard extends JFrame {
         return bubble;
     }
 
-    private static JPanel getJPanel(Color accent, String targetPage) {
+    private JPanel getJPanel(Color accent, String targetPage) {
         JPanel tag = new JPanel(new FlowLayout(FlowLayout.LEFT,0,0));
         tag.setOpaque(false);
         tag.setAlignmentX(Component.LEFT_ALIGNMENT);

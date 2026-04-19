@@ -387,6 +387,7 @@ public class LoginForm extends JFrame {
     }
 
     public static void main(String[] args) {
+        ThemeManager.loadAndApply();
         SwingUtilities.invokeLater(() -> new LoginForm().setVisible(true));
     }
 }
