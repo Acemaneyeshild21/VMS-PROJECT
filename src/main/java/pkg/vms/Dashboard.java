@@ -1,6 +1,8 @@
 package pkg.vms;
 
 import pkg.vms.DAO.VoucherDAO;
+import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.fontawesome5.FontAwesomeSolid;
 
 import javax.swing.*;
 import java.awt.*;
@@ -484,12 +486,15 @@ public class Dashboard extends JFrame {
         JSeparator sep = new JSeparator(JSeparator.VERTICAL);
         sep.setPreferredSize(new Dimension(1,24)); sep.setForeground(BORDER_LIGHT);
         right.add(sep);
-        right.add(buildWinCtrl("\u2014", new Color(240,190,60), e -> setState(ICONIFIED)));
-        right.add(buildWinCtrl("\u25A1", new Color(50,180,100), e -> {
+        right.add(buildWinCtrlIcon(FontAwesomeSolid.WINDOW_MINIMIZE, new Color(240,190,60),
+                "R\u00e9duire la fen\u00eatre", e -> setState(ICONIFIED)));
+        right.add(buildWinCtrlIcon(FontAwesomeSolid.WINDOW_MAXIMIZE, new Color(50,180,100),
+                "Agrandir / Restaurer la fen\u00eatre", e -> {
             if ((getExtendedState()&MAXIMIZED_BOTH)!=0) setExtendedState(NORMAL);
             else setExtendedState(MAXIMIZED_BOTH);
         }));
-        right.add(buildWinCtrl("\u2715", RED_PRIMARY, e -> System.exit(0)));
+        right.add(buildWinCtrlIcon(FontAwesomeSolid.TIMES, RED_PRIMARY,
+                "Quitter l'application", e -> System.exit(0)));
         bar.add(right, BorderLayout.EAST);
         enableDragging(bar);
         return bar;
@@ -512,8 +517,8 @@ public class Dashboard extends JFrame {
         box.setCursor(new Cursor(Cursor.HAND_CURSOR));
         box.setToolTipText("Ouvrir la palette de commandes (Ctrl+K)");
 
-        JLabel ico = new JLabel("\uD83D\uDD0D");
-        ico.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 12));
+        // Loupe vectorielle FontAwesome (plus besoin de Segoe UI Emoji)
+        JLabel ico = IconUtil.label(FontAwesomeSolid.SEARCH, 13, TEXT_MUTED);
 
         JLabel hint = new JLabel("Rechercher\u2026");
         hint.setFont(FONT_CARD_DSC);
@@ -543,13 +548,42 @@ public class Dashboard extends JFrame {
     /** Bouton soleil/lune pour basculer entre th\u00e8me clair et sombre. */
     private JButton buildThemeToggle() {
         boolean dark = VMSStyle.isDark();
-        String icon = dark ? "\u2600\uFE0F" : "\uD83C\uDF19"; // soleil si sombre, lune si clair
-        JButton btn = buildIconButton(icon);
-        btn.setToolTipText(dark ? "Passer en mode clair" : "Passer en mode sombre");
+        Ikon glyph = dark ? FontAwesomeSolid.SUN : FontAwesomeSolid.MOON; // soleil si sombre, lune si clair
+        String tip  = dark ? "Passer en mode clair" : "Passer en mode sombre";
+        JButton btn = buildIconGlyphButton(glyph, tip);
         btn.addActionListener(e -> {
             ToastManager.info(this, VMSStyle.isDark() ? "Passage au mode clair\u2026" : "Passage au mode sombre\u2026");
             ThemeManager.toggle(this, userId, username, role, email);
         });
+        return btn;
+    }
+
+    /** Bouton compact avec ic\u00f4ne FontAwesome + tooltip + hover discret. */
+    private JButton buildIconGlyphButton(Ikon glyph, String tooltip) {
+        JButton btn = new JButton(IconUtil.icon(glyph, 15, TEXT_SECONDARY)) {
+            boolean h = false;
+            {
+                setOpaque(false); setContentAreaFilled(false);
+                setBorderPainted(false); setFocusPainted(false);
+                setCursor(new Cursor(Cursor.HAND_CURSOR));
+                setPreferredSize(new Dimension(34,34));
+                addMouseListener(new MouseAdapter() {
+                    public void mouseEntered(MouseEvent e) { h=true; repaint(); }
+                    public void mouseExited(MouseEvent e)  { h=false; repaint(); }
+                });
+            }
+            @Override protected void paintComponent(Graphics g) {
+                if (h) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2.setColor(new Color(0,0,0,18));
+                    g2.fill(new RoundRectangle2D.Double(0,0,getWidth(),getHeight(),8,8));
+                    g2.dispose();
+                }
+                super.paintComponent(g);
+            }
+        };
+        btn.setToolTipText(tooltip);
         return btn;
     }
 
@@ -581,19 +615,28 @@ public class Dashboard extends JFrame {
         return btn;
     }
 
-    private JButton buildWinCtrl(String sym, Color col, ActionListener action) {
-        JButton btn = new JButton(sym) {
+    /** Bouton contr\u00f4le fen\u00eatre (minimize/maximize/close) avec ic\u00f4ne vectorielle FontAwesome. */
+    private JButton buildWinCtrlIcon(Ikon glyph, Color col, String tooltip, ActionListener action) {
+        Color dim = new Color(col.getRed(), col.getGreen(), col.getBlue(), 140);
+        JButton btn = new JButton(IconUtil.icon(glyph, 11, dim)) {
             boolean h = false;
             {
-                setFont(new Font("Segoe UI", Font.BOLD, 11));
-                setForeground(new Color(col.getRed(),col.getGreen(),col.getBlue(),120));
                 setOpaque(false); setContentAreaFilled(false);
                 setBorderPainted(false); setFocusPainted(false);
                 setCursor(new Cursor(Cursor.HAND_CURSOR));
                 setPreferredSize(new Dimension(26,26));
+                setToolTipText(tooltip);
                 addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { h=true; setForeground(col); repaint(); }
-                    public void mouseExited(MouseEvent e)  { h=false; setForeground(new Color(col.getRed(),col.getGreen(),col.getBlue(),120)); repaint(); }
+                    public void mouseEntered(MouseEvent e) {
+                        h=true;
+                        setIcon(IconUtil.icon(glyph, 11, col));
+                        repaint();
+                    }
+                    public void mouseExited(MouseEvent e)  {
+                        h=false;
+                        setIcon(IconUtil.icon(glyph, 11, dim));
+                        repaint();
+                    }
                 });
                 addActionListener(action);
             }

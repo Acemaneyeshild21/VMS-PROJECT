@@ -1,5 +1,8 @@
 package pkg.vms;
 
+import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.fontawesome5.FontAwesomeSolid;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -17,15 +20,15 @@ public class CommandPalette extends JDialog {
 
     // ── Modèle de commande ──────────────────────────────────────────────────
     public static class Command {
-        final String  id;
-        final String  label;
-        final String  subtitle;
-        final String  icon;      // glyph unicode
-        final String  keywords;  // mots-clés pour la recherche
-        final String  shortcut;  // e.g. "Ctrl+N"
+        final String   id;
+        final String   label;
+        final String   subtitle;
+        final Ikon     icon;      // glyph FontAwesome (via Ikonli)
+        final String   keywords;  // mots-clés pour la recherche
+        final String   shortcut;  // e.g. "Ctrl+N"
         final Runnable action;
 
-        public Command(String id, String label, String subtitle, String icon,
+        public Command(String id, String label, String subtitle, Ikon icon,
                        String keywords, String shortcut, Runnable action) {
             this.id = id;
             this.label = label;
@@ -72,9 +75,8 @@ public class CommandPalette extends JDialog {
         // ── Champ de recherche ─────────────────────────────────────────────
         JPanel top = new JPanel(new BorderLayout(10, 0));
         top.setOpaque(false);
-        JLabel ic = new JLabel("\uD83D\uDD0D");
-        ic.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-        ic.setForeground(VMSStyle.TEXT_MUTED);
+        // Loupe vectorielle FontAwesome (remplace l'emoji 🔍)
+        JLabel ic = IconUtil.label(FontAwesomeSolid.SEARCH, 16, VMSStyle.TEXT_MUTED);
         top.add(ic, BorderLayout.WEST);
 
         search = new JTextField();
@@ -252,10 +254,11 @@ public class CommandPalette extends JDialog {
         row.setAlignmentX(Component.LEFT_ALIGNMENT);
         row.setCursor(new Cursor(Cursor.HAND_CURSOR));
 
-        JLabel icon = new JLabel(cmd.icon);
-        icon.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+        // Icône vectorielle FontAwesome (colorée selon l'état de sélection)
+        JLabel icon = IconUtil.label(cmd.icon, 18,
+                selected ? VMSStyle.RED_PRIMARY : VMSStyle.TEXT_SECONDARY);
+        icon.setHorizontalAlignment(SwingConstants.CENTER);
         icon.setPreferredSize(new Dimension(28, 28));
-        icon.setForeground(selected ? VMSStyle.RED_PRIMARY : VMSStyle.TEXT_SECONDARY);
         row.add(icon, BorderLayout.WEST);
 
         JPanel mid = new JPanel();
@@ -324,42 +327,42 @@ public class CommandPalette extends JDialog {
         List<Command> cmds = new ArrayList<>();
 
         cmds.add(new Command("nav.home", "Aller \u00e0 l'Accueil",
-                "Tableau de bord principal", "\uD83C\uDFE0",
+                "Tableau de bord principal", FontAwesomeSolid.HOME,
                 "accueil dashboard home tableau",
                 "Ctrl+Home", () -> onNavigate.accept("Accueil")));
 
         cmds.add(new Command("nav.demandes", "Ouvrir Demandes",
-                "Liste des demandes en cours", "\uD83D\uDCC4",
+                "Liste des demandes en cours", FontAwesomeSolid.FILE_ALT,
                 "demandes requests en cours",
                 null, () -> onNavigate.accept("Demandes")));
 
         cmds.add(new Command("nav.archives", "Ouvrir Archives",
-                "Demandes cl\u00f4tur\u00e9es / rejet\u00e9es", "\uD83D\uDCE6",
+                "Demandes cl\u00f4tur\u00e9es / rejet\u00e9es", FontAwesomeSolid.ARCHIVE,
                 "archives historique closed",
                 null, () -> onNavigate.accept("Archives")));
 
         cmds.add(new Command("nav.clients", "Gestion Clients",
-                "Carnet d'adresses clients", "\uD83D\uDC65",
+                "Carnet d'adresses clients", FontAwesomeSolid.USERS,
                 "clients contacts crm",
                 null, () -> onNavigate.accept("Clients")));
 
         if (isAdmin || isSuperviseur || isManager) {
             cmds.add(new Command("nav.redemption", "R\u00e9demption",
-                    "Utilisation des bons en magasin", "\uD83D\uDCB3",
+                    "Utilisation des bons en magasin", FontAwesomeSolid.CASH_REGISTER,
                     "redemption utilisation magasin",
                     null, () -> onNavigate.accept("R\u00e9demption")));
         }
 
         if (isAdmin || isManager || isComptable || isApprobateur) {
             cmds.add(new Command("nav.validation", "Validation",
-                    "File d'attente de validation", "\u2705",
+                    "File d'attente de validation", FontAwesomeSolid.CHECK_CIRCLE,
                     "validation approbation paiement",
                     null, () -> onNavigate.accept("Validation")));
         }
 
         if (isAdmin) {
             cmds.add(new Command("nav.parametres", "Param\u00e8tres",
-                    "Configuration syst\u00e8me", "\u2699\ufe0f",
+                    "Configuration syst\u00e8me", FontAwesomeSolid.COG,
                     "parametres settings config admin",
                     null, () -> onNavigate.accept("Parametres")));
         }
@@ -367,35 +370,35 @@ public class CommandPalette extends JDialog {
         // Actions rapides
         if (isAdmin || isComptable) {
             cmds.add(new Command("action.new", "Nouvelle demande",
-                    "Cr\u00e9er une demande de voucher", "\u2795",
+                    "Cr\u00e9er une demande de voucher", FontAwesomeSolid.PLUS_CIRCLE,
                     "new nouvelle demande creer create",
                     "Ctrl+N", () -> onNavigate.accept("Nouvelle Demande")));
         }
 
         if (isAdmin && onAuditLog != null) {
             cmds.add(new Command("admin.audit", "Journal d'audit",
-                    "Consulter tous les \u00e9v\u00e9nements syst\u00e8me", "\uD83D\uDD10",
+                    "Consulter tous les \u00e9v\u00e9nements syst\u00e8me", FontAwesomeSolid.SHIELD_ALT,
                     "audit journal log tracabilite admin",
                     null, onAuditLog));
         }
 
         if (isAdmin && onSessions != null) {
             cmds.add(new Command("admin.sessions", "Sessions actives",
-                    "Voir les utilisateurs connect\u00e9s r\u00e9cemment", "\uD83D\uDC65",
+                    "Voir les utilisateurs connect\u00e9s r\u00e9cemment", FontAwesomeSolid.USER_CLOCK,
                     "sessions actives connexions utilisateurs admin",
                     null, onSessions));
         }
 
         if (isAdmin && onEmailHistory != null) {
             cmds.add(new Command("admin.emails", "Historique emails",
-                    "Journal des envois SMTP (succ\u00e8s et \u00e9checs)", "\u2709\uFE0F",
+                    "Journal des envois SMTP (succ\u00e8s et \u00e9checs)", FontAwesomeSolid.ENVELOPE_OPEN_TEXT,
                     "historique email smtp envoi echec log admin",
                     null, onEmailHistory));
         }
 
         if (onVerifBon != null) {
             cmds.add(new Command("action.verify", "V\u00e9rifier un bon",
-                    "Contr\u00f4ler le statut d'un bon par son code", "\uD83D\uDD0D",
+                    "Contr\u00f4ler le statut d'un bon par son code", FontAwesomeSolid.QRCODE,
                     "verifier bon code qr scan valide utilise",
                     null, onVerifBon));
         }
@@ -404,19 +407,19 @@ public class CommandPalette extends JDialog {
             boolean dark = VMSStyle.isDark();
             String label = dark ? "Mode clair" : "Mode sombre";
             String desc  = dark ? "Basculer l'interface en mode clair" : "Basculer l'interface en mode sombre";
-            String icon  = dark ? "\u2600\uFE0F" : "\uD83C\uDF19";
+            Ikon icon    = dark ? FontAwesomeSolid.SUN : FontAwesomeSolid.MOON;
             cmds.add(new Command("action.theme", label, desc, icon,
                     "theme mode sombre clair dark light toggle",
                     null, onToggleTheme));
         }
 
         cmds.add(new Command("action.refresh", "Rafra\u00eechir",
-                "Recharger les donn\u00e9es du tableau de bord", "\uD83D\uDD04",
+                "Recharger les donn\u00e9es du tableau de bord", FontAwesomeSolid.SYNC_ALT,
                 "refresh reload actualiser",
                 "F5", onRefresh));
 
         cmds.add(new Command("action.logout", "D\u00e9connexion",
-                "Se d\u00e9connecter de l'application", "\uD83D\uDEAA",
+                "Se d\u00e9connecter de l'application", FontAwesomeSolid.SIGN_OUT_ALT,
                 "deconnexion logout sortir quitter",
                 null, onLogout));
 

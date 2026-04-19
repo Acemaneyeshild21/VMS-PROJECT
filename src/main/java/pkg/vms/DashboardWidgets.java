@@ -2,6 +2,9 @@ package pkg.vms;
 
 import pkg.vms.DAO.AuditDAO;
 import pkg.vms.DAO.VoucherDAO;
+import org.kordamp.ikonli.Ikon;
+import org.kordamp.ikonli.fontawesome5.FontAwesomeSolid;
+import org.kordamp.ikonli.swing.FontIcon;
 
 import javax.swing.*;
 import java.awt.*;
@@ -33,8 +36,8 @@ public final class DashboardWidgets {
     public static JPanel buildAFaireWidget(String role, Consumer<String> onNavigate) {
         JPanel card = PageLayout.buildCard(new BorderLayout(0, 12), 18);
 
-        JLabel title = widgetTitle("\u2713  \u00c0 faire aujourd'hui");
-        card.add(title, BorderLayout.NORTH);
+        card.add(widgetTitleBar(FontAwesomeSolid.TASKS, VMSStyle.ACCENT_BLUE,
+                "\u00c0 faire aujourd'hui"), BorderLayout.NORTH);
 
         JPanel body = new JPanel();
         body.setOpaque(false);
@@ -133,8 +136,8 @@ public final class DashboardWidgets {
         JPanel card = PageLayout.buildCard(new BorderLayout(0, 12), 18);
         JPanel head = new JPanel(new BorderLayout());
         head.setOpaque(false);
-        JLabel title = widgetTitle("\uD83D\uDD52  Activit\u00e9 r\u00e9cente");
-        head.add(title, BorderLayout.WEST);
+        head.add(widgetTitleBar(FontAwesomeSolid.HISTORY, VMSStyle.TEXT_SECONDARY,
+                "Activit\u00e9 r\u00e9cente"), BorderLayout.WEST);
         JButton seeAll = new JButton("Voir tout \u2192");
         seeAll.setFont(new Font("Segoe UI", Font.BOLD, 11));
         seeAll.setForeground(VMSStyle.ACCENT_BLUE);
@@ -242,8 +245,8 @@ public final class DashboardWidgets {
     // ════════════════════════════════════════════════════════════════════════
     public static JPanel buildSparklineWidget() {
         JPanel card = PageLayout.buildCard(new BorderLayout(0, 10), 18);
-        JLabel title = widgetTitle("\uD83D\uDCC8  \u00c9missions 30 derniers jours");
-        card.add(title, BorderLayout.NORTH);
+        card.add(widgetTitleBar(FontAwesomeSolid.CHART_LINE, VMSStyle.ACCENT_BLUE,
+                "\u00c9missions 30 derniers jours"), BorderLayout.NORTH);
 
         JLabel totalLabel = new JLabel("\u2026");
         totalLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
@@ -342,8 +345,8 @@ public final class DashboardWidgets {
     // ════════════════════════════════════════════════════════════════════════
     public static JPanel buildTopClientsWidget(Consumer<String> onNavigate) {
         JPanel card = PageLayout.buildCard(new BorderLayout(0, 10), 18);
-        JLabel title = widgetTitle("\uD83C\uDFC6  Top clients (90j)");
-        card.add(title, BorderLayout.NORTH);
+        card.add(widgetTitleBar(FontAwesomeSolid.TROPHY, new Color(234, 179, 8),
+                "Top clients (90j)"), BorderLayout.NORTH);
 
         JPanel body = new JPanel();
         body.setOpaque(false);
@@ -438,8 +441,8 @@ public final class DashboardWidgets {
     // ════════════════════════════════════════════════════════════════════════
     public static JPanel buildExpiringWidget(Consumer<String> onNavigate) {
         JPanel card = PageLayout.buildCard(new BorderLayout(0, 10), 18);
-        JLabel title = widgetTitle("\u23F0  Bons expirant bient\u00f4t (30j)");
-        card.add(title, BorderLayout.NORTH);
+        card.add(widgetTitleBar(FontAwesomeSolid.CLOCK, VMSStyle.WARNING,
+                "Bons expirant bient\u00f4t (30j)"), BorderLayout.NORTH);
 
         JPanel body = new JPanel();
         body.setOpaque(false);
@@ -525,15 +528,22 @@ public final class DashboardWidgets {
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  Widget Météo business 🟢🟡🔴
+    //  Widget Météo business (santé globale de l'activité, 3 niveaux)
     // ════════════════════════════════════════════════════════════════════════
     public static JPanel buildMeteoWidget() {
         JPanel card = PageLayout.buildCard(new BorderLayout(0, 10), 18);
-        JLabel title = widgetTitle("\uD83C\uDF21\uFE0F  M\u00e9t\u00e9o business");
-        card.add(title, BorderLayout.NORTH);
+        // Titre avec icône vectorielle + libellé explicite
+        JPanel titleBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        titleBar.setOpaque(false);
+        titleBar.add(IconUtil.label(FontAwesomeSolid.HEARTBEAT, 14, VMSStyle.ACCENT_BLUE));
+        titleBar.add(widgetTitle("Sant\u00e9 de l'activit\u00e9"));
+        card.add(titleBar, BorderLayout.NORTH);
+        card.setToolTipText("Indicateur global calcul\u00e9 \u00e0 partir du taux de validation, " +
+                "des paiements en attente et du nombre de clients actifs");
 
-        JLabel bigEmoji = new JLabel("\u2026", SwingConstants.CENTER);
-        bigEmoji.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
+        // Grande icône au centre (FontIcon — modifiable dynamiquement)
+        FontIcon bigIcon = IconUtil.icon(FontAwesomeSolid.HOURGLASS_HALF, 56, TEXT_MUTED);
+        JLabel bigIconLabel = new JLabel(bigIcon, SwingConstants.CENTER);
 
         JLabel stateLabel = new JLabel("Analyse en cours\u2026", SwingConstants.CENTER);
         stateLabel.setFont(new Font("Segoe UI", Font.BOLD, 15));
@@ -543,18 +553,26 @@ public final class DashboardWidgets {
         detailL.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         detailL.setForeground(TEXT_SECONDARY);
 
+        // Petit libellé en dessous pour rappeler à l'utilisateur ce qu'il regarde
+        JLabel legendL = new JLabel("Indicateur g\u00e9n\u00e9ral", SwingConstants.CENTER);
+        legendL.setFont(new Font("Segoe UI", Font.PLAIN, 10));
+        legendL.setForeground(TEXT_MUTED);
+
         JPanel col = new JPanel();
         col.setOpaque(false);
         col.setLayout(new BoxLayout(col, BoxLayout.Y_AXIS));
         col.add(Box.createVerticalGlue());
-        bigEmoji.setAlignmentX(Component.CENTER_ALIGNMENT);
+        bigIconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         stateLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
         detailL.setAlignmentX(Component.CENTER_ALIGNMENT);
-        col.add(bigEmoji);
-        col.add(Box.createVerticalStrut(4));
+        legendL.setAlignmentX(Component.CENTER_ALIGNMENT);
+        col.add(bigIconLabel);
+        col.add(Box.createVerticalStrut(6));
         col.add(stateLabel);
         col.add(Box.createVerticalStrut(2));
         col.add(detailL);
+        col.add(Box.createVerticalStrut(8));
+        col.add(legendL);
         col.add(Box.createVerticalGlue());
         card.add(col, BorderLayout.CENTER);
 
@@ -573,22 +591,31 @@ public final class DashboardWidgets {
                     else if (s.pendingPayments <= 15) score += 1;
                     if (s.activeClients > 0) score += 1;
 
+                    Ikon glyph;  Color col;  String state;  String detail;
                     if (score >= 4) {
-                        bigEmoji.setText("\uD83D\uDFE2");
-                        stateLabel.setText("Tout roule !");
-                        detailL.setText("Activit\u00e9 normale, rien \u00e0 signaler.");
+                        glyph  = FontAwesomeSolid.CHECK_CIRCLE;
+                        col    = VMSStyle.SUCCESS;
+                        state  = "Tout roule !";
+                        detail = "Activit\u00e9 normale, rien \u00e0 signaler.";
                     } else if (score >= 2) {
-                        bigEmoji.setText("\uD83D\uDFE1");
-                        stateLabel.setText("Vigilance");
-                        detailL.setText(s.pendingPayments + " paiement(s) en attente, taux validation " + s.validationRate + " %");
+                        glyph  = FontAwesomeSolid.EXCLAMATION_TRIANGLE;
+                        col    = VMSStyle.WARNING;
+                        state  = "Vigilance";
+                        detail = s.pendingPayments + " paiement(s) en attente \u2022 taux validation " + s.validationRate + " %";
                     } else {
-                        bigEmoji.setText("\uD83D\uDD34");
-                        stateLabel.setText("Attention");
-                        detailL.setText("Goulot d\u2019\u00e9tranglement d\u00e9tect\u00e9 \u2014 traitez les demandes en attente.");
+                        glyph  = FontAwesomeSolid.EXCLAMATION_CIRCLE;
+                        col    = VMSStyle.RED_PRIMARY;
+                        state  = "Attention requise";
+                        detail = "Goulot d\u2019\u00e9tranglement d\u00e9tect\u00e9 \u2014 traitez les demandes en attente.";
                     }
+                    bigIconLabel.setIcon(IconUtil.icon(glyph, 56, col));
+                    stateLabel.setText(state);
+                    stateLabel.setForeground(col);
+                    detailL.setText(detail);
                 } catch (Exception e) {
-                    bigEmoji.setText("\u2753");
+                    bigIconLabel.setIcon(IconUtil.icon(FontAwesomeSolid.QUESTION_CIRCLE, 56, TEXT_MUTED));
                     stateLabel.setText("Donn\u00e9es indisponibles");
+                    detailL.setText("Impossible de contacter la base \u2014 r\u00e9essayez plus tard.");
                 }
             }
         }.execute();
@@ -603,6 +630,15 @@ public final class DashboardWidgets {
         l.setFont(new Font("Segoe UI", Font.BOLD, 13));
         l.setForeground(TEXT_PRIMARY);
         return l;
+    }
+
+    /** Barre de titre "ic\u00f4ne + texte" \u2014 remplace les emoji dans les headers de widgets. */
+    private static JPanel widgetTitleBar(Ikon glyph, Color iconColor, String text) {
+        JPanel p = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        p.setOpaque(false);
+        p.add(IconUtil.label(glyph, 14, iconColor));
+        p.add(widgetTitle(text));
+        return p;
     }
 
     private static JPanel placeholderRow(String text) {
