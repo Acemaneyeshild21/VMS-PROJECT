@@ -62,8 +62,9 @@ public class EmailService {
         recapBon.pdfPath = recapPath;
         envoyerEmail(ADMIN_EMAIL, null, sujetAdmin, corpsAdmin, java.util.List.of(recapBon));
 
-        // 3. Marquer comme envoyé
-        pkg.vms.DAO.VoucherDAO.marquerCommeEnvoye(demandeId, userId);
+        // NOTE : marquerCommeEnvoye() est volontairement retiré d'ici.
+        // L'appelant (GestionDemande) le fait UNIQUEMENT si cet appel réussit sans exception.
+        // Ainsi un échec SMTP ne marque jamais la demande comme envoyée.
     }
 
     /**

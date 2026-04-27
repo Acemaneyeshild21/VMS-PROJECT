@@ -1,7 +1,9 @@
 package pkg.vms;
 
+import pkg.vms.DAO.AuditDAO;
 import pkg.vms.DAO.DBconnect;
 import pkg.vms.DAO.VoucherDAO;
+import pkg.vms.Roles;
 import pkg.vms.UIUtils;
 
 import javax.swing.*;
@@ -61,6 +63,11 @@ public class Dashboard extends JFrame {
     private Rectangle dragBounds;
     private int       resizeDir = 0;
 
+    // ── Session timeout (30 min d'inactivité = déconnexion auto) ────────────
+    private static final int SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+    private Timer            sessionTimer;
+    private AWTEventListener activityListener;
+
     // KPI panels — référencés pour mise à jour dynamique
     private JLabel kpiClientsVal;
     private JLabel kpiBonsVal;
@@ -119,6 +126,31 @@ public class Dashboard extends JFrame {
         add(root);
         installResizeHandler(root);
         switchPage("Accueil");
+        demarrerSessionTimer();
+    }
+
+    // ── Session timeout ──────────────────────────────────────────────────────
+    private void demarrerSessionTimer() {
+        activityListener = event -> {
+            if (sessionTimer != null && isShowing()) sessionTimer.restart();
+        };
+        Toolkit.getDefaultToolkit().addAWTEventListener(activityListener,
+            AWTEvent.MOUSE_EVENT_MASK | AWTEvent.MOUSE_MOTION_EVENT_MASK | AWTEvent.KEY_EVENT_MASK);
+
+        sessionTimer = new Timer(SESSION_TIMEOUT_MS, e -> sessionExpiree());
+        sessionTimer.setRepeats(false);
+        sessionTimer.start();
+    }
+
+    private void sessionExpiree() {
+        sessionTimer.stop();
+        Toolkit.getDefaultToolkit().removeAWTEventListener(activityListener);
+        AuditDAO.logSimple("utilisateur", userId, "DECONNEXION", userId,
+            "Session expirée après 30 min d'inactivité");
+        JOptionPane.showMessageDialog(this,
+            "Votre session a expiré après 30 minutes d'inactivité.\nVous allez être redirigé vers la connexion.",
+            "Session expirée", JOptionPane.WARNING_MESSAGE);
+        deconnecter();
     }
 
     // ── Sidebar ──────────────────────────────────────────────────────────────
@@ -180,26 +212,13 @@ public class Dashboard extends JFrame {
         navLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         nav.add(navLabel);
 
-        boolean isAdmin        = "Administrateur".equalsIgnoreCase(role);
-        boolean isManager      = "Manager".equalsIgnoreCase(role);
-        boolean isComptable    = "Comptable".equalsIgnoreCase(role);
-        boolean isApprobateur  = "Approbateur".equalsIgnoreCase(role);
-        boolean isCollaborateur = "Collaborateur".equalsIgnoreCase(role);
-        boolean isSuperviseur  = "Superviseur_Magasin".equalsIgnoreCase(role);
-
         for (int i = 0; i < navItems.length; i++) {
             String page = navItems[i];
-            
-            // Restriction d'accès basée sur les rôles officiels BTS
-            if ("Validation".equals(page) && !(isAdmin || isManager || isComptable || isApprobateur)) {
-                continue;
-            }
-            if ("Parametres".equals(page) && !isAdmin) {
-                continue;
-            }
-            if ("Rédemption".equals(page) && !(isAdmin || isSuperviseur || isManager)) {
-                continue;
-            }
+
+            // Restriction d'accès basée sur les 4 rôles officiels VMS (Roles.java)
+            if ("Validation".equals(page)       && !Roles.peutValider(role))  continue;
+            if ("Parametres".equals(page)       && !Roles.isAdmin(role))      continue;
+            if ("Rédemption".equals(page)       && !Roles.peutRedimer(role))  continue;
 
             JButton btn = buildNavButton(page, navIcons[i]);
             btn.addActionListener(e -> switchPage(page));
@@ -459,7 +478,7 @@ public class Dashboard extends JFrame {
             case "Bons"            -> contentPanel.add(new GestionBons(role, userId),       BorderLayout.CENTER);
             case "R\u00e9demption" -> contentPanel.add(new RedemptionPanel(userId, username, role), BorderLayout.CENTER);
             case "Validation"      -> contentPanel.add(new ValidationPanel(role, userId),   BorderLayout.CENTER);
-            case "Statistiques"    -> contentPanel.add(new StatistiquesPanel(),              BorderLayout.CENTER);
+            case "Statistiques"    -> contentPanel.add(new StatistiquesPanel(role, userId),   BorderLayout.CENTER);
             case "Parametres"      -> contentPanel.add(new ParametresPanel(role, userId),           BorderLayout.CENTER);
             case "Nouvelle Demande" -> contentPanel.add(new FormulaireCreationBon(userId, username), BorderLayout.CENTER);
             default -> {
@@ -942,10 +961,11 @@ public class Dashboard extends JFrame {
     }
 
     private void deconnecter() {
+        if (sessionTimer != null)    sessionTimer.stop();
+        if (activityListener != null)
+            Toolkit.getDefaultToolkit().removeAWTEventListener(activityListener);
         this.dispose();
-        SwingUtilities.invokeLater(() -> {
-            new LoginForm().setVisible(true);
-        });
+        SwingUtilities.invokeLater(() -> new LoginForm().setVisible(true));
     }
 
     private Color getRoleColor(String r) {

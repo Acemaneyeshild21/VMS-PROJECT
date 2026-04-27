@@ -1,25 +1,18 @@
 package pkg.vms;
 
-import pkg.vms.DAO.DBconnect;
-import pkg.vms.DAO.VoucherDAO;
+import pkg.vms.controller.BonController;
 
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
-import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * GestionBons — Liste légère des bons avec :
- *   Nom client | Email | Valeur unitaire | Statut expiration (rapide)
- */
 class GestionBons extends JPanel {
 
     // ── Palette (Centralisée via VMSStyle) ──────────────────────────────────
-    private static final Color BG_ROOT      = VMSStyle.BG_ROOT;
     private static final Color BG_CARD      = VMSStyle.BG_CARD;
     private static final Color RED_PRIMARY  = VMSStyle.RED_PRIMARY;
     private static final Color RED_DARK     = VMSStyle.RED_DARK;
@@ -53,6 +46,7 @@ class GestionBons extends JPanel {
 
     private final int    userId;
     private final String role;
+    private final BonController controller = new BonController();
 
     private DefaultTableModel tableModel;
     private JTable            table;
@@ -102,7 +96,7 @@ class GestionBons extends JPanel {
         };
         titleRow.setOpaque(false);
         titleRow.setBorder(BorderFactory.createEmptyBorder(0, 14, 0, 0));
-        JLabel icon  = new JLabel("\uD83C\uDF81");
+        JLabel icon  = new JLabel("🎁");
         icon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 26));
         JLabel title = new JLabel("  Gestion des Bons");
         title.setFont(FONT_TITLE);
@@ -117,7 +111,7 @@ class GestionBons extends JPanel {
         sub.setAlignmentX(Component.LEFT_ALIGNMENT);
         left.add(titleRow); left.add(sub);
 
-        JButton btnNew = buildRedButton("+ Nouvelle Demande");
+        JButton btnNew = UIUtils.buildRedButton("+ Nouvelle Demande");
         btnNew.addActionListener(e -> ouvrirNouvelledemande());
 
         h.add(left,   BorderLayout.CENTER);
@@ -132,10 +126,10 @@ class GestionBons extends JPanel {
 
         JPanel chips = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         chips.setOpaque(false);
-        chips.add(buildChip("Tous",      null,        "TOUS"));
-        chips.add(buildChip("Actifs",    SUCCESS,     "ACTIF"));
-        chips.add(buildChip("Expirés",   DANGER,      "EXPIRE"));
-        chips.add(buildChip("Ce mois",   WARNING,     "MOIS"));
+        chips.add(buildChip("Tous",    null,    "TOUS"));
+        chips.add(buildChip("Actifs",  SUCCESS, "ACTIF"));
+        chips.add(buildChip("Expirés", DANGER,  "EXPIRE"));
+        chips.add(buildChip("Ce mois", WARNING, "MOIS"));
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         right.setOpaque(false);
@@ -147,7 +141,7 @@ class GestionBons extends JPanel {
                     Graphics2D g2 = (Graphics2D) g;
                     g2.setFont(FONT_FILTER); g2.setColor(TEXT_MUTED);
                     Insets i = getInsets();
-                    g2.drawString("\uD83D\uDD0D  Rechercher client ou email...", i.left, getHeight() - i.bottom - 4);
+                    g2.drawString("🔍  Rechercher client ou email...", i.left, getHeight() - i.bottom - 4);
                 }
             }
         };
@@ -163,22 +157,23 @@ class GestionBons extends JPanel {
             public void keyReleased(KeyEvent e) { filtrerTable(); }
         });
 
-        JButton btnRefresh = buildIconBtn("\u21BB", "Actualiser");
+        JButton btnRefresh = buildIconBtn("↻", "Actualiser");
         btnRefresh.addActionListener(e -> chargerBons());
-        
-        JButton btnArchive = buildIconBtn("\uD83D\uDCC4", "Archiver les expirés");
+
+        JButton btnArchive = buildIconBtn("📄", "Archiver les expirés");
         btnArchive.addActionListener(e -> {
-            int confirm = JOptionPane.showConfirmDialog(this, 
-                "Voulez-vous archiver toutes les demandes dont les bons sont expirés ?", 
+            int confirm = JOptionPane.showConfirmDialog(this,
+                "Voulez-vous archiver toutes les demandes dont les bons sont expirés ?",
                 "Confirmation Archivage", JOptionPane.YES_NO_OPTION);
             if (confirm == JOptionPane.YES_OPTION) {
-                try {
-                    int count = VoucherDAO.archiverDemandesExpirees(userId);
-                    JOptionPane.showMessageDialog(this, count + " demandes ont été archivées.");
-                    chargerBons();
-                } catch (SQLException ex) {
-                    JOptionPane.showMessageDialog(this, "Erreur lors de l'archivage : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
-                }
+                controller.archiverDemandesExpirees(userId,
+                    count -> {
+                        JOptionPane.showMessageDialog(this, count + " demandes ont été archivées.");
+                        chargerBons();
+                    },
+                    err -> JOptionPane.showMessageDialog(this,
+                        "Erreur lors de l'archivage : " + err, "Erreur", JOptionPane.ERROR_MESSAGE)
+                );
             }
         });
 
@@ -279,7 +274,6 @@ class GestionBons extends JPanel {
         header.setPreferredSize(new Dimension(0, 42));
         header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_LIGHT));
 
-        // Largeurs
         int[] widths = {40, 180, 220, 110, 130, 130, 100};
         for (int i = 0; i < widths.length; i++) {
             if (i < table.getColumnCount())
@@ -287,7 +281,6 @@ class GestionBons extends JPanel {
         }
         table.getColumnModel().getColumn(COL_ID).setMaxWidth(40);
 
-        // Renderers
         table.getColumnModel().getColumn(COL_STATUT).setCellRenderer(new StatutRenderer());
         table.getColumnModel().getColumn(COL_EXPIR).setCellRenderer(new ExpirationRenderer());
         table.getColumnModel().getColumn(COL_ACTION).setCellRenderer(new ActionRenderer());
@@ -300,15 +293,14 @@ class GestionBons extends JPanel {
                     Object val = table.getValueAt(row, col);
                     if ("ARCHIVER".equals(val)) {
                         int id = (int) table.getValueAt(row, COL_ID);
-                        int confirm = JOptionPane.showConfirmDialog(GestionBons.this, 
+                        int confirm = JOptionPane.showConfirmDialog(GestionBons.this,
                             "Archiver cette demande ?", "Confirmation", JOptionPane.YES_NO_OPTION);
                         if (confirm == JOptionPane.YES_OPTION) {
-                            try {
-                                VoucherDAO.updateVoucherStatus(id, "ARCHIVE", userId);
-                                chargerBons();
-                            } catch (SQLException ex) {
-                                JOptionPane.showMessageDialog(GestionBons.this, "Erreur : " + ex.getMessage());
-                            }
+                            controller.archiverDemande(id, userId,
+                                () -> chargerBons(),
+                                err -> JOptionPane.showMessageDialog(GestionBons.this,
+                                    "Erreur : " + err, "Erreur", JOptionPane.ERROR_MESSAGE)
+                            );
                         }
                     }
                 }
@@ -340,74 +332,22 @@ class GestionBons extends JPanel {
         return card;
     }
 
-    // ── Chargement BD ───────────────────────────────────────────────────────
-    // On charge depuis demande : nom client, email, valeur_unitaire,
-    // date_creation + validite_jours pour calculer expiration
+    // ── Chargement ──────────────────────────────────────────────────────────
     private void chargerBons() {
-        tableModel.setRowCount(0);
-        String sql =
-                "SELECT d.demande_id, c.name AS nom_client, d.email, " +
-                        "       d.valeur_unitaire, d.statuts, " +
-                        "       d.date_creation, d.validite_jours " +
-                        "FROM demande d " +
-                        "LEFT JOIN client c ON d.clientid = c.clientid " +
-                        "ORDER BY d.date_creation DESC";
-
-        try (Connection conn = DBconnect.getConnection();
-             Statement  stmt = conn.createStatement();
-             ResultSet  rs   = stmt.executeQuery(sql)) {
-
-            int count = 0;
-            java.time.LocalDate today = java.time.LocalDate.now();
-
-            while (rs.next()) {
-                int    id       = rs.getInt("demande_id");
-                String client   = rs.getString("nom_client");
-                String email    = rs.getString("email");
-                double valeur   = rs.getDouble("valeur_unitaire");
-                String statuts  = rs.getString("statuts");
-                int    validite = rs.getInt("validite_jours");
-
-                // Calcul date expiration : date_creation + validite_jours
-                java.sql.Timestamp ts = rs.getTimestamp("date_creation");
-                String expirStr = "—";
-                String expirTag = "INCONNU"; // tag interne pour filtre
-
-                if (ts != null && validite > 0) {
-                    java.time.LocalDate dateCreation = ts.toLocalDateTime().toLocalDate();
-                    java.time.LocalDate dateExpir    = dateCreation.plusDays(validite);
-                    expirStr = dateExpir.toString();
-
-                    long joursRestants = java.time.temporal.ChronoUnit.DAYS.between(today, dateExpir);
-                    if (joursRestants < 0) {
-                        expirTag = "EXPIRE";
-                        expirStr = "Expiré (" + Math.abs(joursRestants) + "j)";
-                    } else if (joursRestants <= 30) {
-                        expirTag = "MOIS";
-                        expirStr = joursRestants + " j restants";
-                    } else {
-                        expirTag = "ACTIF";
-                        expirStr = joursRestants + " j restants";
-                    }
+        controller.chargerBons(
+            bons -> {
+                tableModel.setRowCount(0);
+                for (BonController.BonView b : bons) {
+                    tableModel.addRow(new Object[]{
+                        b.id, b.client, b.email, b.valeurFmt,
+                        b.statut, b.expirTag + "|" + b.expirStr, b.action
+                    });
                 }
-
-                tableModel.addRow(new Object[]{
-                        id,
-                        client  != null ? client : "—",
-                        email   != null ? email  : "—",
-                        String.format("Rs %,.0f", valeur),
-                        statuts != null ? statuts : "—",
-                        expirTag + "|" + expirStr,   // tag|texte pour renderer
-                        expirTag.equals("EXPIRE") && !"ARCHIVE".equals(statuts) ? "ARCHIVER" : ""
-                });
-                count++;
-            }
-            lblTotal.setText(count + " bon" + (count > 1 ? "s" : "") + " au total");
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-            lblTotal.setText("Erreur : " + e.getMessage());
-        }
+                int count = bons.size();
+                lblTotal.setText(count + " bon" + (count > 1 ? "s" : "") + " au total");
+            },
+            err -> lblTotal.setText("Erreur : " + err)
+        );
     }
 
     // ── Filtre ──────────────────────────────────────────────────────────────
@@ -417,17 +357,15 @@ class GestionBons extends JPanel {
         table.setRowSorter(sorter);
 
         List<RowFilter<Object, Object>> filters = new ArrayList<>();
-
         if (!filtreExpir.equals("TOUS"))
             filters.add(RowFilter.regexFilter("(?i)^" + filtreExpir, COL_EXPIR));
-
         if (!search.isEmpty())
             filters.add(RowFilter.regexFilter("(?i)" + search, COL_CLIENT, COL_EMAIL));
 
         sorter.setRowFilter(filters.isEmpty() ? null : RowFilter.andFilter(filters));
 
         int visible = table.getRowCount();
-        lblTotal.setText(visible + " bon" + (visible > 1 ? "s" : "") + " affiche" + (visible > 1 ? "s" : ""));
+        lblTotal.setText(visible + " bon" + (visible > 1 ? "s" : "") + " affiché" + (visible > 1 ? "s" : ""));
     }
 
     // ── Renderer Statut ─────────────────────────────────────────────────────
@@ -474,11 +412,11 @@ class GestionBons extends JPanel {
         }
         private String labelFor(String s) {
             switch (s) {
-                case "EN_ATTENTE_PAIEMENT": return "\u23F3 En attente";
-                case "PAYE":               return "\uD83D\uDCB3 Pay\u00e9";
-                case "APPROUVE":           return "\u2705 Approuv\u00e9";
-                case "GENERE":             return "\uD83C\uDF9F G\u00e9n\u00e9r\u00e9";
-                case "REJETE":             return "\u274C Rejet\u00e9";
+                case "EN_ATTENTE_PAIEMENT": return "⏳ En attente";
+                case "PAYE":               return "💳 Payé";
+                case "APPROUVE":           return "✅ Approuvé";
+                case "GENERE":             return "🎟 Généré";
+                case "REJETE":             return "❌ Rejeté";
                 default:                   return s;
             }
         }
@@ -496,9 +434,9 @@ class GestionBons extends JPanel {
             Color bg, fg;
             String prefix;
             switch (tag) {
-                case "EXPIRE": bg = new Color(254,226,226); fg = DANGER;   prefix = "\uD83D\uDD34 "; break;
-                case "MOIS":   bg = new Color(255,237,213); fg = WARNING;  prefix = "\uD83D\uDFE0 "; break;
-                case "ACTIF":  bg = new Color(220,252,231); fg = SUCCESS;  prefix = "\uD83D\uDFE2 "; break;
+                case "EXPIRE": bg = new Color(254,226,226); fg = DANGER;   prefix = "🔴 "; break;
+                case "MOIS":   bg = new Color(255,237,213); fg = WARNING;  prefix = "🟠 "; break;
+                case "ACTIF":  bg = new Color(220,252,231); fg = SUCCESS;  prefix = "🟢 "; break;
                 default:       bg = new Color(241,245,249); fg = TEXT_MUTED; prefix = ""; break;
             }
 
@@ -526,11 +464,11 @@ class GestionBons extends JPanel {
                 JTable t, Object val, boolean sel, boolean foc, int row, int col) {
             String s = val != null ? val.toString() : "";
             if (s.isEmpty()) return new JLabel("");
-            
+
             JPanel p = new JPanel(new GridBagLayout());
             p.setOpaque(true);
             p.setBackground(sel ? RED_LIGHT : (row % 2 == 0 ? BG_CARD : new Color(249, 250, 252)));
-            
+
             JButton btn = new JButton(s) {
                 @Override protected void paintComponent(Graphics g) {
                     Graphics2D g2 = (Graphics2D) g.create();
@@ -554,25 +492,14 @@ class GestionBons extends JPanel {
     // ── Actions ─────────────────────────────────────────────────────────────
     private void ouvrirNouvelledemande() {
         Frame parent = (Frame) SwingUtilities.getWindowAncestor(this);
-
-        // Créer le panneau FormulaireCreationBon avec les paramètres attendus
         FormulaireCreationBon panel = new FormulaireCreationBon(userId, role);
-
-        // Encapsuler dans un JDialog modal
         JDialog dialog = new JDialog((JFrame) parent, "Nouvelle Demande de Bon", true);
         dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
         dialog.setSize(650, 550);
         dialog.setLocationRelativeTo(parent);
         dialog.add(panel);
         dialog.setVisible(true);
-
-        // Actualiser la liste après fermeture de la boîte de dialogue
         chargerBons();
-    }
-
-    // ── Helpers UI ──────────────────────────────────────────────────────────
-    private JButton buildRedButton(String text) {
-        return UIUtils.buildRedButton(text);
     }
 
     private JButton buildIconBtn(String symbol, String tooltip) {

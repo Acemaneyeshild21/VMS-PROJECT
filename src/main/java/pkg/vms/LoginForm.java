@@ -1,12 +1,12 @@
 package pkg.vms;
 
 import pkg.vms.DAO.AuthDAO;
+import pkg.vms.controller.LoginController;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
-import java.sql.SQLException;
 
 public class LoginForm extends JFrame {
 
@@ -18,6 +18,8 @@ public class LoginForm extends JFrame {
     private static final Color TEXT_M     = VMSStyle.TEXT_MUTED;
     private static final Color BORDER     = VMSStyle.BORDER_LIGHT;
     private static final Color SUCCESS    = VMSStyle.SUCCESS;
+
+    private final LoginController loginController = new LoginController();
 
     private JTextField       txtUsername;
     private JPasswordField   txtPassword;
@@ -415,33 +417,19 @@ public class LoginForm extends JFrame {
         btnLogin.setText("Connexion en cours...");
         lblError.setText(" ");
 
-        new SwingWorker<AuthDAO.UserSession, Void>() {
-            @Override protected AuthDAO.UserSession doInBackground() throws Exception {
-                return AuthDAO.authenticate(user, pass);
+        loginController.authenticate(user, pass,
+            session -> {
+                dispose();
+                SwingUtilities.invokeLater(() ->
+                    new Dashboard(session.userId, session.username, session.role, session.email)
+                            .setVisible(true));
+            },
+            errMsg -> {
+                showError(errMsg);
+                btnLogin.setEnabled(true);
+                btnLogin.setText("Se connecter");
             }
-
-            @Override protected void done() {
-                try {
-                    AuthDAO.UserSession session = get();
-                    if (session != null) {
-                        dispose();
-                        SwingUtilities.invokeLater(() -> {
-                            new Dashboard(session.userId, session.username, session.role, session.email)
-                                    .setVisible(true);
-                        });
-                    } else {
-                        showError("Identifiants incorrects. V\u00e9rifiez votre nom d'utilisateur et mot de passe.");
-                        btnLogin.setEnabled(true);
-                        btnLogin.setText("Se connecter");
-                    }
-                } catch (Exception ex) {
-                    showError("Erreur de connexion \u00e0 la base de donn\u00e9es.");
-                    btnLogin.setEnabled(true);
-                    btnLogin.setText("Se connecter");
-                    ex.printStackTrace();
-                }
-            }
-        }.execute();
+        );
     }
 
     private void showError(String msg) {

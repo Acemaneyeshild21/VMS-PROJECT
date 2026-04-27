@@ -1,21 +1,15 @@
 package pkg.vms;
 
-import pkg.vms.DAO.DBconnect;
 import pkg.vms.DAO.VoucherDAO;
+import pkg.vms.controller.ValidationController;
 
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
-import java.sql.*;
-import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Panneau de validation des demandes de bons cadeau.
- * Deux onglets : Paiements (Comptable/Admin) et Approbations (Approbateur/Manager/Admin).
- */
 public class ValidationPanel extends JPanel {
 
     // ── Palette (Centralisee via VMSStyle) ──────────────────────────────────
@@ -56,6 +50,7 @@ public class ValidationPanel extends JPanel {
     private static final int COL_ACTIONS = 7;
 
     private final int    userId;
+    private final ValidationController controller = new ValidationController();
 
     private DefaultTableModel tableModel;
     private JTable            table;
@@ -64,16 +59,15 @@ public class ValidationPanel extends JPanel {
     private JButton           tabApprobations;
     private JLabel            badgePaiements;
     private JLabel            badgeApprobations;
-    private String            activeTab; // "PAIEMENTS" ou "APPROBATIONS"
+    private String            activeTab;
 
     private final boolean canPaiement;
     private final boolean canApprobation;
 
     public ValidationPanel(String role, int userId) {
         this.userId = userId;
-        this.canPaiement    = "Comptable".equalsIgnoreCase(role) || "Administrateur".equalsIgnoreCase(role) || "Manager".equalsIgnoreCase(role);
-        this.canApprobation = "Approbateur".equalsIgnoreCase(role) || "Manager".equalsIgnoreCase(role)
-                              || "Administrateur".equalsIgnoreCase(role);
+        this.canPaiement    = Roles.peutValiderPaiement(role);
+        this.canApprobation = Roles.peutApprouver(role);
 
         setLayout(new BorderLayout());
         setOpaque(false);
@@ -108,8 +102,8 @@ public class ValidationPanel extends JPanel {
         JPanel mid = new JPanel(new BorderLayout(0, 12));
         mid.setOpaque(false);
         mid.setBorder(BorderFactory.createEmptyBorder(18, 0, 0, 0));
-        mid.add(buildTabBar(),     BorderLayout.NORTH);
-        mid.add(buildTableCard(),  BorderLayout.CENTER);
+        mid.add(buildTabBar(),    BorderLayout.NORTH);
+        mid.add(buildTableCard(), BorderLayout.CENTER);
         wrapper.add(mid, BorderLayout.CENTER);
         add(wrapper, BorderLayout.CENTER);
     }
@@ -142,8 +136,7 @@ public class ValidationPanel extends JPanel {
         titleRow.add(title);
         titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        String subtitleText = buildSubtitle();
-        JLabel sub = new JLabel(subtitleText);
+        JLabel sub = new JLabel(buildSubtitle());
         sub.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
         sub.setForeground(TEXT_SECOND);
         sub.setBorder(BorderFactory.createEmptyBorder(5, 14, 0, 0));
@@ -160,13 +153,9 @@ public class ValidationPanel extends JPanel {
     }
 
     private String buildSubtitle() {
-        if (canPaiement && canApprobation) {
-            return "Validation des paiements et approbation des demandes";
-        } else if (canPaiement) {
-            return "Validation des paiements en attente";
-        } else {
-            return "Approbation des demandes payées";
-        }
+        if (canPaiement && canApprobation) return "Validation des paiements et approbation des demandes";
+        if (canPaiement)                   return "Validation des paiements en attente";
+        return "Approbation des demandes payées";
     }
 
     // ── TAB BAR ────────────────────────────────────────────────────────────
@@ -267,12 +256,10 @@ public class ValidationPanel extends JPanel {
 
     private void switchTab(String tab) {
         activeTab = tab;
-        // Update tab button visuals
         if (tabPaiements != null) {
             JLabel lbl = (JLabel) tabPaiements.getClientProperty("tabLabel");
             boolean sel = "PAIEMENTS".equals(tab);
             lbl.setForeground(sel ? Color.WHITE : TEXT_SECOND);
-            // Access the anonymous inner class's sel field via reflection-free approach
             tabPaiements.putClientProperty("selected", sel);
             tabPaiements.repaint();
         }
@@ -369,104 +356,45 @@ public class ValidationPanel extends JPanel {
         return card;
     }
 
-    // ── CHARGEMENT BD ──────────────────────────────────────────────────────
+    // ── CHARGEMENT ──────────────────────────────────────────────────────────
     private void chargerDonnees() {
         String statut = "PAIEMENTS".equals(activeTab) ? ST_ATTENTE_PAIEMENT : ST_PAYE;
 
-        new SwingWorker<List<Object[]>, Void>() {
-            @Override
-            protected List<Object[]> doInBackground() throws Exception {
-                List<Object[]> data = new ArrayList<>();
-                String sql = "SELECT d.demande_id, d.reference, c.name AS nom_client, d.nombre_bons, " +
-                             "d.valeur_unitaire, d.montant_total, d.date_creation, d.statuts " +
-                             "FROM demande d LEFT JOIN client c ON d.clientid = c.clientid " +
-                             "WHERE d.statuts = ? ORDER BY d.date_creation DESC";
-                try (Connection conn = DBconnect.getConnection();
-                     PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setString(1, statut);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        while (rs.next()) {
-                            data.add(new Object[]{
-                                rs.getInt("demande_id"),
-                                rs.getString("reference"),
-                                rs.getString("nom_client"),
-                                rs.getInt("nombre_bons"),
-                                rs.getDouble("valeur_unitaire"),
-                                rs.getDouble("montant_total"),
-                                rs.getString("date_creation"),
-                                "actions"
-                            });
-                        }
-                    }
+        controller.chargerDemandes(statut,
+            rows -> {
+                tableModel.setRowCount(0);
+                for (VoucherDAO.DemandeComplet dc : rows) {
+                    tableModel.addRow(new Object[]{
+                        dc.id, dc.reference, dc.client, dc.nbBons,
+                        dc.valeurUnit, dc.montantTotal, dc.dateCreation, "actions"
+                    });
                 }
-                return data;
-            }
+                int count = rows.size();
+                String label = "PAIEMENTS".equals(activeTab) ? "paiement" : "approbation";
+                lblTotal.setText(count + " " + label + (count > 1 ? "s" : "") + " en attente");
+                updateBadge(statut, count);
+            },
+            err -> lblTotal.setText("Erreur lors du chargement")
+        );
 
-            @Override
-            protected void done() {
-                try {
-                    tableModel.setRowCount(0);
-                    List<Object[]> data = get();
-                    for (Object[] row : data) {
-                        tableModel.addRow(row);
-                    }
-                    int count = data.size();
-                    String label = "PAIEMENTS".equals(activeTab)
-                            ? "paiement" : "approbation";
-                    lblTotal.setText(count + " " + label + (count > 1 ? "s" : "")
-                            + " en attente");
-                    updateBadgeCounts(statut, count);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    lblTotal.setText("Erreur lors du chargement");
-                }
-            }
-        }.execute();
-
-        // Also update the other tab's badge count in parallel
-        chargerBadgeAutreOnglet(statut);
-    }
-
-    private void updateBadgeCounts(String loadedStatut, int count) {
-        if (ST_ATTENTE_PAIEMENT.equals(loadedStatut) && badgePaiements != null) {
-            badgePaiements.setText(String.valueOf(count));
-        } else if (ST_PAYE.equals(loadedStatut) && badgeApprobations != null) {
-            badgeApprobations.setText(String.valueOf(count));
+        // Badge de l'autre onglet
+        String autreStatut = ST_ATTENTE_PAIEMENT.equals(statut) ? ST_PAYE : ST_ATTENTE_PAIEMENT;
+        boolean needBadge = (ST_ATTENTE_PAIEMENT.equals(autreStatut) && badgePaiements != null)
+                         || (ST_PAYE.equals(autreStatut) && badgeApprobations != null);
+        if (needBadge) {
+            controller.compterDemandes(autreStatut,
+                count -> updateBadge(autreStatut, count),
+                err -> {}
+            );
         }
     }
 
-    private void chargerBadgeAutreOnglet(String loadedStatut) {
-        String autreStatut = ST_ATTENTE_PAIEMENT.equals(loadedStatut) ? ST_PAYE : ST_ATTENTE_PAIEMENT;
-        boolean needBadge = (ST_ATTENTE_PAIEMENT.equals(autreStatut) && badgePaiements != null)
-                         || (ST_PAYE.equals(autreStatut) && badgeApprobations != null);
-        if (!needBadge) return;
-
-        new SwingWorker<Integer, Void>() {
-            @Override
-            protected Integer doInBackground() throws Exception {
-                String sql = "SELECT COUNT(*) FROM demande WHERE statuts = ?";
-                try (Connection conn = DBconnect.getConnection();
-                     PreparedStatement ps = conn.prepareStatement(sql)) {
-                    ps.setString(1, autreStatut);
-                    try (ResultSet rs = ps.executeQuery()) {
-                        if (rs.next()) return rs.getInt(1);
-                    }
-                }
-                return 0;
-            }
-
-            @Override
-            protected void done() {
-                try {
-                    int c = get();
-                    if (ST_ATTENTE_PAIEMENT.equals(autreStatut) && badgePaiements != null) {
-                        badgePaiements.setText(String.valueOf(c));
-                    } else if (ST_PAYE.equals(autreStatut) && badgeApprobations != null) {
-                        badgeApprobations.setText(String.valueOf(c));
-                    }
-                } catch (Exception ignored) { }
-            }
-        }.execute();
+    private void updateBadge(String statut, int count) {
+        if (ST_ATTENTE_PAIEMENT.equals(statut) && badgePaiements != null) {
+            badgePaiements.setText(String.valueOf(count));
+        } else if (ST_PAYE.equals(statut) && badgeApprobations != null) {
+            badgeApprobations.setText(String.valueOf(count));
+        }
     }
 
     // ── RENDERER ACTIONS ───────────────────────────────────────────────────
@@ -476,7 +404,6 @@ public class ValidationPanel extends JPanel {
             JPanel p = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 6));
             p.setOpaque(true);
             p.setBackground(sel ? RED_LIGHT : (row % 2 == 0 ? BG_CARD : new Color(249, 250, 252)));
-
             if ("PAIEMENTS".equals(activeTab)) {
                 p.add(buildActionBtn("Valider", SUCCESS, false));
             } else {
@@ -503,22 +430,13 @@ public class ValidationPanel extends JPanel {
 
             if ("PAIEMENTS".equals(activeTab)) {
                 JButton btnValider = buildActionBtn("Valider", SUCCESS, true);
-                btnValider.addActionListener(e -> {
-                    fireEditingStopped();
-                    validerPaiement();
-                });
+                btnValider.addActionListener(e -> { fireEditingStopped(); validerPaiement(); });
                 p.add(btnValider);
             } else {
                 JButton btnApprouver = buildActionBtn("Approuver", SUCCESS, true);
-                btnApprouver.addActionListener(e -> {
-                    fireEditingStopped();
-                    approuverDemande();
-                });
+                btnApprouver.addActionListener(e -> { fireEditingStopped(); approuverDemande(); });
                 JButton btnRejeter = buildActionBtn("Rejeter", RED_PRIMARY, true);
-                btnRejeter.addActionListener(e -> {
-                    fireEditingStopped();
-                    rejeterDemande();
-                });
+                btnRejeter.addActionListener(e -> { fireEditingStopped(); rejeterDemande(); });
                 p.add(btnApprouver);
                 p.add(btnRejeter);
             }
@@ -529,20 +447,17 @@ public class ValidationPanel extends JPanel {
             if (currentRow < 0) return;
             int modelRow = table.convertRowIndexToModel(currentRow);
             int demandeId = (int) tableModel.getValueAt(modelRow, COL_ID);
-            String ref = String.valueOf(tableModel.getValueAt(modelRow, COL_REF));
+            String ref    = String.valueOf(tableModel.getValueAt(modelRow, COL_REF));
 
             int conf = JOptionPane.showConfirmDialog(ValidationPanel.this,
                     "Confirmer la validation du paiement pour la demande " + ref + " ?",
                     "Valider Paiement", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
             if (conf == JOptionPane.YES_OPTION) {
-                try {
-                    VoucherDAO.updateVoucherStatus(demandeId, ST_PAYE, userId);
-                    chargerDonnees();
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
-                    JOptionPane.showMessageDialog(ValidationPanel.this,
-                            "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
-                }
+                controller.changerStatut(demandeId, ST_PAYE, userId,
+                    () -> chargerDonnees(),
+                    err -> JOptionPane.showMessageDialog(ValidationPanel.this,
+                        "Erreur : " + err, "Erreur", JOptionPane.ERROR_MESSAGE)
+                );
             }
         }
 
@@ -550,42 +465,50 @@ public class ValidationPanel extends JPanel {
             if (currentRow < 0) return;
             int modelRow = table.convertRowIndexToModel(currentRow);
             int demandeId = (int) tableModel.getValueAt(modelRow, COL_ID);
-            String ref = String.valueOf(tableModel.getValueAt(modelRow, COL_REF));
+            String ref    = String.valueOf(tableModel.getValueAt(modelRow, COL_REF));
 
-            int conf = JOptionPane.showConfirmDialog(ValidationPanel.this,
-                    "Confirmer l'approbation de la demande " + ref + " ?",
-                    "Approuver", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
-            if (conf == JOptionPane.YES_OPTION) {
-                try {
-                    VoucherDAO.updateVoucherStatus(demandeId, ST_APPROUVE, userId);
-                    chargerDonnees();
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
-                    JOptionPane.showMessageDialog(ValidationPanel.this,
-                            "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
-                }
-            }
+            controller.verifierSeparationTaches(demandeId, userId,
+                aValide -> {
+                    if (aValide) {
+                        JOptionPane.showMessageDialog(ValidationPanel.this,
+                            "<html><b>Action refusée — Séparation des tâches</b><br><br>" +
+                            "Vous avez validé le paiement de la demande <b>" + ref + "</b>.<br>" +
+                            "Une personne différente doit procéder à l'approbation.</html>",
+                            "Conflit de rôles", JOptionPane.ERROR_MESSAGE);
+                        return;
+                    }
+                    int conf = JOptionPane.showConfirmDialog(ValidationPanel.this,
+                            "Confirmer l'approbation de la demande " + ref + " ?",
+                            "Approuver", JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+                    if (conf == JOptionPane.YES_OPTION) {
+                        controller.changerStatut(demandeId, ST_APPROUVE, userId,
+                            () -> chargerDonnees(),
+                            err -> JOptionPane.showMessageDialog(ValidationPanel.this,
+                                "Erreur : " + err, "Erreur", JOptionPane.ERROR_MESSAGE)
+                        );
+                    }
+                },
+                err -> JOptionPane.showMessageDialog(ValidationPanel.this,
+                    "Erreur vérification : " + err, "Erreur", JOptionPane.ERROR_MESSAGE)
+            );
         }
 
         private void rejeterDemande() {
             if (currentRow < 0) return;
             int modelRow = table.convertRowIndexToModel(currentRow);
             int demandeId = (int) tableModel.getValueAt(modelRow, COL_ID);
-            String ref = String.valueOf(tableModel.getValueAt(modelRow, COL_REF));
+            String ref    = String.valueOf(tableModel.getValueAt(modelRow, COL_REF));
 
             String raison = (String) JOptionPane.showInputDialog(ValidationPanel.this,
                     "Motif du rejet pour la demande " + ref + " :",
                     "Rejeter la demande", JOptionPane.WARNING_MESSAGE,
                     null, null, "");
             if (raison != null) {
-                try {
-                    VoucherDAO.updateVoucherStatus(demandeId, ST_REJETE, userId);
-                    chargerDonnees();
-                } catch (SQLException ex) {
-                    ex.printStackTrace();
-                    JOptionPane.showMessageDialog(ValidationPanel.this,
-                            "Erreur : " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
-                }
+                controller.changerStatut(demandeId, ST_REJETE, userId,
+                    () -> chargerDonnees(),
+                    err -> JOptionPane.showMessageDialog(ValidationPanel.this,
+                        "Erreur : " + err, "Erreur", JOptionPane.ERROR_MESSAGE)
+                );
             }
         }
     }
@@ -617,67 +540,6 @@ public class ValidationPanel extends JPanel {
         btn.setFocusPainted(false);
         btn.setPreferredSize(new Dimension(btn.getPreferredSize().width + 16, 28));
         if (interactive) btn.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        return btn;
-    }
-
-    private JButton buildRedButton(String text) {
-        JButton btn = new JButton(text) {
-            boolean h = false;
-            {
-                setFont(FONT_BTN);
-                setForeground(Color.WHITE);
-                setOpaque(false);
-                setContentAreaFilled(false);
-                setBorderPainted(false);
-                setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(getPreferredSize().width + 28, 38));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { h = true;  repaint(); }
-                    public void mouseExited(MouseEvent e)  { h = false; repaint(); }
-                });
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(h ? RED_DARK : RED_PRIMARY);
-                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 8, 8));
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
-        return btn;
-    }
-
-    private JButton buildOutlineButton(String text) {
-        JButton btn = new JButton(text) {
-            boolean h = false;
-            {
-                setFont(FONT_BTN);
-                setForeground(TEXT_SECOND);
-                setOpaque(false);
-                setContentAreaFilled(false);
-                setBorderPainted(false);
-                setFocusPainted(false);
-                setCursor(new Cursor(Cursor.HAND_CURSOR));
-                setPreferredSize(new Dimension(getPreferredSize().width + 24, 38));
-                addMouseListener(new MouseAdapter() {
-                    public void mouseEntered(MouseEvent e) { h = true;  repaint(); }
-                    public void mouseExited(MouseEvent e)  { h = false; repaint(); }
-                });
-            }
-            @Override protected void paintComponent(Graphics g) {
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(h ? new Color(245, 246, 250) : BG_CARD);
-                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 8, 8));
-                g2.setColor(BORDER_LIGHT);
-                g2.setStroke(new BasicStroke(1f));
-                g2.draw(new RoundRectangle2D.Double(0.5, 0.5, getWidth()-1, getHeight()-1, 8, 8));
-                g2.dispose();
-                super.paintComponent(g);
-            }
-        };
         return btn;
     }
 

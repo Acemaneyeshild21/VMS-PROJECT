@@ -3,6 +3,7 @@ package pkg.vms.DAO;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import pkg.vms.Client;
 
 public class ClientDAO {
 
@@ -58,6 +59,103 @@ public class ClientDAO {
             }
         }
         return magasins;
+    }
+
+    public static List<Client> getAllClients() throws SQLException {
+        List<Client> clients = new ArrayList<>();
+        String sql = "SELECT clientid, name, email, contact_number, company, date_creation, actif FROM client ORDER BY clientid DESC";
+        try (Connection conn = DBconnect.getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                clients.add(new Client(
+                    rs.getInt("clientid"), rs.getString("name"), rs.getString("email"),
+                    rs.getString("contact_number"), rs.getString("company"),
+                    rs.getTimestamp("date_creation"), rs.getBoolean("actif")
+                ));
+            }
+        }
+        return clients;
+    }
+
+    public static List<Client> searchClients(String search) throws SQLException {
+        List<Client> clients = new ArrayList<>();
+        String sql = "SELECT clientid, name, email, contact_number, company, date_creation, actif FROM client " +
+                     "WHERE LOWER(name) LIKE LOWER(?) OR LOWER(email) LIKE LOWER(?) OR LOWER(company) LIKE LOWER(?) " +
+                     "ORDER BY clientid DESC";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            String pattern = "%" + search + "%";
+            ps.setString(1, pattern); ps.setString(2, pattern); ps.setString(3, pattern);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    clients.add(new Client(
+                        rs.getInt("clientid"), rs.getString("name"), rs.getString("email"),
+                        rs.getString("contact_number"), rs.getString("company"),
+                        rs.getTimestamp("date_creation"), rs.getBoolean("actif")
+                    ));
+                }
+            }
+        }
+        return clients;
+    }
+
+    public static Client getClientById(int clientId) throws SQLException {
+        String sql = "SELECT clientid, name, email, contact_number, company, date_creation, actif FROM client WHERE clientid = ?";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, clientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new Client(
+                        rs.getInt("clientid"), rs.getString("name"), rs.getString("email"),
+                        rs.getString("contact_number"), rs.getString("company"),
+                        rs.getTimestamp("date_creation"), rs.getBoolean("actif")
+                    );
+                }
+            }
+        }
+        return null;
+    }
+
+    public static boolean addClient(Client client) throws SQLException {
+        String sql = "INSERT INTO client (name, email, contact_number, company, actif) VALUES (?, ?, ?, ?, ?)";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, client.getName()); ps.setString(2, client.getEmail());
+            ps.setString(3, client.getContactNumber()); ps.setString(4, client.getCompany());
+            ps.setBoolean(5, client.isActif());
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    public static boolean updateClient(Client client) throws SQLException {
+        String sql = "UPDATE client SET name=?, email=?, contact_number=?, company=?, actif=? WHERE clientid=?";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, client.getName()); ps.setString(2, client.getEmail());
+            ps.setString(3, client.getContactNumber()); ps.setString(4, client.getCompany());
+            ps.setBoolean(5, client.isActif()); ps.setInt(6, client.getClientId());
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    public static boolean deactivateClient(int clientId) throws SQLException {
+        String sql = "UPDATE client SET actif = false WHERE clientid = ?";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, clientId);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    public static boolean deleteClientPermanently(int clientId) throws SQLException {
+        String sql = "DELETE FROM client WHERE clientid = ?";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, clientId);
+            return ps.executeUpdate() > 0;
+        }
     }
 
     /**

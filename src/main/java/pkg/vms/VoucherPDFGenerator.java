@@ -17,12 +17,18 @@ import java.io.FileOutputStream;
 import java.util.HashMap;
 import java.util.Map;
 import com.itextpdf.text.pdf.draw.LineSeparator;
+
 /**
  * Génère un PDF par bon avec QR code unique, code-barres, et signature autorisée.
+ * Les PDFs sont écrits sur disque (exports/bons/) ET retournés en mémoire (bytea pour BD).
  */
 public class VoucherPDFGenerator {
 
-    private static final String OUTPUT_DIR = System.getProperty("user.home") + "/VMS_Bons";
+    /** Dossier de sortie des bons individuels (nom de fichier = code du bon). */
+    private static final String OUTPUT_DIR = System.getProperty("user.home") + "/exports/bons";
+
+    /** Résultat d'une génération PDF : chemin disque + octets bruts pour la BD. */
+    public record PdfResult(String filePath, byte[] data) {}
 
     // Couleurs du thème
     private static final BaseColor RED_PRIMARY = new BaseColor(210, 35, 45);
@@ -31,18 +37,23 @@ public class VoucherPDFGenerator {
     private static final BaseColor BG_LIGHT    = new BaseColor(248, 249, 252);
 
     /**
-     * Génère un PDF pour un bon et retourne le chemin du fichier.
+     * Génère un PDF pour un bon.
+     * Écrit sur disque dans OUTPUT_DIR (nom = code du bon) ET retourne les octets bruts
+     * pour stockage en base (colonne bon.pdf_data BYTEA).
      */
-    public static String genererPDF(BonDAO.BonInfo bon) throws Exception {
-        // Créer le dossier de sortie
+    public static PdfResult genererPDF(BonDAO.BonInfo bon) throws Exception {
         File dir = new File(OUTPUT_DIR);
         if (!dir.exists()) dir.mkdirs();
 
-        String fileName = "BON_" + bon.codeUnique.replaceAll("[^a-zA-Z0-9-]", "_") + ".pdf";
+        // Nom de fichier = code unique du bon (sans caractères spéciaux)
+        String fileName = bon.codeUnique.replaceAll("[^a-zA-Z0-9-]", "_") + ".pdf";
         String filePath = OUTPUT_DIR + "/" + fileName;
 
+        // Génération en mémoire d'abord (permet d'écrire en DB ET sur disque)
+        ByteArrayOutputStream pdfBytes = new ByteArrayOutputStream();
+
         Document doc = new Document(PageSize.A5.rotate(), 30, 30, 25, 25);
-        PdfWriter writer = PdfWriter.getInstance(doc, new FileOutputStream(filePath));
+        PdfWriter writer = PdfWriter.getInstance(doc, pdfBytes);
         doc.open();
 
         // ── Bordure du bon ──
@@ -169,7 +180,14 @@ public class VoucherPDFGenerator {
         doc.add(sig);
 
         doc.close();
-        return filePath;
+
+        // Écrire les octets sur disque
+        byte[] data = pdfBytes.toByteArray();
+        try (FileOutputStream fos = new FileOutputStream(filePath)) {
+            fos.write(data);
+        }
+
+        return new PdfResult(filePath, data);
     }
 
     /**
