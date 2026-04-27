@@ -140,6 +140,10 @@ public class ParametresController {
         }.execute();
     }
 
+    public void testerConnexionEmail(Consumer<Boolean> onSuccess, Consumer<String> onError) {
+        pkg.vms.EmailService.testConnectionAsync(onSuccess, onError);
+    }
+
     // ── Email config ─────────────────────────────────────────────────────────
 
     public void chargerConfigEmail(Consumer<SettingsDAO.EmailSettings> onSuccess, Consumer<String> onError) {

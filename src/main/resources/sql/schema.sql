@@ -646,6 +646,28 @@ CREATE TRIGGER trg_redemption_auto_redime
     FOR EACH ROW
     EXECUTE FUNCTION trg_redemption_marquer_redime();
 
+-- ────────────────────────────────────────────────────────────────────────────
+-- TABLE : email_errors — Historique des échecs d'envoi SMTP
+-- Permet la relance depuis ParametresPanel (EmailService.resendEmail)
+-- ────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS email_errors (
+    id              SERIAL PRIMARY KEY,
+    demande_id      INTEGER REFERENCES demande(demande_id) ON DELETE SET NULL,
+    demande_ref     VARCHAR(50),
+    to_email        VARCHAR(255) NOT NULL,
+    email_type      VARCHAR(50)  NOT NULL,          -- VOUCHER | APPROVAL_REQUEST | PAYMENT_CONFIRMATION | ADMIN_RECAP
+    nb_tentatives   INTEGER      NOT NULL DEFAULT 1,
+    derniere_erreur TEXT,
+    payload         TEXT,                            -- données JSON pour la relance
+    created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
+    resolved        BOOLEAN      NOT NULL DEFAULT FALSE,
+    resolved_at     TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_errors_unresolved
+    ON email_errors(resolved, created_at DESC)
+    WHERE resolved = FALSE;
+
 -- 9e. Vue bons proches d'expiration avec seuil issu de la table app_settings
 CREATE OR REPLACE VIEW v_bons_proche_expiration AS
 SELECT * FROM v_bons_details

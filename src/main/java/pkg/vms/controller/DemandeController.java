@@ -9,6 +9,7 @@ import pkg.vms.VoucherPDFGenerator;
 
 import javax.swing.SwingWorker;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
 
 public class DemandeController {
@@ -140,13 +141,17 @@ public class DemandeController {
                 }
 
                 publish(new String[]{"85", "Envoi des emails…"});
-                try {
-                    EmailService.envoyerBonsParEmail(demandeId, bons, userId);
-                    VoucherDAO.marquerCommeEnvoye(demandeId, userId);
-                } catch (Exception emailEx) {
+                String[] emailErr = {null};
+                CountDownLatch latch = new CountDownLatch(1);
+                EmailService.envoyerBonsParEmail(demandeId, bons, userId,
+                        () -> latch.countDown(),
+                        err -> { emailErr[0] = err; latch.countDown(); });
+                latch.await(); // bloque jusqu'à fin d'envoi (thread background, pas d'EDT)
+                if (emailErr[0] != null) {
                     emailFailed = true;
-                    BonDAO.logEmailError(demandeId, emailEx.getMessage());
-                    AuditDAO.logEnvoi(demandeId, false, userId, emailEx.getMessage());
+                    BonDAO.logEmailError(demandeId, emailErr[0]);
+                } else {
+                    VoucherDAO.marquerCommeEnvoye(demandeId, userId);
                 }
 
                 publish(new String[]{"100", "Terminé !"});
@@ -180,7 +185,13 @@ public class DemandeController {
             @Override
             protected Void doInBackground() throws Exception {
                 List<BonDAO.BonInfo> bons = BonDAO.getBonsByDemande(demandeId);
-                EmailService.envoyerBonsParEmail(demandeId, bons, userId);
+                String[] emailErr2 = {null};
+                CountDownLatch latch2 = new CountDownLatch(1);
+                EmailService.envoyerBonsParEmail(demandeId, bons, userId,
+                        () -> latch2.countDown(),
+                        err -> { emailErr2[0] = err; latch2.countDown(); });
+                latch2.await();
+                if (emailErr2[0] != null) throw new Exception("Email échec : " + emailErr2[0]);
                 VoucherDAO.marquerCommeEnvoye(demandeId, userId);
                 BonDAO.resolveEmailErrors(demandeId);
                 AuditDAO.logEnvoi(demandeId, true, userId, null);
