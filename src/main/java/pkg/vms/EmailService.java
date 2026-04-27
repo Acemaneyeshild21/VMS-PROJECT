@@ -480,243 +480,590 @@ public class EmailService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    //  Templates HTML — compatibles TOUS clients email
-    //  (Gmail, Apple Mail iPhone/iPad, Huawei Mail, Samsung Mail,
-    //   Outlook, Yahoo Mail, tous les webmails)
+    //  Templates HTML — production-ready, compatibles tous clients email
+    //  Gmail · Apple Mail (iPhone/iPad) · Huawei Mail · Samsung Mail
+    //  Outlook · Yahoo Mail · tous les webmails
     //
-    //  RÈGLES :
-    //  ✅ Layout 100% <table> — aucun Flexbox, aucun CSS Grid
-    //  ✅ Styles 100% inline — aucune balise <style> externe
-    //  ✅ Largeur max 600px, centré sur la page
-    //  ✅ Police Arial / Helvetica (universelle, présente sur tous les OS)
-    //  ✅ Couleurs en HEX (#RRGGBB), jamais rgba()
+    //  RÈGLES (email-safe) :
+    //  ✅ Layout 100% <table> — pas de Flexbox, pas de CSS Grid
+    //  ✅ Styles 100% inline — pas de <style> externe
+    //  ✅ Largeur max 600px, centré via align="center"
+    //  ✅ Police Arial/Helvetica (universelle sur tous les OS)
+    //  ✅ Couleurs HEX uniquement — pas de rgba()
+    //  ✅ Variables {PLACEHOLDER} remplacées par fill() avant envoi
     //  ✅ Données dynamiques échappées via escHtml()
-    //  ❌ Pas de media queries dans le corps de l'email
-    //  ❌ Pas de JavaScript
+    //  ❌ Pas de media queries · Pas de JavaScript
+    //
+    //  BRANDING Intermart VMS :
+    //  · Header principal  : #000099 (navy — professionnel, sobre)
+    //  · Header notice     : #0066cc (bleu clair — accessible, rassurant)
+    //  · Header interne    : #1e293b (gris foncé — confidentiel / admin)
+    //  · Accentuation      : #25255a (bleu marine foncé — titres info-box)
+    //  · Warning           : #fdf6e0 / #f2c94c / #975a00
     // ─────────────────────────────────────────────────────────────────────────
+
+    // ── Constantes Intermart (modifier ici = propagé dans tous les templates) ──
+    private static final String C_SOCIETE  = "Intermart Maurice Ltd";
+    private static final String C_SYSTEME  = "VMS &ndash; Voucher Management System";
+    private static final String C_SUPPORT  = "support@intermart.mu";
+    private static final String C_ENTPR    = "bons@intermart.mu";
+    private static final String C_SITE     = "www.intermart.mu";
+    private static final String C_ADRESSE  = "Port-Louis, &Icirc;le Maurice";
+    private static final String C_REG      = "CCI Maurice";
+
+    // ─── Méthode utilitaire : remplace les {PLACEHOLDER} dans le template ───
+    private static String fill(String tpl, String... kvPairs) {
+        String out = tpl;
+        for (int i = 0; i + 1 < kvPairs.length; i += 2)
+            out = out.replace(kvPairs[i], kvPairs[i + 1]);
+        return out;
+    }
+
+    // ── Formatage conditionnel des montants ───────────────────────────────────
+    private static String montant(double v) {
+        return v > 0 ? "Rs&nbsp;" + String.format("%,.2f", v) : "&mdash;";
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TEMPLATE 1 — Bons cadeaux au client (standard, couleur #000099)
+    //  Basé sur la version "Standard professionnelle"
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TEMPLATE 1 RAW — Bons cadeaux au client (Standard #000099)
+    //  Variables : {CLIENT_NAME} {DEMANDE_REF} {NOMBRE_BONS}
+    //              {VALEUR_UNITAIRE} {VALEUR_TOTALE} {NB_PJ}
+    // ─────────────────────────────────────────────────────────────────────────
+    private static final String TPL_VOUCHER = """
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Vos bons cadeaux &ndash; Intermart VMS</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" border="0"
+             style="max-width:600px;width:100%;background-color:#ffffff;border-radius:4px;overflow:hidden;border:1px solid #e0e0e0;">
+
+        <!-- HEADER -->
+        <tr>
+          <td style="background-color:#000099;padding:24px 30px 20px;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="padding:0 0 6px;">
+                <h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">Intermart VMS</h1>
+              </td></tr>
+              <tr><td>
+                <p style="color:#e9e9ff;font-size:13px;margin:0;">Voucher &amp; Gift Management System</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <tr>
+          <td style="padding:30px;line-height:1.5;">
+            <p style="color:#1a1a1a;font-size:16px;font-weight:500;margin:0 0 14px;">
+              Bonjour <strong>{CLIENT_NAME}</strong>,
+            </p>
+            <p style="color:#344054;font-size:14px;margin:0 0 20px;">
+              Les bons cadeaux associ&eacute;s &agrave; la demande <strong>{DEMANDE_REF}</strong> sont g&eacute;n&eacute;r&eacute;s et disponibles.
+              Vous trouverez <strong>{NB_PJ}</strong> en pi&egrave;ce(s) jointe(s) &agrave; cet email.
+            </p>
+
+            <!-- DETAILS BOX -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="border:1px solid #e0e0e0;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:16px 18px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr><td style="padding:0 0 8px;">
+                    <p style="color:#25255a;font-size:13px;font-weight:bold;margin:0;letter-spacing:0.1em;text-transform:uppercase;">
+                      D&Eacute;TAILS DE LA COMMANDE
+                    </p>
+                  </td></tr>
+                  <tr><td>
+                    <p style="color:#344054;font-size:13px;margin:0;line-height:1.7;">
+                      R&eacute;f&eacute;rence : <strong>{DEMANDE_REF}</strong><br>
+                      Nombre de bons : <strong>{NOMBRE_BONS}</strong><br>
+                      Valeur unitaire : <strong>{VALEUR_UNITAIRE}</strong><br>
+                      Valeur totale : <strong>{VALEUR_TOTALE}</strong>
+                    </p>
+                  </td></tr>
+                </table>
+              </td></tr>
+            </table>
+
+            <!-- WARNING -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#fdf6e0;border:1px solid #f2c94c;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:14px 16px;">
+                <p style="color:#975a00;font-size:13px;margin:0;line-height:1.5;">
+                  &#9888;&#65039; <strong>Utilisation</strong> : chaque bon est &agrave; <strong>usage unique</strong>,
+                  non fractionnable, et doit &ecirc;tre utilis&eacute; avant la date d&apos;expiration.
+                  Toute copie ou tentative de fraude est strictement interdite.
+                </p>
+              </td></tr>
+            </table>
+
+            <p style="color:#344054;font-size:14px;margin:0 0 10px;">
+              Pour toute question concernant cette commande, contactez notre service client :
+            </p>
+            <p style="margin:0 0 18px;">
+              <a href="mailto:{SUPPORT_EMAIL}" style="color:#000099;text-decoration:underline;font-size:14px;">{SUPPORT_EMAIL}</a>
+            </p>
+            <p style="color:#667085;font-size:12px;margin:0;">
+              Ce message est g&eacute;n&eacute;r&eacute; automatiquement, merci de ne pas y r&eacute;pondre directement.
+            </p>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background-color:#f0f0f0;padding:20px 30px;border-top:1px solid #e0e0e0;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="padding:0 0 4px;">
+                <p style="color:#4a4a4a;font-size:12px;font-weight:bold;margin:0;">
+                  Intermart VMS &ndash; Syst&egrave;me de gestion de bons cadeaux
+                </p>
+              </td></tr>
+              <tr><td style="padding:4px 0 0;">
+                <p style="color:#666666;font-size:11px;margin:0;line-height:1.6;">
+                  {C_SYSTEME}<br>
+                  {C_SOCIETE} &bull; {C_ADRESSE}<br>
+                  <a href="https://{C_SITE}" style="color:#000099;text-decoration:underline;font-size:11px;">{C_SITE}</a>
+                </p>
+              </td></tr>
+              <tr><td style="padding:10px 0 0;">
+                <p style="color:#999999;font-size:11px;margin:0;">
+                  Ce message est confidentiel et &agrave; usage exclusif du destinataire.
+                  Toute utilisation, reproduction ou diffusion non autoris&eacute;e est strictement interdite.
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+""";
 
     /** Template 1 — Bons cadeaux envoyés au client */
     private static String buildVoucherTemplate(String clientName, String demandeRef,
                                                int nombreBons, double valeurTotale) {
-        String nbStr   = nombreBons + " bon" + (nombreBons > 1 ? "s" : "");
-        String pjStr   = nombreBons + " pièce" + (nombreBons > 1 ? "s" : "") +
-                         " jointe" + (nombreBons > 1 ? "s" : "");
-        return "<!DOCTYPE html>" +
-        "<html lang=\"fr\"><head>" +
-        "<meta charset=\"UTF-8\">" +
-        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\">" +
-        "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">" +
-        "<title>Vos bons cadeaux Intermart</title></head>" +
-        "<body style=\"margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;\">" +
-
-        // ── Wrapper ──
-        "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#f4f4f4;padding:20px 0;\">" +
-        "<tr><td align=\"center\">" +
-
-        // ── Container 600px ──
-        "<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" " +
-        "style=\"max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #dddddd;\">" +
-
-        // HEADER
-        "<tr><td style=\"background-color:#D2232D;padding:30px 30px 28px;text-align:center;\">" +
-        "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr><td align=\"center\">" +
-        "<h1 style=\"color:#ffffff;font-size:28px;margin:0;font-family:Georgia,serif;letter-spacing:3px;font-weight:bold;\">INTERMART</h1>" +
-        "<p style=\"color:#f8c8c8;font-size:13px;margin:8px 0 0;letter-spacing:1px;\">Système de gestion de bons cadeaux</p>" +
-        "</td></tr></table></td></tr>" +
-
-        // BODY
-        "<tr><td style=\"padding:32px 30px;\">" +
-        "<p style=\"color:#222222;font-size:16px;margin:0 0 14px;\">Bonjour <strong>" + escHtml(clientName) + "</strong>,</p>" +
-        "<p style=\"color:#555555;font-size:14px;line-height:1.75;margin:0 0 24px;\">" +
-        "Nous avons le plaisir de vous transmettre vos bons cadeaux Intermart pour la demande " +
-        "<strong>" + escHtml(demandeRef) + "</strong>. " +
-        "Vous trouverez <strong>" + nbStr + "</strong> en " + pjStr + " à cet email.</p>" +
-
-        // Info box
-        "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" " +
-        "style=\"background-color:#fff5f5;border-left:4px solid #D2232D;border-radius:4px;margin:0 0 20px;\">" +
-        "<tr><td style=\"padding:16px;\">" +
-        "<p style=\"color:#D2232D;font-size:13px;margin:0 0 10px;\"><strong>&#128203; Détails de votre commande</strong></p>" +
-        "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\">" +
-        "<tr><td style=\"color:#777777;font-size:13px;padding:3px 0;width:160px;\">Référence&nbsp;:</td>" +
-        "<td style=\"color:#222222;font-size:13px;font-weight:bold;\">" + escHtml(demandeRef) + "</td></tr>" +
-        "<tr><td style=\"color:#777777;font-size:13px;padding:3px 0;\">Nombre de bons&nbsp;:</td>" +
-        "<td style=\"color:#222222;font-size:13px;font-weight:bold;\">" + nombreBons + "</td></tr>" +
-        (valeurTotale > 0 ?
-        "<tr><td style=\"color:#777777;font-size:13px;padding:3px 0;\">Valeur totale&nbsp;:</td>" +
-        "<td style=\"color:#222222;font-size:13px;font-weight:bold;\">Rs " + String.format("%,.2f", valeurTotale) + "</td></tr>" : "") +
-        "</table></td></tr></table>" +
-
-        // Warning box
-        "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" " +
-        "style=\"background-color:#fff8e1;border-left:4px solid #f59e0b;border-radius:4px;margin:0 0 24px;\">" +
-        "<tr><td style=\"padding:14px;\">" +
-        "<p style=\"color:#78350f;font-size:13px;margin:0;line-height:1.6;\">" +
-        "&#9888;&#65039; Chaque bon est à <strong>usage unique</strong>, non fractionnable et lié à sa date de validité. " +
-        "Présentez le PDF imprimé ou sur écran en magasin pour validation.</p>" +
-        "</td></tr></table>" +
-
-        "<p style=\"color:#555555;font-size:14px;line-height:1.6;margin:0 0 6px;\">Pour toute question, contactez-nous à " +
-        "<a href=\"mailto:support@intermart.mu\" style=\"color:#D2232D;text-decoration:none;\">support@intermart.mu</a></p>" +
-        "<p style=\"color:#555555;font-size:14px;margin:18px 0 0;\">Cordialement,<br><strong>L'équipe Intermart Maurice</strong></p>" +
-        "</td></tr>" +
-
-        // FOOTER
-        "<tr><td style=\"background-color:#f8f9fa;padding:18px 30px;text-align:center;border-top:1px solid #eeeeee;\">" +
-        "<p style=\"color:#aaaaaa;font-size:11px;margin:0;line-height:1.6;\">" +
-        "&#169; 2026 Intermart Maurice &#8212; Email généré automatiquement, merci de ne pas répondre.<br>" +
-        "Intermart Maurice Ltd &#8226; Port-Louis, Île Maurice</p>" +
-        "</td></tr></table>" + // Container
-
-        "</td></tr></table>" + // Wrapper
-        "</body></html>";
+        String nbPj = nombreBons + " bon" + (nombreBons > 1 ? "s" : "") +
+                     " (" + nombreBons + " pièce" + (nombreBons > 1 ? "s" : "") + " jointe" + (nombreBons > 1 ? "s" : "") + ")";
+        return fill(TPL_VOUCHER,
+            "{CLIENT_NAME}",     escHtml(clientName),
+            "{DEMANDE_REF}",     escHtml(demandeRef),
+            "{NOMBRE_BONS}",     String.valueOf(nombreBons),
+            "{VALEUR_UNITAIRE}", "&mdash;",
+            "{VALEUR_TOTALE}",   montant(valeurTotale),
+            "{NB_PJ}",           nbPj,
+            "{SUPPORT_EMAIL}",   C_SUPPORT,
+            "{C_SYSTEME}",       C_SYSTEME,
+            "{C_SOCIETE}",       C_SOCIETE,
+            "{C_ADRESSE}",       C_ADRESSE,
+            "{C_SITE}",          C_SITE
+        );
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TEMPLATE 2 RAW — Demande d'approbation (formelle #000099, workflow interne)
+    //  Adapté de la version "Enterprise / Grands comptes"
+    //  Variables : {APPROBATEUR_NAME} {DEMANDE_REF} {MONTANT_TOTAL}
+    // ─────────────────────────────────────────────────────────────────────────
+    private static final String TPL_APPROVAL = """
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Demande d&apos;approbation &ndash; Intermart VMS</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" border="0"
+             style="max-width:600px;width:100%;background-color:#ffffff;border-radius:4px;overflow:hidden;border:1px solid #e0e0e0;">
+
+        <!-- HEADER -->
+        <tr>
+          <td style="background-color:#000099;padding:24px 30px 20px;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td><h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">Intermart VMS</h1></td></tr>
+              <tr><td><p style="color:#e9e9ff;font-size:13px;margin:0;">Workflow d&apos;approbation &ndash; Enterprise Solutions</p></td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <tr>
+          <td style="padding:30px;line-height:1.5;">
+            <p style="color:#1a1a1a;font-size:16px;font-weight:500;margin:0 0 14px;">
+              Bonjour <strong>{APPROBATEUR_NAME}</strong>,
+            </p>
+            <p style="color:#344054;font-size:14px;margin:0 0 18px;">
+              Nous vous informons qu&apos;une demande de bons cadeaux associ&eacute;e &agrave; la r&eacute;f&eacute;rence
+              <strong>{DEMANDE_REF}</strong> est en attente de votre approbation dans le syst&egrave;me VMS Intermart.
+            </p>
+
+            <!-- DETAILS BOX -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="border:1px solid #e0e0e0;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:16px 18px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr><td>
+                    <p style="color:#25255a;font-size:13px;font-weight:bold;margin:0;letter-spacing:0.1em;text-transform:uppercase;">
+                      D&Eacute;TAILS DE LA DEMANDE
+                    </p>
+                  </td></tr>
+                  <tr><td style="padding:8px 0 0;">
+                    <p style="color:#344054;font-size:13px;margin:0;line-height:1.7;">
+                      R&eacute;f&eacute;rence : <strong>{DEMANDE_REF}</strong><br>
+                      Montant total : <strong>{MONTANT_TOTAL}</strong><br>
+                      Statut : <strong>En attente d&apos;approbation</strong>
+                    </p>
+                  </td></tr>
+                </table>
+              </td></tr>
+            </table>
+
+            <!-- WARNING -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#fdf6e0;border:1px solid #f2c94c;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:14px 16px;">
+                <p style="color:#975a00;font-size:13px;margin:0;line-height:1.5;">
+                  &#9888;&#65039; <strong>Action requise</strong> : veuillez vous connecter &agrave; l&apos;application VMS
+                  pour approuver ou rejeter cette demande. Toute d&eacute;cision doit &ecirc;tre trac&eacute;e dans le syst&egrave;me.
+                </p>
+              </td></tr>
+            </table>
+
+            <p style="color:#344054;font-size:14px;margin:0 0 10px;">
+              Pour toute question technique ou administrative, contactez :
+            </p>
+            <p style="margin:0 0 18px;">
+              <a href="mailto:{ENTPR_EMAIL}" style="color:#000099;text-decoration:underline;font-size:14px;">{ENTPR_EMAIL}</a>
+            </p>
+            <p style="color:#667085;font-size:12px;margin:0;">
+              Ce message est g&eacute;n&eacute;r&eacute; automatiquement dans le cadre du workflow VMS. Merci de ne pas y r&eacute;pondre directement.
+            </p>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background-color:#f0f0f0;padding:20px 30px;border-top:1px solid #e0e0e0;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="padding:0 0 4px;">
+                <p style="color:#4a4a4a;font-size:12px;font-weight:bold;margin:0;">
+                  Intermart VMS &ndash; Workflow &amp; Gestion des Bons Cadeaux
+                </p>
+              </td></tr>
+              <tr><td style="padding:4px 0 0;">
+                <p style="color:#666666;font-size:11px;margin:0;line-height:1.6;">
+                  {C_SYSTEME}<br>
+                  {C_SOCIETE} &bull; {C_ADRESSE}<br>
+                  <a href="https://{C_SITE}" style="color:#000099;text-decoration:underline;font-size:11px;">{C_SITE}</a>
+                </p>
+              </td></tr>
+              <tr><td style="padding:10px 0 0;">
+                <p style="color:#999999;font-size:11px;margin:0;">
+                  Ce message est confidentiel et &agrave; usage exclusif de l&apos;organisation destinataire.
+                  Toute utilisation, reproduction ou diffusion non autoris&eacute;e est strictement interdite.
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+""";
 
     /** Template 2 — Demande d'approbation (pour l'approbateur) */
     private static String buildApprovalTemplate(String approbateurName, String demandeRef,
                                                 double montantTotal) {
-        return "<!DOCTYPE html>" +
-        "<html lang=\"fr\"><head>" +
-        "<meta charset=\"UTF-8\">" +
-        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\">" +
-        "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">" +
-        "<title>Demande d'approbation — VMS</title></head>" +
-        "<body style=\"margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;\">" +
-        "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#f4f4f4;padding:20px 0;\">" +
-        "<tr><td align=\"center\">" +
-        "<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" " +
-        "style=\"max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #dddddd;\">" +
-
-        // HEADER orange
-        "<tr><td style=\"background-color:#f59e0b;padding:28px 30px;text-align:center;\">" +
-        "<h1 style=\"color:#ffffff;font-size:22px;margin:0;font-weight:bold;\">&#128203; Action requise</h1>" +
-        "<p style=\"color:#fef3c7;font-size:13px;margin:8px 0 0;\">Demande en attente de votre approbation — VMS Intermart</p>" +
-        "</td></tr>" +
-
-        "<tr><td style=\"padding:30px;\">" +
-        "<p style=\"color:#222222;font-size:16px;margin:0 0 14px;\">Bonjour" +
-        (!approbateurName.isBlank() ? " <strong>" + escHtml(approbateurName) + "</strong>" : "") + ",</p>" +
-        "<p style=\"color:#555555;font-size:14px;line-height:1.75;margin:0 0 22px;\">" +
-        "Une nouvelle demande de bons cadeaux requiert votre approbation dans le système VMS Intermart.</p>" +
-
-        // Details
-        "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" " +
-        "style=\"background-color:#fffbeb;border-left:4px solid #f59e0b;border-radius:4px;margin:0 0 22px;\">" +
-        "<tr><td style=\"padding:16px;\">" +
-        "<p style=\"color:#92400e;font-size:13px;margin:0 0 10px;\"><strong>&#128203; Informations de la demande</strong></p>" +
-        "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\">" +
-        "<tr><td style=\"color:#777777;font-size:13px;padding:3px 0;width:160px;\">Référence&nbsp;:</td>" +
-        "<td style=\"color:#222222;font-size:13px;font-weight:bold;\">" + escHtml(demandeRef) + "</td></tr>" +
-        (montantTotal > 0 ?
-        "<tr><td style=\"color:#777777;font-size:13px;padding:3px 0;\">Montant total&nbsp;:</td>" +
-        "<td style=\"color:#222222;font-size:13px;font-weight:bold;\">Rs " + String.format("%,.2f", montantTotal) + "</td></tr>" : "") +
-        "</table></td></tr></table>" +
-
-        "<p style=\"color:#555555;font-size:14px;line-height:1.6;margin:0 0 14px;\">" +
-        "Connectez-vous à l'application VMS pour approuver ou rejeter cette demande.</p>" +
-        "<p style=\"color:#555555;font-size:14px;margin:16px 0 0;\">Cordialement,<br><strong>Système VMS Intermart</strong></p>" +
-        "</td></tr>" +
-
-        "<tr><td style=\"background-color:#f8f9fa;padding:18px 30px;text-align:center;border-top:1px solid #eeeeee;\">" +
-        "<p style=\"color:#aaaaaa;font-size:11px;margin:0;\">&#169; 2026 Intermart Maurice &#8212; Email automatique VMS</p>" +
-        "</td></tr></table></td></tr></table></body></html>";
+        String nom = (approbateurName != null && !approbateurName.isBlank())
+                     ? escHtml(approbateurName) : "Madame, Monsieur";
+        return fill(TPL_APPROVAL,
+            "{APPROBATEUR_NAME}", nom,
+            "{DEMANDE_REF}",      escHtml(demandeRef),
+            "{MONTANT_TOTAL}",    montant(montantTotal),
+            "{ENTPR_EMAIL}",      C_ENTPR,
+            "{C_SYSTEME}",        C_SYSTEME,
+            "{C_SOCIETE}",        C_SOCIETE,
+            "{C_ADRESSE}",        C_ADRESSE,
+            "{C_SITE}",           C_SITE
+        );
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TEMPLATE 3 RAW — Confirmation de paiement (#0066cc, notice client)
+    //  Adapté de la version "Notice client simple et polie"
+    //  Variables : {COMPTABLE_NAME} {DEMANDE_REF}
+    // ─────────────────────────────────────────────────────────────────────────
+    private static final String TPL_PAYMENT = """
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Confirmation de paiement &ndash; Intermart VMS</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" border="0"
+             style="max-width:600px;width:100%;background-color:#ffffff;border-radius:4px;overflow:hidden;border:1px solid #e0e0e0;">
+
+        <!-- HEADER -->
+        <tr>
+          <td style="background-color:#0066cc;padding:24px 30px 18px;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td><h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">Intermart VMS</h1></td></tr>
+              <tr><td><p style="color:#d9edf7;font-size:13px;margin:0;">Confirmation de validation de paiement</p></td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <tr>
+          <td style="padding:30px;line-height:1.5;">
+            <p style="color:#1a1a1a;font-size:16px;font-weight:500;margin:0 0 14px;">
+              Bonjour <strong>{COMPTABLE_NAME}</strong>,
+            </p>
+            <p style="color:#344054;font-size:14px;margin:0 0 18px;">
+              Nous vous confirmons que le paiement associ&eacute; &agrave; la demande
+              <strong>{DEMANDE_REF}</strong> a &eacute;t&eacute; valid&eacute; avec succ&egrave;s dans le syst&egrave;me VMS Intermart.
+            </p>
+
+            <!-- DETAILS BOX -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="border:1px solid #e0e0e0;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:16px 18px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr><td>
+                    <p style="color:#25255a;font-size:13px;font-weight:bold;margin:0;letter-spacing:0.1em;text-transform:uppercase;">
+                      PAIEMENT VALID&Eacute;
+                    </p>
+                  </td></tr>
+                  <tr><td style="padding:8px 0 0;">
+                    <p style="color:#344054;font-size:13px;margin:0;line-height:1.7;">
+                      R&eacute;f&eacute;rence : <strong>{DEMANDE_REF}</strong><br>
+                      Statut : <strong>Paiement confirm&eacute;</strong><br>
+                      Prochaine &eacute;tape : <strong>En attente d&apos;approbation</strong>
+                    </p>
+                  </td></tr>
+                </table>
+              </td></tr>
+            </table>
+
+            <!-- INFO CLIENT -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#f0f7ff;border:1px solid #0066cc;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:14px 16px;">
+                <p style="color:#003d7a;font-size:13px;margin:0;line-height:1.5;">
+                  &#10003; La demande peut d&eacute;sormais &ecirc;tre soumise &agrave; l&apos;approbateur d&eacute;sign&eacute;.
+                  Connectez-vous &agrave; VMS pour suivre l&apos;&eacute;volution du dossier.
+                </p>
+              </td></tr>
+            </table>
+
+            <p style="color:#344054;font-size:14px;margin:0 0 10px;">
+              Pour toute question ou assistance, contactez le support VMS :
+            </p>
+            <p style="margin:0 0 18px;">
+              <a href="mailto:{ENTPR_EMAIL}" style="color:#0066cc;text-decoration:underline;font-size:14px;">{ENTPR_EMAIL}</a>
+            </p>
+            <p style="color:#667085;font-size:12px;margin:0;">
+              Ce message est g&eacute;n&eacute;r&eacute; automatiquement. Merci de ne pas y r&eacute;pondre directement.
+            </p>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background-color:#f0f0f0;padding:20px 30px;border-top:1px solid #e0e0e0;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="padding:0 0 4px;">
+                <p style="color:#4a4a4a;font-size:12px;font-weight:bold;margin:0;">
+                  Intermart VMS &ndash; Syst&egrave;me de gestion de bons cadeaux
+                </p>
+              </td></tr>
+              <tr><td style="padding:4px 0 0;">
+                <p style="color:#666666;font-size:11px;margin:0;line-height:1.6;">
+                  {C_SYSTEME}<br>
+                  {C_SOCIETE} &bull; {C_ADRESSE}<br>
+                  <a href="https://{C_SITE}" style="color:#0066cc;text-decoration:underline;font-size:11px;">{C_SITE}</a>
+                </p>
+              </td></tr>
+              <tr><td style="padding:10px 0 0;">
+                <p style="color:#999999;font-size:11px;margin:0;">
+                  Ce message est g&eacute;n&eacute;r&eacute; automatiquement. Merci de ne pas y r&eacute;pondre directement.
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+""";
 
     /** Template 3 — Confirmation de validation de paiement */
     private static String buildPaymentConfirmTemplate(String comptableName, String demandeRef) {
-        return "<!DOCTYPE html>" +
-        "<html lang=\"fr\"><head>" +
-        "<meta charset=\"UTF-8\">" +
-        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\">" +
-        "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">" +
-        "<title>Paiement validé — VMS</title></head>" +
-        "<body style=\"margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;\">" +
-        "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#f4f4f4;padding:20px 0;\">" +
-        "<tr><td align=\"center\">" +
-        "<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" " +
-        "style=\"max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #dddddd;\">" +
-
-        // HEADER vert
-        "<tr><td style=\"background-color:#16a34a;padding:28px 30px;text-align:center;\">" +
-        "<h1 style=\"color:#ffffff;font-size:22px;margin:0;font-weight:bold;\">&#9989; Paiement validé</h1>" +
-        "<p style=\"color:#bbf7d0;font-size:13px;margin:8px 0 0;\">Confirmation de validation — VMS Intermart</p>" +
-        "</td></tr>" +
-
-        "<tr><td style=\"padding:30px;\">" +
-        "<p style=\"color:#222222;font-size:16px;margin:0 0 14px;\">Bonjour" +
-        (!comptableName.isBlank() ? " <strong>" + escHtml(comptableName) + "</strong>" : "") + ",</p>" +
-        "<p style=\"color:#555555;font-size:14px;line-height:1.75;margin:0 0 22px;\">" +
-        "Le paiement pour la demande suivante a été validé avec succès dans VMS Intermart.</p>" +
-
-        "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" " +
-        "style=\"background-color:#f0fdf4;border-left:4px solid #16a34a;border-radius:4px;margin:0 0 22px;\">" +
-        "<tr><td style=\"padding:16px;\">" +
-        "<p style=\"color:#14532d;font-size:13px;margin:0 0 6px;\"><strong>&#128203; Référence validée</strong></p>" +
-        "<p style=\"color:#222222;font-size:16px;font-weight:bold;margin:0;\">" + escHtml(demandeRef) + "</p>" +
-        "</td></tr></table>" +
-
-        "<p style=\"color:#555555;font-size:14px;line-height:1.6;margin:0 0 14px;\">" +
-        "La demande peut désormais être traitée pour la génération des bons cadeaux.</p>" +
-        "<p style=\"color:#555555;font-size:14px;margin:16px 0 0;\">Cordialement,<br><strong>Système VMS Intermart</strong></p>" +
-        "</td></tr>" +
-
-        "<tr><td style=\"background-color:#f8f9fa;padding:18px 30px;text-align:center;border-top:1px solid #eeeeee;\">" +
-        "<p style=\"color:#aaaaaa;font-size:11px;margin:0;\">&#169; 2026 Intermart Maurice &#8212; Email automatique VMS</p>" +
-        "</td></tr></table></td></tr></table></body></html>";
+        String nom = (comptableName != null && !comptableName.isBlank())
+                     ? escHtml(comptableName) : "Madame, Monsieur";
+        return fill(TPL_PAYMENT,
+            "{COMPTABLE_NAME}", nom,
+            "{DEMANDE_REF}",   escHtml(demandeRef),
+            "{ENTPR_EMAIL}",   C_ENTPR,
+            "{C_SYSTEME}",     C_SYSTEME,
+            "{C_SOCIETE}",     C_SOCIETE,
+            "{C_ADRESSE}",     C_ADRESSE,
+            "{C_SITE}",        C_SITE
+        );
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TEMPLATE 4 RAW — Récapitulatif admin (#1e293b, confidentiel interne)
+    //  Adapté de la version "Enterprise" — usage administrateur uniquement
+    //  Variables : {DEMANDE_REF} {NOMBRE_BONS} {VALEUR_UNITAIRE} {VALEUR_TOTALE}
+    // ─────────────────────────────────────────────────────────────────────────
+    private static final String TPL_ADMIN_RECAP = """
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>R&eacute;capitulatif administrateur &ndash; Intermart VMS</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" border="0"
+             style="max-width:600px;width:100%;background-color:#ffffff;border-radius:4px;overflow:hidden;border:1px solid #e0e0e0;">
+
+        <!-- HEADER -->
+        <tr>
+          <td style="background-color:#1e293b;padding:24px 30px 20px;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td><h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">Intermart VMS</h1></td></tr>
+              <tr><td><p style="color:#94a3b8;font-size:13px;margin:0;">R&eacute;capitulatif administrateur &ndash; Usage confidentiel</p></td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <tr>
+          <td style="padding:30px;line-height:1.5;">
+            <p style="color:#344054;font-size:14px;margin:0 0 18px;">
+              La g&eacute;n&eacute;ration de bons cadeaux associ&eacute;e &agrave; la demande de r&eacute;f&eacute;rence
+              <strong>{DEMANDE_REF}</strong> est termin&eacute;e. Le r&eacute;capitulatif PDF est joint &agrave; cet email.
+            </p>
+
+            <!-- DETAILS BOX -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="border:1px solid #e0e0e0;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:16px 18px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr><td>
+                    <p style="color:#25255a;font-size:13px;font-weight:bold;margin:0;letter-spacing:0.1em;text-transform:uppercase;">
+                      D&Eacute;TAILS DE LA G&Eacute;N&Eacute;RATION
+                    </p>
+                  </td></tr>
+                  <tr><td style="padding:8px 0 0;">
+                    <p style="color:#344054;font-size:13px;margin:0;line-height:1.7;">
+                      R&eacute;f&eacute;rence : <strong>{DEMANDE_REF}</strong><br>
+                      Nombre de bons g&eacute;n&eacute;r&eacute;s : <strong>{NOMBRE_BONS}</strong><br>
+                      Valeur unitaire : <strong>{VALEUR_UNITAIRE}</strong><br>
+                      Valeur totale : <strong>{VALEUR_TOTALE}</strong><br>
+                      Bons envoy&eacute;s au client : <strong>Oui</strong>
+                    </p>
+                  </td></tr>
+                </table>
+              </td></tr>
+            </table>
+
+            <!-- WARNING -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#fdf6e0;border:1px solid #f2c94c;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:14px 16px;">
+                <p style="color:#975a00;font-size:13px;margin:0;line-height:1.5;">
+                  &#9888;&#65039; <strong>Confidentiel</strong> : ce r&eacute;capitulatif est r&eacute;serv&eacute; &agrave;
+                  l&apos;administrateur. Les bons g&eacute;n&eacute;r&eacute;s sont actifs et op&eacute;rationnels.
+                  Toute anomalie doit &ecirc;tre signal&eacute;e imm&eacute;diatement.
+                </p>
+              </td></tr>
+            </table>
+
+            <p style="color:#667085;font-size:12px;margin:0;">
+              Ce message est g&eacute;n&eacute;r&eacute; automatiquement par le syst&egrave;me VMS. Merci de ne pas y r&eacute;pondre directement.
+            </p>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background-color:#f0f0f0;padding:20px 30px;border-top:1px solid #e0e0e0;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="padding:0 0 4px;">
+                <p style="color:#4a4a4a;font-size:12px;font-weight:bold;margin:0;">
+                  Intermart VMS &ndash; Administration &amp; Gestion des Bons
+                </p>
+              </td></tr>
+              <tr><td style="padding:4px 0 0;">
+                <p style="color:#666666;font-size:11px;margin:0;line-height:1.6;">
+                  {C_SYSTEME}<br>
+                  {C_SOCIETE} &bull; {C_ADRESSE}
+                </p>
+              </td></tr>
+              <tr><td style="padding:10px 0 0;">
+                <p style="color:#999999;font-size:11px;margin:0;">
+                  Ce message est confidentiel et &agrave; usage exclusif de l&apos;organisation destinataire.
+                  Toute utilisation, reproduction ou diffusion non autoris&eacute;e est strictement interdite.
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+""";
 
     /** Template 4 — Récapitulatif admin après génération des bons */
     private static String buildAdminRecapTemplate(String demandeRef, int nombreBons,
                                                   double valeurUnitaire, double valeurTotale) {
-        return "<!DOCTYPE html>" +
-        "<html lang=\"fr\"><head>" +
-        "<meta charset=\"UTF-8\">" +
-        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\">" +
-        "<meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">" +
-        "<title>Récapitulatif génération — VMS Admin</title></head>" +
-        "<body style=\"margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;\">" +
-        "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#f4f4f4;padding:20px 0;\">" +
-        "<tr><td align=\"center\">" +
-        "<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" " +
-        "style=\"max-width:600px;width:100%;background-color:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #dddddd;\">" +
-
-        // HEADER gris foncé
-        "<tr><td style=\"background-color:#1e293b;padding:28px 30px;text-align:center;\">" +
-        "<h1 style=\"color:#ffffff;font-size:22px;margin:0;font-weight:bold;\">&#128196; Récapitulatif Admin</h1>" +
-        "<p style=\"color:#94a3b8;font-size:13px;margin:8px 0 0;\">Génération de bons cadeaux terminée — VMS Intermart</p>" +
-        "</td></tr>" +
-
-        "<tr><td style=\"padding:30px;\">" +
-        "<p style=\"color:#222222;font-size:15px;margin:0 0 20px;\">" +
-        "La génération de bons pour la demande <strong>" + escHtml(demandeRef) + "</strong> est terminée.</p>" +
-
-        // Tableau des stats
-        "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"border-collapse:collapse;margin:0 0 22px;\">" +
-        "<tr style=\"background-color:#1e293b;\">" +
-        "<th style=\"color:#ffffff;font-size:12px;text-align:left;padding:10px 14px;font-weight:bold;\">Paramètre</th>" +
-        "<th style=\"color:#ffffff;font-size:12px;text-align:right;padding:10px 14px;font-weight:bold;\">Valeur</th></tr>" +
-        "<tr style=\"background-color:#f8fafc;\">" +
-        "<td style=\"color:#555555;font-size:13px;padding:10px 14px;border-bottom:1px solid #e2e8f0;\">Référence</td>" +
-        "<td style=\"color:#222222;font-size:13px;font-weight:bold;text-align:right;padding:10px 14px;border-bottom:1px solid #e2e8f0;\">" + escHtml(demandeRef) + "</td></tr>" +
-        "<tr>" +
-        "<td style=\"color:#555555;font-size:13px;padding:10px 14px;border-bottom:1px solid #e2e8f0;\">Bons générés</td>" +
-        "<td style=\"color:#222222;font-size:13px;font-weight:bold;text-align:right;padding:10px 14px;border-bottom:1px solid #e2e8f0;\">" + nombreBons + "</td></tr>" +
-        (valeurUnitaire > 0 ?
-        "<tr style=\"background-color:#f8fafc;\"><td style=\"color:#555555;font-size:13px;padding:10px 14px;border-bottom:1px solid #e2e8f0;\">Valeur unitaire</td>" +
-        "<td style=\"color:#222222;font-size:13px;font-weight:bold;text-align:right;padding:10px 14px;border-bottom:1px solid #e2e8f0;\">Rs " + String.format("%,.2f", valeurUnitaire) + "</td></tr>" : "") +
-        (valeurTotale > 0 ?
-        "<tr><td style=\"color:#555555;font-size:14px;padding:12px 14px;font-weight:bold;\">Montant total</td>" +
-        "<td style=\"color:#D2232D;font-size:15px;font-weight:bold;text-align:right;padding:12px 14px;\">Rs " + String.format("%,.2f", valeurTotale) + "</td></tr>" : "") +
-        "</table>" +
-
-        "<p style=\"color:#555555;font-size:13px;line-height:1.6;margin:0;\">Le PDF récapitulatif est joint à cet email. Les bons ont été envoyés au client.</p>" +
-        "</td></tr>" +
-
-        "<tr><td style=\"background-color:#f8f9fa;padding:18px 30px;text-align:center;border-top:1px solid #eeeeee;\">" +
-        "<p style=\"color:#aaaaaa;font-size:11px;margin:0;\">" +
-        "&#169; 2026 Intermart Maurice &#8212; Email automatique VMS Admin<br>" +
-        "Cet email est confidentiel &#8212; destiné à l'administrateur uniquement.</p>" +
-        "</td></tr></table></td></tr></table></body></html>";
+        return fill(TPL_ADMIN_RECAP,
+            "{DEMANDE_REF}",     escHtml(demandeRef),
+            "{NOMBRE_BONS}",     String.valueOf(nombreBons),
+            "{VALEUR_UNITAIRE}", montant(valeurUnitaire),
+            "{VALEUR_TOTALE}",   montant(valeurTotale),
+            "{C_SYSTEME}",       C_SYSTEME,
+            "{C_SOCIETE}",       C_SOCIETE,
+            "{C_ADRESSE}",       C_ADRESSE,
+            "{C_SITE}",          C_SITE
+        );
     }
 
     /**
