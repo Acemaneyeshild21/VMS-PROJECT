@@ -1,14 +1,37 @@
 package pkg.vms.DAO;
 
 import org.mindrot.jbcrypt.BCrypt;
+import pkg.vms.Roles;
 
 import java.sql.*;
 import java.util.*;
 
 public class UserDAO {
 
+    // ── Fix A : ensemble des rôles valides défini une seule fois depuis Roles.java ──
+    // Toute valeur hors de cet ensemble est rejetée AVANT d'atteindre la base,
+    // ce qui garantit la cohérence même si la contrainte CHECK SQL est désactivée.
+    private static final Set<String> ROLES_VALIDES = Set.of(
+        Roles.ADMIN_SIEGE,
+        Roles.COMPTABLE,
+        Roles.APPROBATEUR,
+        Roles.SUPERVISEUR_MAGASIN,
+        Roles.MANAGER,
+        Roles.COLLABORATEUR
+    );
+
+    /** Vérifie qu'un rôle est dans la liste blanche. Lève IllegalArgumentException si invalide. */
+    private static void validerRole(String role) {
+        if (role == null || !ROLES_VALIDES.contains(role)) {
+            throw new IllegalArgumentException(
+                "Rôle invalide : \"" + role + "\". Valeurs acceptées : " + ROLES_VALIDES
+            );
+        }
+    }
+
     // ==================== REGISTRATION ====================
     public static boolean registerUser(String username, String email, String password, String role) throws SQLException {
+        validerRole(role); // Fix A — rejet avant INSERT
         String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
         String query = "INSERT INTO utilisateur (username, email, password, role) VALUES (?, ?, ?, ?) RETURNING userid";
         try (Connection conn = DBconnect.getConnection();
@@ -139,6 +162,7 @@ public class UserDAO {
     }
 
     public static boolean updateUserRole(int userId, String newRole) throws SQLException {
+        validerRole(newRole); // Fix A — rejet avant UPDATE
         String query = "UPDATE utilisateur SET role = ? WHERE userid = ?";
         try (Connection conn = DBconnect.getConnection();
              PreparedStatement ps = conn.prepareStatement(query)) {
@@ -155,17 +179,25 @@ public class UserDAO {
     }
 
     // ==================== ROLES ====================
-    public static List<String> getAllRoles() throws SQLException {
-        List<String> roles = new ArrayList<>();
-        String query = "SELECT DISTINCT role FROM utilisateur WHERE role IS NOT NULL";
-        try (Connection conn = DBconnect.getConnection();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(query)) {
-            while (rs.next()) {
-                roles.add(rs.getString("role"));
-            }
-        }
-        return roles;
+    /**
+     * Fix C — Retourne la liste des rôles depuis les constantes {@link Roles},
+     * et non depuis la base de données.
+     *
+     * <p>L'ancienne version faisait un {@code SELECT DISTINCT role FROM utilisateur},
+     * ce qui permettait à n'importe qui ayant un accès DB direct d'insérer un rôle
+     * fictif et de le voir apparaître dans la liste. Désormais la liste est figée
+     * par le code source et correspond exactement à la liste blanche {@code ROLES_VALIDES}.</p>
+     */
+    public static List<String> getAllRoles() {
+        // Ordre d'affichage UX : du plus privilégié au moins privilégié
+        return List.of(
+            Roles.ADMIN_SIEGE,
+            Roles.MANAGER,
+            Roles.COMPTABLE,
+            Roles.APPROBATEUR,
+            Roles.SUPERVISEUR_MAGASIN,
+            Roles.COLLABORATEUR
+        );
     }
 
     // ==================== MODEL ====================

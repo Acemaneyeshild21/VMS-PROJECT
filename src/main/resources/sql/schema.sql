@@ -45,9 +45,16 @@ CREATE TABLE IF NOT EXISTS utilisateur (
     ))
 );
 
+-- Fix B — Colonnes de verrouillage de compte (migration douce : IF NOT EXISTS)
+-- tentatives_echec : compteur réinitialisé à 0 à chaque connexion réussie
+-- verrouille_jusqua : NULL = compte actif, sinon timestamp de fin de verrou
+ALTER TABLE utilisateur
+    ADD COLUMN IF NOT EXISTS tentatives_echec   INTEGER   NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS verrouille_jusqua  TIMESTAMP          DEFAULT NULL;
+
 -- FK différée : superviseur_id dans magasin → utilisateur (créé après magasin)
 ALTER TABLE magasin
-    ADD CONSTRAINT fk_magasin_superviseur
+    ADD CONSTRAINT IF NOT EXISTS fk_magasin_superviseur
     FOREIGN KEY (superviseur_id) REFERENCES utilisateur(userid);
 
 -- Clients (bénéficiaires des bons)
