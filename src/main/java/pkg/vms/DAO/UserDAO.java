@@ -88,6 +88,28 @@ public class UserDAO {
         return false;
     }
 
+    /**
+     * Réinitialise le mot de passe directement (flux "mot de passe oublié" avec OTP validé).
+     * Ne vérifie PAS l'ancien mot de passe — appeler SEULEMENT après validation OTP.
+     */
+    public static boolean resetPasswordDirect(int userId, String newPassword) throws SQLException {
+        String hash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+        String sql  = "UPDATE utilisateur SET password = ?, tentatives_echec = 0, "
+                    + "verrouille_jusqua = NULL WHERE userid = ?";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, hash);
+            ps.setInt(2, userId);
+            int rows = ps.executeUpdate();
+            if (rows > 0) {
+                AuditDAO.logSimple("utilisateur", userId, "RESET_PASSWORD_OK", userId,
+                        "Mot de passe réinitialisé via OTP");
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ==================== PROFILE MANAGEMENT ====================
     public static UserProfile getUserProfile(int userId) throws SQLException {
         String query = "SELECT userid, username, email, role FROM utilisateur WHERE userid = ?";

@@ -168,11 +168,7 @@ public class LoginView {
     }
 
     private void showResetDialog() {
-        Alert a = new Alert(Alert.AlertType.INFORMATION,
-            "La réinitialisation par OTP sera disponible prochainement.", ButtonType.OK);
-        a.setTitle("Mot de passe oublié");
-        a.setHeaderText("Réinitialisation");
-        a.showAndWait();
+        new ForgotPasswordDialog(stage).show();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

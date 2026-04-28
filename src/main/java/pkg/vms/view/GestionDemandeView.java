@@ -278,10 +278,82 @@ public class GestionDemandeView {
             }
         }
 
+        // Voir les bons — disponible si bons générés
+        if ("GENERE".equals(statut) || "ENVOYE".equals(statut) || "ARCHIVE".equals(statut)) {
+            if (!menu.getItems().isEmpty()) menu.getItems().add(new SeparatorMenuItem());
+            MenuItem mBons = new MenuItem("🎟 Voir les bons");
+            mBons.setOnAction(e -> showBonsDialog(id, ref));
+            menu.getItems().add(mBons);
+        }
+
         if (!menu.getItems().isEmpty()) {
             menu.show(table, javafx.geometry.Side.RIGHT, 0, 0);
         }
     }
+
+    private void showBonsDialog(int demandeId, String ref) {
+        javafx.concurrent.Task<java.util.List<pkg.vms.DAO.BonDAO.BonInfo>> task = new javafx.concurrent.Task<>() {
+            @Override protected java.util.List<pkg.vms.DAO.BonDAO.BonInfo> call() throws Exception {
+                return pkg.vms.DAO.BonDAO.getBonsByDemande(demandeId);
+            }
+        };
+        task.setOnSucceeded(ev -> {
+            java.util.List<pkg.vms.DAO.BonDAO.BonInfo> bons = task.getValue();
+            if (bons.isEmpty()) { showInfo("Aucun bon trouvé pour " + ref + "."); return; }
+
+            javafx.stage.Stage s = new javafx.stage.Stage();
+            s.initModality(javafx.stage.Modality.WINDOW_MODAL);
+            s.initOwner(table.getScene().getWindow());
+            s.setTitle("Bons de la demande " + ref + " (" + bons.size() + " bon(s))");
+            s.setWidth(640); s.setHeight(400);
+
+            javafx.collections.ObservableList<pkg.vms.DAO.BonDAO.BonInfo> rows =
+                javafx.collections.FXCollections.observableArrayList(bons);
+            @SuppressWarnings("unchecked")
+            TableView<pkg.vms.DAO.BonDAO.BonInfo> tbl = new TableView<>(rows);
+            tbl.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+            TableColumn<pkg.vms.DAO.BonDAO.BonInfo, String> cCode = new TableColumn<>("Code");
+            cCode.setCellValueFactory(p -> new SimpleStringProperty(p.getValue().codeUnique));
+            cCode.setPrefWidth(200);
+
+            TableColumn<pkg.vms.DAO.BonDAO.BonInfo, String> cVal = new TableColumn<>("Valeur");
+            cVal.setCellValueFactory(p -> new SimpleStringProperty("Rs " + String.format("%,.2f", p.getValue().valeur)));
+            cVal.setPrefWidth(100);
+
+            TableColumn<pkg.vms.DAO.BonDAO.BonInfo, String> cStat = new TableColumn<>("Statut");
+            cStat.setCellValueFactory(p -> new SimpleStringProperty(p.getValue().statut));
+            cStat.setPrefWidth(110);
+
+            TableColumn<pkg.vms.DAO.BonDAO.BonInfo, String> cExpir = new TableColumn<>("Expiration");
+            cExpir.setCellValueFactory(p -> new SimpleStringProperty(nvl(p.getValue().dateExpiration)));
+            cExpir.setPrefWidth(130);
+
+            TableColumn<pkg.vms.DAO.BonDAO.BonInfo, String> cDetail = new TableColumn<>("Détail");
+            cDetail.setPrefWidth(90);
+            cDetail.setCellFactory(col -> new TableCell<>() {
+                final Button btn = new Button("🔍 QR");
+                { btn.setStyle("-fx-font-size:11;-fx-padding:4 8;-fx-background-color:#7c3aed;"
+                             + "-fx-text-fill:white;-fx-background-radius:6;-fx-cursor:hand;");
+                  btn.setOnAction(e -> new BonDetailDialog(getTableView().getItems().get(getIndex())).show(s));
+                }
+                @Override protected void updateItem(String v, boolean empty) {
+                    super.updateItem(v, empty);
+                    setGraphic(empty ? null : btn);
+                }
+            });
+
+            tbl.getColumns().addAll(cCode, cVal, cStat, cExpir, cDetail);
+
+            s.setScene(new javafx.scene.Scene(new BorderPane(tbl)));
+            s.centerOnScreen();
+            s.show();
+        });
+        task.setOnFailed(ev -> showErr("Erreur chargement bons : " + task.getException().getMessage()));
+        new Thread(task).start();
+    }
+
+    private String nvl(String x) { return x != null ? x : ""; }
 
     private void changerStatut(int id, String statut, String ref) {
         vCtrl.changerStatut(id, statut, session.userId,

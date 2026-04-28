@@ -117,16 +117,21 @@ public class GestionClientsView {
         });
 
         TableColumn<Client, String> cActions = new TableColumn<>("Actions");
-        cActions.setPrefWidth(150);
+        cActions.setPrefWidth(220);
         cActions.setCellFactory(col -> new TableCell<>() {
             final HBox btns = new HBox(6,
-                actionBtn("✏ Modifier", "#2563eb"),
-                actionBtn("🗑 Supprimer", "#dc2626")
+                actionBtn("👁 Fiche",     "#7c3aed"),
+                actionBtn("✏ Modifier",  "#2563eb"),
+                actionBtn("🗑 Supprimer","#dc2626")
             );
             {
-                ((Button)btns.getChildren().get(0)).setOnAction(e ->
-                    showFormDialog(getTableView().getItems().get(getIndex())));
+                ((Button)btns.getChildren().get(0)).setOnAction(e -> {
+                    Client c = getTableView().getItems().get(getIndex());
+                    new FicheClient360Dialog(c).show(table.getScene().getWindow() instanceof javafx.stage.Stage s ? s : null);
+                });
                 ((Button)btns.getChildren().get(1)).setOnAction(e ->
+                    showFormDialog(getTableView().getItems().get(getIndex())));
+                ((Button)btns.getChildren().get(2)).setOnAction(e ->
                     supprimerClient(getTableView().getItems().get(getIndex())));
             }
             @Override protected void updateItem(String v, boolean empty) {
