@@ -26,6 +26,8 @@ public class GestionClientsView {
     private TableView<Client>            table;
     private Label                        lblCount;
     private TextField                    tfSearch;
+    private VBox                         tableCard;
+    private pkg.vms.SkeletonPane         skeleton;
 
     public GestionClientsView(AuthDAO.UserSession session) { this.session = session; }
 
@@ -85,10 +87,15 @@ public class GestionClientsView {
 
     @SuppressWarnings("unchecked")
     private VBox buildTable() {
-        VBox card = new VBox(0);
-        card.setStyle("-fx-background-color:white;-fx-background-radius:12;"
+        tableCard = new VBox(0);
+        tableCard.setStyle("-fx-background-color:white;-fx-background-radius:12;"
                     + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.06),8,0,0,2);");
-        VBox.setVgrow(card, Priority.ALWAYS);
+        VBox.setVgrow(tableCard, Priority.ALWAYS);
+
+        // Skeleton affiché pendant le premier chargement
+        skeleton = new pkg.vms.SkeletonPane(8, 5);
+        VBox.setVgrow(skeleton, Priority.ALWAYS);
+        tableCard.getChildren().add(skeleton);
 
         table = new TableView<>(rows);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
@@ -141,7 +148,7 @@ public class GestionClientsView {
         });
 
         table.getColumns().addAll(cNom, cEmail, cTel, cSoc, cDate, cActif, cActions);
-        return card;
+        return tableCard;
     }
 
     private void loadData() {
@@ -149,7 +156,17 @@ public class GestionClientsView {
         ctrl.chargerClients(data -> {
             rows.setAll(data);
             lblCount.setText(data.size() + " client(s)");
-        }, err -> showErr(err));
+            showTable(); // remplace skeleton par la table
+        }, err -> { showTable(); showErr(err); });
+    }
+
+    /** Remplace le skeleton par la vraie table (idempotent). */
+    private void showTable() {
+        if (skeleton != null) {
+            skeleton.stop();
+            tableCard.getChildren().setAll(table);
+            skeleton = null;
+        }
     }
 
     private void rechercherClients(String q) {
