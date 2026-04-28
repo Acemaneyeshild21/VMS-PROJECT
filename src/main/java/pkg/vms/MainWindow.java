@@ -5,6 +5,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.image.Image;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.util.Duration;
@@ -83,6 +84,11 @@ public class MainWindow {
         } catch (Exception ignored) {}
 
         stage.setTitle("VoucherManager VMS — " + session.username);
+        // Favicon
+        try {
+            stage.getIcons().add(new Image(getClass().getResourceAsStream("/vms.ico")));
+        } catch (Exception ignored) {}
+
         stage.setScene(scene);
         stage.setMinWidth(1050);
         stage.setMinHeight(680);
@@ -341,7 +347,16 @@ public class MainWindow {
                 b.getStyleClass().add("nav-item-active");
             });
 
-        contentArea.getChildren().setAll(loadView(page));
+        // ── Transition fade out → charger → fade in ────────────────────────
+        FadeTransition out = new FadeTransition(Duration.millis(70), contentArea);
+        out.setFromValue(1.0); out.setToValue(0.0);
+        out.setOnFinished(e -> {
+            contentArea.getChildren().setAll(loadView(page));
+            FadeTransition in = new FadeTransition(Duration.millis(160), contentArea);
+            in.setFromValue(0.0); in.setToValue(1.0);
+            in.play();
+        });
+        out.play();
     }
 
     private java.util.stream.Stream<Button> allNavButtons() {
@@ -376,12 +391,38 @@ public class MainWindow {
     // ── Logout ───────────────────────────────────────────────────────────────
 
     private void logout() {
-        Alert alert = new Alert(Alert.AlertType.CONFIRMATION,
-            "Voulez-vous vous déconnecter ?", ButtonType.YES, ButtonType.NO);
-        alert.setTitle("Déconnexion");
-        alert.setHeaderText("Confirmer la déconnexion");
-        alert.showAndWait().ifPresent(r -> {
-            if (r == ButtonType.YES) new LoginView(stage).show();
+        // Dialog custom plus sobre qu'une Alert système
+        Dialog<ButtonType> dlg = new Dialog<>();
+        dlg.setTitle("Déconnexion");
+
+        ButtonType btnOui = new ButtonType("Déconnecter", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+        ButtonType btnNon = new ButtonType("Annuler",     javafx.scene.control.ButtonBar.ButtonData.CANCEL_CLOSE);
+        dlg.getDialogPane().getButtonTypes().addAll(btnOui, btnNon);
+
+        VBox content = new VBox(12);
+        content.setPadding(new Insets(20, 24, 8, 24));
+        Label ico  = new Label("↩");
+        ico.setStyle("-fx-font-size:32;-fx-text-fill:#dc2626;");
+        Label msg  = new Label("Voulez-vous vous déconnecter ?");
+        msg.setStyle("-fx-font-size:14;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
+        Label sub  = new Label("Vous serez redirigé vers l'écran de connexion.");
+        sub.setStyle("-fx-font-size:12;-fx-text-fill:#64748b;");
+        content.getChildren().addAll(ico, msg, sub);
+        content.setAlignment(Pos.CENTER_LEFT);
+
+        dlg.getDialogPane().setContent(content);
+        dlg.getDialogPane().setHeader(null);
+
+        // Style le bouton Déconnecter en rouge
+        javafx.application.Platform.runLater(() -> {
+            var okBtn = dlg.getDialogPane().lookupButton(btnOui);
+            if (okBtn != null) okBtn.setStyle(
+                "-fx-background-color:#dc2626;-fx-text-fill:white;-fx-font-weight:bold;"
+                + "-fx-background-radius:8;-fx-padding:8 16;-fx-cursor:hand;");
+        });
+
+        dlg.showAndWait().ifPresent(r -> {
+            if (r == btnOui) new LoginView(stage).show();
         });
     }
 

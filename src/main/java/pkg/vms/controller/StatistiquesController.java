@@ -18,6 +18,12 @@ public class StatistiquesController {
         public double montantTotal;
         public int bonsActifs;
         public double tauxRedemption;
+        // Tendances (champs complémentaires pour le Dashboard)
+        public int demandesAttente     = 0;
+        public int demandesApprouvees  = 0;
+        public int bonsExpirant30j     = 0;
+        public int redemptionsToday    = 0;
+        // Listes de détail
         public List<Object[]> statutRows        = new ArrayList<>();
         public List<Object[]> auditRows         = new ArrayList<>();
         public List<Object[]> topClientsRows    = new ArrayList<>();
@@ -39,6 +45,14 @@ public class StatistiquesController {
                     data.tauxRedemption = StatistiquesDAO.getTauxRedemption();
                     data.statutRows     = StatistiquesDAO.getStatsByStatut();
                     data.topClientsRows = StatistiquesDAO.getTopClients(5);
+
+                    // Compter EN_ATTENTE et APPROUVE depuis statutRows
+                    for (Object[] r : data.statutRows) {
+                        String s = String.valueOf(r[0]);
+                        int cnt  = ((Number) r[1]).intValue();
+                        if ("EN_ATTENTE_PAIEMENT".equals(s)) data.demandesAttente    = cnt;
+                        if ("APPROUVE".equals(s))             data.demandesApprouvees = cnt;
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -68,6 +82,7 @@ public class StatistiquesController {
                             bon.get("Client"), bon.get("Expiration"), bon.get("Jours Restants")
                         });
                     }
+                    data.bonsExpirant30j = data.bonsExpirationRows.size();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

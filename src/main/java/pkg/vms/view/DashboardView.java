@@ -17,10 +17,16 @@ public class DashboardView {
     private final StatistiquesController   ctrl = new StatistiquesController();
 
     // KPI labels (mis à jour après chargement async)
-    private final Label kpiDemandes = new Label("—");
-    private final Label kpiMontant  = new Label("—");
-    private final Label kpiBons     = new Label("—");
-    private final Label kpiTaux     = new Label("—");
+    private final Label kpiDemandes      = new Label("—");
+    private final Label kpiMontant       = new Label("—");
+    private final Label kpiBons          = new Label("—");
+    private final Label kpiTaux          = new Label("—");
+
+    // KPI tendances
+    private final Label kpiDemandesTrend = new Label("…");
+    private final Label kpiMontantTrend  = new Label("…");
+    private final Label kpiBonsTrend     = new Label("…");
+    private final Label kpiTauxTrend     = new Label("…");
 
     @SuppressWarnings("unchecked")
     private final TableView<String[]> tblAudit = new TableView<>();
@@ -85,16 +91,16 @@ public class DashboardView {
 
     private HBox buildKpiRow() {
         HBox row = new HBox(16,
-            kpiCard(kpiDemandes, "Demandes",      "Total créées",        "#2563eb"),
-            kpiCard(kpiMontant,  "Montant total", "Rs — Valeur émise",   "#16a34a"),
-            kpiCard(kpiBons,     "Bons actifs",   "En circulation",      "#d97706"),
-            kpiCard(kpiTaux,     "Taux valid.",   "Bons rédemptés / émis","#7c3aed")
+            kpiCard(kpiDemandes, kpiDemandesTrend, "Demandes",      "Total créées",         "#2563eb"),
+            kpiCard(kpiMontant,  kpiMontantTrend,  "Montant total", "Rs — Valeur émise",    "#16a34a"),
+            kpiCard(kpiBons,     kpiBonsTrend,      "Bons actifs",   "En circulation",       "#d97706"),
+            kpiCard(kpiTaux,     kpiTauxTrend,      "Taux valid.",   "Bons rédemptés / émis","#7c3aed")
         );
         row.setFillHeight(true);
         return row;
     }
 
-    private VBox kpiCard(Label valLbl, String title, String desc, String color) {
+    private VBox kpiCard(Label valLbl, Label trendLbl, String title, String desc, String color) {
         VBox card = new VBox(0);
         card.setStyle(
             "-fx-background-color:white;-fx-background-radius:12;"
@@ -123,17 +129,10 @@ public class DashboardView {
         Label dsc = new Label(desc);
         dsc.setStyle("-fx-font-size:11;-fx-text-fill:#94a3b8;");
 
-        // Indicateur coloré
-        HBox indicator = new HBox(6);
-        indicator.setAlignment(Pos.CENTER_LEFT);
-        Region dot = new Region();
-        dot.setStyle("-fx-background-color:" + color + ";-fx-background-radius:4;");
-        dot.setPrefSize(8, 8);
-        Label indLbl = new Label("Mis à jour");
-        indLbl.setStyle("-fx-font-size:10;-fx-text-fill:" + color + ";");
-        indicator.getChildren().addAll(dot, indLbl);
+        // Tendance (ex: "↑ 12 ce mois" ou "⬇ Expirent bientôt")
+        trendLbl.setStyle("-fx-font-size:11;-fx-text-fill:" + color + ";-fx-font-weight:bold;");
 
-        body.getChildren().addAll(ttl, valLbl, dsc, indicator);
+        body.getChildren().addAll(ttl, valLbl, dsc, trendLbl);
         card.getChildren().addAll(bar, body);
         return card;
     }
@@ -255,6 +254,12 @@ public class DashboardView {
                 kpiMontant.setText("Rs " + String.format("%,.0f", data.montantTotal));
                 kpiBons.setText(String.valueOf(data.bonsActifs));
                 kpiTaux.setText(String.format("%.1f%%", data.tauxRedemption));
+
+                // Tendances (données complémentaires)
+                kpiDemandesTrend.setText("↗ " + data.demandesAttente + " en attente");
+                kpiMontantTrend.setText("↗ " + data.demandesApprouvees + " approuvées");
+                kpiBonsTrend.setText("⚠ " + data.bonsExpirant30j + " expirent dans 30j");
+                kpiTauxTrend.setText("✓ " + data.redemptionsToday + " validées aujourd'hui");
 
                 tblAudit.getItems().clear();
                 for (Object[] row : data.auditRows) {
