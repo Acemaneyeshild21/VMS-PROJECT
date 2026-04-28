@@ -727,3 +727,118 @@ WHERE statut = 'ACTIF'
           30
       ) || ' days'
   )::INTERVAL;
+
+-- ============================================================================
+-- 10. TRIGGERS MÉTIER SUPPLÉMENTAIRES
+-- ============================================================================
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 10a. TRIGGER : Anti-double-spend côté base de données
+--      Un bon REDIMÉ ne peut jamais être inséré une deuxième fois dans
+--      la table redemption. La procédure sp_redimer_bon gère déjà ce cas,
+--      mais ce trigger est un filet de sécurité DB-level indépendant du
+--      code applicatif (protection contre les accès directs à la DB).
+-- ────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION trg_fn_anti_double_spend()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_statut VARCHAR(30);
+BEGIN
+    SELECT statut INTO v_statut FROM bon WHERE bon_id = NEW.bon_id;
+
+    IF v_statut = 'REDIME' THEN
+        RAISE EXCEPTION
+            'DOUBLE_SPEND: le bon % (id=%) est déjà rédimé — opération refusée.',
+            (SELECT code_unique FROM bon WHERE bon_id = NEW.bon_id), NEW.bon_id
+            USING ERRCODE = 'P0001';
+    END IF;
+
+    IF v_statut = 'EXPIRE' THEN
+        RAISE EXCEPTION
+            'BON_EXPIRE: le bon % (id=%) a expiré — rédemption refusée.',
+            (SELECT code_unique FROM bon WHERE bon_id = NEW.bon_id), NEW.bon_id
+            USING ERRCODE = 'P0002';
+    END IF;
+
+    -- Log automatique tentative de double-spend (si bon déjà REDIME atteint ce point
+    -- via un autre chemin, le RAISE ci-dessus aurait arrêté — ce log est pour l'audit)
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_anti_double_spend ON redemption;
+CREATE TRIGGER trg_anti_double_spend
+    BEFORE INSERT ON redemption
+    FOR EACH ROW
+    EXECUTE FUNCTION trg_fn_anti_double_spend();
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 10b. TRIGGER : Cohérence automatique du montant_total sur demande
+--      Recalcule automatiquement montant_total = nombre_bons * valeur_unitaire
+--      à chaque INSERT ou UPDATE, garantissant la cohérence des données
+--      même en cas d'accès direct à la base (pgAdmin, scripts SQL).
+--      Valide également que les valeurs sont positives (intégrité métier).
+-- ────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION trg_fn_demande_montant_coherence()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Validation : valeurs positives
+    IF NEW.nombre_bons <= 0 THEN
+        RAISE EXCEPTION 'MONTANT_INVALIDE: nombre_bons doit être > 0 (reçu: %)', NEW.nombre_bons
+            USING ERRCODE = 'P0003';
+    END IF;
+
+    IF NEW.valeur_unitaire <= 0 THEN
+        RAISE EXCEPTION 'MONTANT_INVALIDE: valeur_unitaire doit être > 0 (reçu: %)', NEW.valeur_unitaire
+            USING ERRCODE = 'P0004';
+    END IF;
+
+    -- Recalcul automatique du montant total
+    NEW.montant_total := NEW.nombre_bons * NEW.valeur_unitaire;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_demande_montant ON demande;
+CREATE TRIGGER trg_demande_montant
+    BEFORE INSERT OR UPDATE OF nombre_bons, valeur_unitaire ON demande
+    FOR EACH ROW
+    EXECUTE FUNCTION trg_fn_demande_montant_coherence();
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 10c. TRIGGER : Normalisation email utilisateur
+--      Convertit automatiquement les adresses email en minuscules
+--      à l'insertion et à la mise à jour, évitant les doublons
+--      dus aux différences de casse (ex: Daniel@example.com vs daniel@example.com).
+-- ────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION trg_fn_normalize_email()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.email IS NOT NULL THEN
+        NEW.email := LOWER(TRIM(NEW.email));
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_utilisateur_normalize_email ON utilisateur;
+CREATE TRIGGER trg_utilisateur_normalize_email
+    BEFORE INSERT OR UPDATE OF email ON utilisateur
+    FOR EACH ROW
+    EXECUTE FUNCTION trg_fn_normalize_email();
+
+DROP TRIGGER IF EXISTS trg_client_normalize_email ON client;
+CREATE TRIGGER trg_client_normalize_email
+    BEFORE INSERT OR UPDATE OF email ON client
+    FOR EACH ROW
+    EXECUTE FUNCTION trg_fn_normalize_email();
+
+-- ============================================================================
+-- FIN DU SCHÉMA VMS — MCCI BTS SIO SLAM RP2 — Session 2026
+-- Triggers : trg_demande_update, trg_separation_taches_demande,
+--            trg_redemption_auto_redime, trg_anti_double_spend,
+--            trg_demande_montant, trg_utilisateur_normalize_email,
+--            trg_client_normalize_email
+-- Procédures : sp_generer_bons, sp_redimer_bon
+-- ============================================================================
