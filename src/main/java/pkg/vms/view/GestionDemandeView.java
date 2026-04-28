@@ -272,8 +272,11 @@ public class GestionDemandeView {
                 mGen.setOnAction(e -> genererBons(id, ref));
                 menu.getItems().add(mGen);
             }
-            case "ENVOYE" -> {
-                MenuItem mResend = new MenuItem("📧 Renvoyer par email");
+            case "GENERE", "ENVOYE" -> {
+                // GENERE = bons générés mais email échoué ; ENVOYE = tout OK
+                MenuItem mResend = new MenuItem("📧 " + ("GENERE".equals(statut)
+                        ? "Envoyer par email (non envoyé)"
+                        : "Renvoyer par email"));
                 mResend.setOnAction(e -> renvoyerEmail(id, ref));
                 menu.getItems().add(mResend);
             }

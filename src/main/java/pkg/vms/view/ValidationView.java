@@ -156,7 +156,7 @@ public class ValidationView {
         switch (statut) {
             case "EN_ATTENTE_PAIEMENT" -> cbNext.getItems().addAll("PAYE", "REJETE", "ANNULE");
             case "PAYE"                -> cbNext.getItems().addAll("APPROUVE", "REJETE");
-            case "APPROUVE"            -> cbNext.getItems().addAll("GENERE");
+            case "APPROUVE"            -> { showInfo("Pour générer les bons, utilisez la vue « Demandes » → ⋯ Actions → 🎟 Générer les bons."); return; }
             default                    -> { showInfo("Aucune action disponible pour : " + statut); return; }
         }
         cbNext.getSelectionModel().selectFirst();
