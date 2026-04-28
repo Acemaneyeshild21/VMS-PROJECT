@@ -435,6 +435,49 @@ public class BonDAO {
         return list;
     }
 
+    // ── Historique rédemptions du jour pour un magasin ───────────────────────
+
+    public static class RedemptionRecord {
+        public String heure;
+        public String codeUnique;
+        public double valeur;
+        public String statut;      // "OK" | "ECHEC"
+        public String message;
+    }
+
+    /**
+     * Rédemptions du jour (heure locale) pour un magasin donné.
+     * Retourne les 50 dernières, les plus récentes en premier.
+     */
+    public static List<RedemptionRecord> getRedemptionsAujourdhui(int magasinId) throws SQLException {
+        List<RedemptionRecord> out = new ArrayList<>();
+        String sql =
+            "SELECT r.date_redemption, b.code_unique, b.valeur " +
+            "FROM redemption r " +
+            "JOIN bon b ON r.bon_id = b.bon_id " +
+            "WHERE r.magasin_id = ? " +
+            "  AND r.date_redemption::date = CURRENT_DATE " +
+            "ORDER BY r.date_redemption DESC " +
+            "LIMIT 50";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, magasinId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    RedemptionRecord rec = new RedemptionRecord();
+                    java.sql.Timestamp ts = rs.getTimestamp("date_redemption");
+                    rec.heure      = ts != null ? ts.toString().substring(11, 19) : "";
+                    rec.codeUnique = rs.getString("code_unique");
+                    rec.valeur     = rs.getDouble("valeur");
+                    rec.statut     = "OK";
+                    rec.message    = "Validé";
+                    out.add(rec);
+                }
+            }
+        }
+        return out;
+    }
+
     public static class RedemptionResult {
         public boolean   succes;
         public String    message;
