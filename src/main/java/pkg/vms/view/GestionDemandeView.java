@@ -447,13 +447,6 @@ public class GestionDemandeView {
         return b;
     }
 
-    private void showErr(String msg) {
-        Alert a = new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK);
-        a.setTitle("Erreur"); a.showAndWait();
-    }
-
-    private void showInfo(String msg) {
-        Alert a = new Alert(Alert.AlertType.INFORMATION, msg, ButtonType.OK);
-        a.setTitle("Information"); a.showAndWait();
-    }
+    private void showErr(String msg)  { pkg.vms.Toast.error(msg); }
+    private void showInfo(String msg) { pkg.vms.Toast.success(msg); }
 }

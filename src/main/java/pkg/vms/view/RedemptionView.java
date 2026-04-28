@@ -267,5 +267,5 @@ public class RedemptionView {
         return l;
     }
 
-    private void showErr(String msg) { new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK).showAndWait(); }
+    private void showErr(String msg) { pkg.vms.Toast.error(msg); }
 }

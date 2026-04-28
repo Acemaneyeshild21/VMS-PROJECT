@@ -779,6 +779,6 @@ public class ParametresView {
         try { return Integer.parseInt(s.trim()); } catch (Exception e) { return def; }
     }
 
-    private void showErr(String msg)  { new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK).showAndWait(); }
-    private void showInfo(String msg) { new Alert(Alert.AlertType.INFORMATION, msg, ButtonType.OK).showAndWait(); }
+    private void showErr(String msg)  { pkg.vms.Toast.error(msg); }
+    private void showInfo(String msg) { pkg.vms.Toast.success(msg); }
 }
