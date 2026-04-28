@@ -4,14 +4,13 @@ import javafx.application.Application;
 import javafx.stage.Stage;
 import pkg.vms.DAO.EmailLogDAO;
 import pkg.vms.DAO.PasswordResetDAO;
+import pkg.vms.LoginView;
 
 /**
  * Point d'entrée JavaFX de l'application VoucherManager (VMS).
  *
  * <p>La classe {@link Launcher} appelle {@code Main.launch()} pour contourner
  * la restriction du module system JavaFX sur les fat-JARs.</p>
- *
- * <p>Phase 2 : {@code start()} instanciera {@code LoginView} (JavaFX).</p>
  */
 public class Main extends Application {
 
@@ -21,8 +20,8 @@ public class Main extends Application {
         EmailLogDAO.ensureSchema();
         PasswordResetDAO.ensureSchema();
 
-        // Phase 2 : LoginView JavaFX sera créée ici
-        // new LoginView(primaryStage).show();
+        // Afficher l'écran de connexion JavaFX
+        new LoginView(primaryStage).show();
     }
 
     public static void main(String[] args) {
