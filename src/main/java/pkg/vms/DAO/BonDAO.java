@@ -1,23 +1,28 @@
 package pkg.vms.DAO;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.sql.*;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 public class BonDAO {
 
     public static class BonInfo {
-        public int bonId;
+        public int    bonId;
         public String codeUnique;
         public double valeur;
         public String statut;
         public String dateEmission;
         public String dateExpiration;
-        public int demandeId;
+        public int    demandeId;
         public String clientNom;
         public String clientEmail;
         public String reference;
         public String pdfPath;
+        public byte[] pdfData;   // octets PDF stockés en base (BYTEA)
     }
 
     /**
@@ -74,7 +79,7 @@ public class BonDAO {
     }
 
     /**
-     * Met à jour le chemin PDF d'un bon.
+     * Met à jour le chemin PDF d'un bon (stockage disque).
      */
     public static void updatePdfPath(int bonId, String pdfPath) throws SQLException {
         String sql = "UPDATE bon SET pdf_path = ? WHERE bon_id = ?";
@@ -87,42 +92,160 @@ public class BonDAO {
     }
 
     /**
+     * Stocke les octets bruts du PDF dans la colonne bon.pdf_data (BYTEA).
+     */
+    public static void updatePdfData(int bonId, byte[] pdfData) throws SQLException {
+        String sql = "UPDATE bon SET pdf_data = ? WHERE bon_id = ?";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setBytes(1, pdfData);
+            ps.setInt(2, bonId);
+            ps.executeUpdate();
+        }
+    }
+
+    /**
+     * Enregistre une erreur d'envoi email pour une demande.
+     * La colonne tentative est incrémentée automatiquement par rapport aux erreurs existantes.
+     * Ne lève pas d'exception : l'échec de log ne doit pas masquer l'erreur d'origine.
+     */
+    public static void logEmailError(int demandeId, String erreur) {
+        String sql = "INSERT INTO email_errors (demande_id, tentative, erreur) " +
+                     "VALUES (?, (SELECT COALESCE(MAX(tentative), 0) + 1 " +
+                     "           FROM email_errors WHERE demande_id = ?), ?)";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, demandeId);
+            ps.setInt(2, demandeId);
+            ps.setString(3, erreur != null ? erreur : "Erreur inconnue");
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Impossible de logger l'erreur email : " + e.getMessage());
+        }
+    }
+
+    /**
+     * Marque toutes les erreurs email non résolues d'une demande comme résolues.
+     */
+    public static void resolveEmailErrors(int demandeId) throws SQLException {
+        String sql = "UPDATE email_errors SET resolu = TRUE WHERE demande_id = ? AND NOT resolu";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, demandeId);
+            ps.executeUpdate();
+        }
+    }
+
+    /**
      * Appelle la procédure stockée sp_redimer_bon pour la rédemption sécurisée.
+     * Gère les pertes de connexion, les timeouts de verrou, et parse les messages
+     * du SP pour identifier le type d'erreur précis (EXPIRÉ, DÉJÀ UTILISÉ, etc.).
      */
     public static RedemptionResult redimerBon(String codeUnique, int magasinId, int utilisateurId) throws SQLException {
         String sql = "SELECT * FROM sp_redimer_bon(?, ?, ?)";
-        try (Connection conn = DBconnect.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            // Timeout de verrouillage pour éviter les blocages infinis en cas de haute concurrence
-            try (Statement st = conn.createStatement()) {
-                st.execute("SET lock_timeout = '5s'");
-            }
+        try {
+            try (Connection conn = DBconnect.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ps.setString(1, codeUnique);
-            ps.setInt(2, magasinId);
-            ps.setInt(3, utilisateurId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    RedemptionResult r = new RedemptionResult();
-                    r.succes = rs.getBoolean("succes");
-                    r.message = rs.getString("message");
-                    r.valeur = rs.getDouble("bon_valeur");
-                    
-                    if (r.succes) {
-                        AuditDAO.logSimple("bon", -1, "UTILISATION_BON", utilisateurId, "Code: " + codeUnique + ", Magasin: " + magasinId);
+                // Timeout de verrouillage pour éviter les blocages infinis en haute concurrence
+                try (Statement st = conn.createStatement()) {
+                    st.execute("SET lock_timeout = '5s'");
+                }
+
+                ps.setString(1, codeUnique);
+                ps.setInt(2, magasinId);
+                ps.setInt(3, utilisateurId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        boolean succes = rs.getBoolean("succes");
+                        String message  = rs.getString("message");
+                        double  valeur  = rs.getDouble("bon_valeur");
+                        RedemptionResult.ErrorType type = succes
+                                ? RedemptionResult.ErrorType.SUCCESS
+                                : parseErrorType(message);
+
+                        if (succes) {
+                            AuditDAO.logSimple("bon", -1, "UTILISATION_BON", utilisateurId,
+                                    "Code: " + codeUnique + ", Magasin: " + magasinId);
+                        } else {
+                            // Tracer toute tentative de rédemption refusée
+                            AuditDAO.logSimple("bon", -1, "REDEMPTION_ECHOUEE", utilisateurId,
+                                    "Refus [" + type + "] : " + message
+                                    + " | Code: " + codeUnique + " | Magasin: " + magasinId);
+                        }
+                        return new RedemptionResult(succes, message, valeur, type);
                     }
-                    return r;
                 }
             }
         } catch (SQLException e) {
-            // Code 55P03 = lock_not_available en PostgreSQL
             if ("55P03".equals(e.getSQLState())) {
-                return new RedemptionResult(false, "Le bon est en cours de traitement ailleurs. Réessayez.", 0);
+                AuditDAO.logSimple("bon", -1, "REDEMPTION_ECHOUEE", utilisateurId,
+                        "Timeout verrou [LOCK_TIMEOUT] | Code: " + codeUnique + " | Magasin: " + magasinId);
+                return new RedemptionResult(false,
+                        "Le bon est en cours de traitement ailleurs. Réessayez.",
+                        0, RedemptionResult.ErrorType.LOCK_TIMEOUT);
+            }
+            if (isConnectionError(e)) {
+                logOfflineAttempt(codeUnique, magasinId, utilisateurId, e.getMessage());
+                return new RedemptionResult(false,
+                        "Connexion indisponible — Validation impossible. Tentative enregistrée.",
+                        0, RedemptionResult.ErrorType.CONNECTION_ERROR);
             }
             throw e;
         }
-        return new RedemptionResult(false, "Erreur interne", 0);
+        return new RedemptionResult(false, "Erreur interne", 0, RedemptionResult.ErrorType.UNKNOWN);
+    }
+
+    private static boolean isConnectionError(SQLException e) {
+        String state = e.getSQLState();
+        if (state != null && state.startsWith("08")) return true;
+        String msg = e.getMessage();
+        if (msg != null && (msg.contains("Connection is not available")
+                || msg.contains("Unable to acquire JDBC Connection")
+                || msg.contains("Connection refused")
+                || msg.contains("timed out")
+                || msg.contains("Communications link failure"))) {
+            return true;
+        }
+        Throwable cause = e.getCause();
+        while (cause != null) {
+            if (cause instanceof java.net.ConnectException
+                    || cause instanceof java.net.SocketException
+                    || cause instanceof java.net.UnknownHostException) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
+    }
+
+    private static RedemptionResult.ErrorType parseErrorType(String message) {
+        if (message == null) return RedemptionResult.ErrorType.UNKNOWN;
+        String lc = message.toLowerCase();
+        if (lc.contains("déjà été utilisé") || lc.contains("deja ete utilise"))
+            return RedemptionResult.ErrorType.ALREADY_USED;
+        if (lc.contains("expiré") || lc.contains("expire"))
+            return RedemptionResult.ErrorType.EXPIRED;
+        if (lc.contains("introuvable") || lc.contains("invalide"))
+            return RedemptionResult.ErrorType.INVALID_CODE;
+        if (lc.contains("annul"))
+            return RedemptionResult.ErrorType.CANCELLED;
+        return RedemptionResult.ErrorType.UNKNOWN;
+    }
+
+    private static void logOfflineAttempt(String codeUnique, int magasinId, int utilisateurId, String erreur) {
+        try {
+            File logDir = new File(System.getProperty("user.home") + "/exports/logs");
+            if (!logDir.exists()) logDir.mkdirs();
+            String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+            String line = String.format("[%s] CODE=%s MAGASIN=%d USER=%d ERREUR=%s%n",
+                    timestamp, codeUnique, magasinId, utilisateurId, erreur);
+            try (FileWriter fw = new FileWriter(new File(logDir, "redemption_hors_ligne.log"), true)) {
+                fw.write(line);
+            }
+        } catch (Exception ex) {
+            System.err.println("Impossible de logger la tentative hors-ligne: " + ex.getMessage());
+        }
     }
 
     /**
@@ -274,17 +397,69 @@ public class BonDAO {
         return list;
     }
 
+    /**
+     * Récupère les bons actifs dont la date d'expiration est dans moins de {@code seuilJours} jours.
+     * Utilisé pour l'export Excel « Bons proches d'expiration ».
+     */
+    public static java.util.List<java.util.Map<String, Object>> getBonsProchesExpirationForExport(
+            int seuilJours) throws SQLException {
+        java.util.List<java.util.Map<String, Object>> list = new java.util.ArrayList<>();
+        String sql = "SELECT b.bon_id, b.code_unique, b.valeur, b.statut, "
+                   + "b.date_emission, b.date_expiration, d.reference, c.name AS client, "
+                   + "EXTRACT(DAY FROM (b.date_expiration - CURRENT_TIMESTAMP)) AS jours_restants "
+                   + "FROM bon b "
+                   + "JOIN demande d ON b.demande_id = d.demande_id "
+                   + "LEFT JOIN client c ON d.clientid = c.clientid "
+                   + "WHERE b.statut = 'ACTIF' "
+                   + "AND b.date_expiration > CURRENT_TIMESTAMP "
+                   + "AND b.date_expiration < CURRENT_TIMESTAMP + (? || ' days')::INTERVAL "
+                   + "ORDER BY b.date_expiration ASC";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, seuilJours);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    java.util.Map<String, Object> row = new java.util.HashMap<>();
+                    row.put("ID",             rs.getInt("bon_id"));
+                    row.put("Code Unique",    rs.getString("code_unique"));
+                    row.put("Valeur",         rs.getDouble("valeur"));
+                    row.put("Réf Demande",    rs.getString("reference"));
+                    row.put("Client",         rs.getString("client"));
+                    row.put("Émission",       rs.getString("date_emission"));
+                    row.put("Expiration",     rs.getString("date_expiration"));
+                    row.put("Jours Restants", (int) rs.getDouble("jours_restants"));
+                    list.add(row);
+                }
+            }
+        }
+        return list;
+    }
+
     public static class RedemptionResult {
-        public boolean succes;
-        public String message;
-        public double valeur;
+        public boolean   succes;
+        public String    message;
+        public double    valeur;
+        public ErrorType errorType;
+
+        public enum ErrorType {
+            SUCCESS, CONNECTION_ERROR, EXPIRED, ALREADY_USED,
+            INVALID_CODE, CANCELLED, LOCK_TIMEOUT, UNKNOWN
+        }
 
         public RedemptionResult() {}
 
         public RedemptionResult(boolean succes, String message, double valeur) {
-            this.succes = succes;
-            this.message = message;
-            this.valeur = valeur;
+            this.succes    = succes;
+            this.message   = message;
+            this.valeur    = valeur;
+            this.errorType = succes ? ErrorType.SUCCESS : ErrorType.UNKNOWN;
+        }
+
+        public RedemptionResult(boolean succes, String message, double valeur, ErrorType errorType) {
+            this.succes    = succes;
+            this.message   = message;
+            this.valeur    = valeur;
+            this.errorType = errorType;
         }
     }
 }

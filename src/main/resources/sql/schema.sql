@@ -45,9 +45,16 @@ CREATE TABLE IF NOT EXISTS utilisateur (
     ))
 );
 
+-- Fix B — Colonnes de verrouillage de compte (migration douce : IF NOT EXISTS)
+-- tentatives_echec : compteur réinitialisé à 0 à chaque connexion réussie
+-- verrouille_jusqua : NULL = compte actif, sinon timestamp de fin de verrou
+ALTER TABLE utilisateur
+    ADD COLUMN IF NOT EXISTS tentatives_echec   INTEGER   NOT NULL DEFAULT 0,
+    ADD COLUMN IF NOT EXISTS verrouille_jusqua  TIMESTAMP          DEFAULT NULL;
+
 -- FK différée : superviseur_id dans magasin → utilisateur (créé après magasin)
 ALTER TABLE magasin
-    ADD CONSTRAINT fk_magasin_superviseur
+    ADD CONSTRAINT IF NOT EXISTS fk_magasin_superviseur
     FOREIGN KEY (superviseur_id) REFERENCES utilisateur(userid);
 
 -- Clients (bénéficiaires des bons)
@@ -513,3 +520,210 @@ ON CONFLICT DO NOTHING;
 INSERT INTO utilisateur (username, email, password, role) VALUES
     ('admin', 'admin@intermart.mu', '$2a$10$IHLDj8FrYmsg3payhyc6x.mVUo7JdHH.kP5YaFg2K9MvqgOzG.0/6', 'Administrateur')
 ON CONFLICT (username) DO NOTHING;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 7. SÉCURITÉ — Séparation des tâches & intégrité de l'audit
+-- ────────────────────────────────────────────────────────────────────────────
+
+-- 7a. FK audit_log → utilisateur : ON DELETE SET NULL
+--     Permet de supprimer un utilisateur sans perdre les enregistrements d'audit.
+--     Le nom (colonne username) reste présent pour l'historique.
+ALTER TABLE audit_log
+    DROP CONSTRAINT IF EXISTS audit_log_utilisateur_id_fkey;
+ALTER TABLE audit_log
+    ADD CONSTRAINT audit_log_utilisateur_id_fkey
+    FOREIGN KEY (utilisateur_id) REFERENCES utilisateur(userid) ON DELETE SET NULL;
+
+-- 7b. Ajout de l'action DECONNEXION dans la contrainte audit_log.chk_action
+ALTER TABLE audit_log DROP CONSTRAINT IF EXISTS chk_action;
+ALTER TABLE audit_log ADD CONSTRAINT chk_action CHECK (action IN (
+    'CREATION','MODIFICATION','SUPPRESSION','PAIEMENT','APPROBATION',
+    'GENERATION','ENVOI','REDEMPTION','REJET','ANNULATION',
+    'CONNEXION','CONNEXION_ECHOUEE','DECONNEXION','INSCRIPTION',
+    'CHANGEMENT_STATUT','ARCHIVAGE_MASSIF','UTILISATION_BON',
+    'UPDATE_EMAIL'
+));
+
+-- 7c. Trigger : Séparation des tâches (SoD)
+--     Un même utilisateur ne peut pas valider le paiement ET approuver la même demande.
+--     Bloqué côté base en complément du contrôle Java.
+CREATE OR REPLACE FUNCTION trg_separation_taches()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.statuts = 'APPROUVE'
+       AND NEW.approuve_par IS NOT NULL
+       AND NEW.valide_par   IS NOT NULL
+       AND NEW.valide_par = NEW.approuve_par
+    THEN
+        RAISE EXCEPTION 'SEPARATION_TACHES: l''utilisateur % a déjà validé le paiement de cette demande et ne peut pas également l''approuver (demande_id=%)',
+            NEW.approuve_par, NEW.demande_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_separation_taches_demande ON demande;
+CREATE TRIGGER trg_separation_taches_demande
+    BEFORE UPDATE ON demande
+    FOR EACH ROW
+    EXECUTE FUNCTION trg_separation_taches();
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 8. GÉNÉRATION — Séquence références + stockage PDF + erreurs email
+-- ────────────────────────────────────────────────────────────────────────────
+
+-- 8a. Séquence pour les références (VR0001, VR0002…) — concurrence-safe
+CREATE SEQUENCE IF NOT EXISTS seq_demande_ref START 1 INCREMENT 1 NO CYCLE;
+
+-- 8b. Colonne BYTEA pour stocker le PDF directement en base
+ALTER TABLE bon ADD COLUMN IF NOT EXISTS pdf_data BYTEA;
+
+-- 8c. Table de suivi des erreurs d'envoi email avec historique des tentatives
+CREATE TABLE IF NOT EXISTS email_errors (
+    error_id    SERIAL PRIMARY KEY,
+    demande_id  INT  NOT NULL REFERENCES demande(demande_id),
+    tentative   INT  NOT NULL DEFAULT 1,
+    erreur      TEXT NOT NULL,
+    resolu      BOOLEAN DEFAULT FALSE,
+    date_erreur TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_email_errors_demande ON email_errors(demande_id);
+CREATE INDEX IF NOT EXISTS idx_email_errors_resolu  ON email_errors(resolu) WHERE NOT resolu;
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- 9. AUDIT TRAIL COMPLET & REPORTING CONFIGURABLE
+-- ────────────────────────────────────────────────────────────────────────────
+
+-- 9a. Étendre les actions autorisées dans l'audit trail
+--     ENVOI_ECHEC  : envoi email échoué (bons générés mais non livrés)
+--     REDEMPTION_ECHOUEE : tentative de rédemption refusée (code invalide / expiré / déjà utilisé)
+ALTER TABLE audit_log DROP CONSTRAINT IF EXISTS chk_action;
+ALTER TABLE audit_log ADD CONSTRAINT chk_action CHECK (action IN (
+    'CREATION','MODIFICATION','SUPPRESSION',
+    'PAIEMENT','APPROBATION','GENERATION',
+    'ENVOI','ENVOI_ECHEC',
+    'REDEMPTION','REDEMPTION_ECHOUEE','UTILISATION_BON',
+    'REJET','ANNULATION',
+    'CONNEXION','CONNEXION_ECHOUEE','DECONNEXION','INSCRIPTION',
+    'CHANGEMENT_STATUT','ARCHIVAGE_MASSIF','UPDATE_EMAIL'
+));
+
+-- 9b. Paramètre configurable : seuil d'expiration pour le rapport bons proches d'expiration
+INSERT INTO app_settings (setting_key, setting_value) VALUES
+    ('bon_expiration_seuil_jours', '30')
+ON CONFLICT (setting_key) DO NOTHING;
+
+-- 9c. Mise à jour du trigger de demande : capture le contexte utilisateur
+--     Le code Java exécute SET app.current_user_id = <userId> avant chaque UPDATE demande,
+--     dans la même connexion, afin que le trigger puisse enregistrer qui a fait l'action.
+CREATE OR REPLACE FUNCTION trg_demande_date_modification()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_user_id_text TEXT;
+    v_user_id      INT  := NULL;
+    v_username     TEXT := NULL;
+BEGIN
+    NEW.date_modification := CURRENT_TIMESTAMP;
+
+    -- Lire l'identifiant posé par Java (SET app.current_user_id = ?)
+    v_user_id_text := current_setting('app.current_user_id', true);
+    IF v_user_id_text IS NOT NULL AND v_user_id_text <> '' THEN
+        BEGIN
+            v_user_id := v_user_id_text::INT;
+            SELECT username INTO v_username FROM utilisateur WHERE userid = v_user_id;
+        EXCEPTION WHEN others THEN
+            v_user_id  := NULL;
+            v_username := NULL;
+        END;
+    END IF;
+
+    IF OLD.statuts IS DISTINCT FROM NEW.statuts THEN
+        INSERT INTO audit_log (
+            table_name, record_id, action,
+            ancien_val, nouveau_val,
+            utilisateur_id, username, contexte
+        )
+        VALUES (
+            'demande',
+            NEW.demande_id,
+            CASE NEW.statuts
+                WHEN 'PAYE'     THEN 'PAIEMENT'
+                WHEN 'APPROUVE' THEN 'APPROBATION'
+                WHEN 'GENERE'   THEN 'GENERATION'
+                WHEN 'ENVOYE'   THEN 'ENVOI'
+                WHEN 'REJETE'   THEN 'REJET'
+                WHEN 'ANNULE'   THEN 'ANNULATION'
+                WHEN 'ARCHIVE'  THEN 'ARCHIVAGE_MASSIF'
+                ELSE 'CHANGEMENT_STATUT'
+            END,
+            jsonb_build_object('statuts', OLD.statuts),
+            jsonb_build_object('statuts', NEW.statuts, 'reference', NEW.reference),
+            v_user_id,
+            v_username,
+            'Statut : ' || OLD.statuts || ' → ' || NEW.statuts
+              || CASE WHEN NEW.reference IS NOT NULL THEN ' (' || NEW.reference || ')' ELSE '' END
+        );
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_demande_update ON demande;
+CREATE TRIGGER trg_demande_update
+    BEFORE UPDATE ON demande
+    FOR EACH ROW
+    EXECUTE FUNCTION trg_demande_date_modification();
+
+-- 9d. Trigger automatique : après INSERT dans redemption → marquer le bon RÉDIMÉ
+--     Filet de sécurité si un INSERT est fait directement sans passer par sp_redimer_bon.
+CREATE OR REPLACE FUNCTION trg_redemption_marquer_redime()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE bon SET statut = 'REDIME'
+    WHERE bon_id = NEW.bon_id AND statut != 'REDIME';
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_redemption_auto_redime ON redemption;
+CREATE TRIGGER trg_redemption_auto_redime
+    AFTER INSERT ON redemption
+    FOR EACH ROW
+    EXECUTE FUNCTION trg_redemption_marquer_redime();
+
+-- ────────────────────────────────────────────────────────────────────────────
+-- TABLE : email_errors — Historique des échecs d'envoi SMTP
+-- Permet la relance depuis ParametresPanel (EmailService.resendEmail)
+-- ────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS email_errors (
+    id              SERIAL PRIMARY KEY,
+    demande_id      INTEGER REFERENCES demande(demande_id) ON DELETE SET NULL,
+    demande_ref     VARCHAR(50),
+    to_email        VARCHAR(255) NOT NULL,
+    email_type      VARCHAR(50)  NOT NULL,          -- VOUCHER | APPROVAL_REQUEST | PAYMENT_CONFIRMATION | ADMIN_RECAP
+    nb_tentatives   INTEGER      NOT NULL DEFAULT 1,
+    derniere_erreur TEXT,
+    payload         TEXT,                            -- données JSON pour la relance
+    created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
+    resolved        BOOLEAN      NOT NULL DEFAULT FALSE,
+    resolved_at     TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_errors_unresolved
+    ON email_errors(resolved, created_at DESC)
+    WHERE resolved = FALSE;
+
+-- 9e. Vue bons proches d'expiration avec seuil issu de la table app_settings
+CREATE OR REPLACE VIEW v_bons_proche_expiration AS
+SELECT * FROM v_bons_details
+WHERE statut = 'ACTIF'
+  AND date_expiration > CURRENT_TIMESTAMP
+  AND date_expiration < CURRENT_TIMESTAMP + (
+      COALESCE(
+          (SELECT setting_value::INT
+           FROM app_settings
+           WHERE setting_key = 'bon_expiration_seuil_jours'),
+          30
+      ) || ' days'
+  )::INTERVAL;

@@ -1,6 +1,7 @@
 package pkg.vms;
 
 import pkg.vms.DAO.AuthDAO;
+import pkg.vms.controller.LoginController;
 
 import javax.swing.*;
 import java.awt.*;
@@ -323,6 +324,8 @@ public class LoginForm extends JFrame {
     }
 
     // ── LOGIN ACTION ──────────────────────────────────────────────────────
+    private final LoginController loginController = new LoginController();
+
     private void actionLogin() {
         String user = txtUsername.getText().trim();
         String pass = new String(txtPassword.getPassword());
@@ -336,31 +339,28 @@ public class LoginForm extends JFrame {
         btnLogin.setText("Connexion en cours...");
         lblError.setText(" ");
 
-        new SwingWorker<AuthDAO.UserSession, Void>() {
-            @Override protected AuthDAO.UserSession doInBackground() throws Exception {
-                return AuthDAO.authenticate(user, pass);
+        loginController.authenticate(user, pass,
+            // onSuccess
+            session -> {
+                dispose();
+                SwingUtilities.invokeLater(() ->
+                        new Dashboard(session.userId, session.username, session.role, session.email)
+                                .setVisible(true));
+            },
+            // onError (mauvais mdp ou DB)
+            msg -> {
+                showError(msg);
+                btnLogin.setEnabled(true);
+                btnLogin.setText("Se connecter");
+            },
+            // onBloque — compte verrouillé : affichage orange distinct
+            msg -> {
+                lblError.setText("<html><center>" + msg.replace("\n", "<br>") + "</center></html>");
+                lblError.setForeground(new Color(200, 100, 0));
+                btnLogin.setEnabled(true);
+                btnLogin.setText("Se connecter");
             }
-            @Override protected void done() {
-                try {
-                    AuthDAO.UserSession session = get();
-                    if (session != null) {
-                        dispose();
-                        SwingUtilities.invokeLater(() ->
-                                new Dashboard(session.userId, session.username, session.role, session.email)
-                                        .setVisible(true));
-                    } else {
-                        showError("Identifiants incorrects. Vérifiez votre nom d'utilisateur et mot de passe.");
-                        btnLogin.setEnabled(true);
-                        btnLogin.setText("Se connecter");
-                    }
-                } catch (Exception ex) {
-                    showError("Erreur de connexion à la base de données.");
-                    btnLogin.setEnabled(true);
-                    btnLogin.setText("Se connecter");
-                    ex.printStackTrace();
-                }
-            }
-        }.execute();
+        );
     }
 
     private void showError(String msg) {

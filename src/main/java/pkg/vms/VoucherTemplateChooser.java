@@ -477,7 +477,8 @@ public class VoucherTemplateChooser extends JDialog {
                 }
                 if (chooser.result == Result.SEND) {
                     publish("Envoi des emails...");
-                    EmailService.envoyerBonsParEmail(demandeId, bons, userId);
+                    EmailService.envoyerBonsParEmail(demandeId, bons, userId,
+                            () -> {}, err -> System.err.println("[VoucherTemplateChooser] Email err: " + err));
                 }
                 return true;
             }

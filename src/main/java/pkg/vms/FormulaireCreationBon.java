@@ -1,16 +1,15 @@
 package pkg.vms;
 
 import pkg.vms.DAO.ClientDAO;
-import pkg.vms.DAO.VoucherDAO;
+import pkg.vms.controller.DemandeController;
 import javax.swing.*;
 import java.awt.*;
-import java.sql.SQLException;
-import java.util.List;
 
 public class FormulaireCreationBon extends JPanel {
 
     private final int userId;
     private final String username;
+    private final DemandeController controller = new DemandeController();
 
     private JComboBox<ClientDAO.ClientInfo> cbClient;
     private JComboBox<ClientDAO.MagasinInfo> cbMagasin;
@@ -22,6 +21,7 @@ public class FormulaireCreationBon extends JPanel {
     private JTextArea txtMotif;
     private JLabel lblStatus;
     private JLabel lblMontantTotal;
+    private JButton btnSubmit;
 
     public FormulaireCreationBon(int userId, String username) {
         this.userId = userId;
@@ -31,7 +31,6 @@ public class FormulaireCreationBon extends JPanel {
         setOpaque(false);
         setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
 
-        // Header
         JPanel header = new JPanel(new BorderLayout());
         header.setOpaque(false);
         JLabel title = new JLabel("Nouvelle Demande de Bons Cadeau");
@@ -40,7 +39,6 @@ public class FormulaireCreationBon extends JPanel {
         header.add(title, BorderLayout.WEST);
         add(header, BorderLayout.NORTH);
 
-        // Content
         JPanel content = new JPanel(new GridBagLayout());
         content.setOpaque(false);
         GridBagConstraints gbc = new GridBagConstraints();
@@ -50,7 +48,6 @@ public class FormulaireCreationBon extends JPanel {
         gbc.weightx = 1.0;
         int row = 0;
 
-        // Client
         gbc.gridy = row++;
         content.add(buildLabel("Client *"), gbc);
         gbc.gridy = row++;
@@ -58,7 +55,6 @@ public class FormulaireCreationBon extends JPanel {
         styleCombo(cbClient);
         content.add(cbClient, gbc);
 
-        // Magasin
         gbc.gridy = row++;
         content.add(buildLabel("Magasin *"), gbc);
         gbc.gridy = row++;
@@ -66,7 +62,6 @@ public class FormulaireCreationBon extends JPanel {
         styleCombo(cbMagasin);
         content.add(cbMagasin, gbc);
 
-        // Nombre de bons + Valeur unitaire (2 colonnes)
         gbc.gridy = row++;
         JPanel rowNbVal = new JPanel(new GridLayout(1, 2, 16, 0));
         rowNbVal.setOpaque(false);
@@ -95,14 +90,12 @@ public class FormulaireCreationBon extends JPanel {
         rowNbVal.add(panelVal);
         content.add(rowNbVal, gbc);
 
-        // Montant total calculé
         gbc.gridy = row++;
         lblMontantTotal = new JLabel("Montant total : Rs 0.00");
         lblMontantTotal.setFont(VMSStyle.FONT_BTN_MAIN);
         lblMontantTotal.setForeground(VMSStyle.ACCENT_BLUE);
         content.add(lblMontantTotal, gbc);
 
-        // Validité + Type (2 colonnes)
         gbc.gridy = row++;
         JPanel rowValidType = new JPanel(new GridLayout(1, 2, 16, 0));
         rowValidType.setOpaque(false);
@@ -125,7 +118,6 @@ public class FormulaireCreationBon extends JPanel {
         rowValidType.add(panelType);
         content.add(rowValidType, gbc);
 
-        // Email destinataire
         gbc.gridy = row++;
         content.add(buildLabel("Email destinataire (pour envoi des bons)"), gbc);
         gbc.gridy = row++;
@@ -133,7 +125,6 @@ public class FormulaireCreationBon extends JPanel {
         styleField(txtEmailDestinataire);
         content.add(txtEmailDestinataire, gbc);
 
-        // Motif
         gbc.gridy = row++;
         content.add(buildLabel("Motif / Commentaire"), gbc);
         gbc.gridy = row++;
@@ -143,10 +134,9 @@ public class FormulaireCreationBon extends JPanel {
         txtMotif.setWrapStyleWord(true);
         content.add(new JScrollPane(txtMotif), gbc);
 
-        // Bouton soumettre
         gbc.gridy = row++;
         gbc.insets = new Insets(20, 0, 10, 0);
-        JButton btnSubmit = new JButton("Soumettre la Demande");
+        btnSubmit = new JButton("Soumettre la Demande");
         btnSubmit.setBackground(VMSStyle.RED_PRIMARY);
         btnSubmit.setForeground(Color.WHITE);
         btnSubmit.setFont(VMSStyle.FONT_BTN_MAIN);
@@ -156,7 +146,6 @@ public class FormulaireCreationBon extends JPanel {
         btnSubmit.addActionListener(e -> actionSubmit());
         content.add(btnSubmit, gbc);
 
-        // Status
         gbc.gridy = row;
         lblStatus = new JLabel("");
         lblStatus.setHorizontalAlignment(SwingConstants.CENTER);
@@ -172,26 +161,27 @@ public class FormulaireCreationBon extends JPanel {
     }
 
     private void chargerDonnees() {
-        try {
-            List<ClientDAO.ClientInfo> clients = ClientDAO.getActiveClients();
-            for (ClientDAO.ClientInfo c : clients) cbClient.addItem(c);
-
-            List<ClientDAO.MagasinInfo> magasins = ClientDAO.getAllMagasins();
-            for (ClientDAO.MagasinInfo m : magasins) cbMagasin.addItem(m);
-
-            // Pré-remplir l'email du client sélectionné
-            cbClient.addActionListener(e -> {
-                ClientDAO.ClientInfo sel = (ClientDAO.ClientInfo) cbClient.getSelectedItem();
-                if (sel != null) txtEmailDestinataire.setText(sel.email);
-            });
-            if (cbClient.getItemCount() > 0) {
-                ClientDAO.ClientInfo first = cbClient.getItemAt(0);
-                txtEmailDestinataire.setText(first.email);
+        lblStatus.setText("Chargement...");
+        lblStatus.setForeground(VMSStyle.TEXT_MUTED);
+        controller.chargerDonneesFormulaire(
+            data -> {
+                for (ClientDAO.ClientInfo c : data.clients)   cbClient.addItem(c);
+                for (ClientDAO.MagasinInfo m : data.magasins) cbMagasin.addItem(m);
+                cbClient.addActionListener(e -> {
+                    ClientDAO.ClientInfo sel = (ClientDAO.ClientInfo) cbClient.getSelectedItem();
+                    if (sel != null) txtEmailDestinataire.setText(sel.email);
+                });
+                if (cbClient.getItemCount() > 0) {
+                    ClientDAO.ClientInfo first = cbClient.getItemAt(0);
+                    txtEmailDestinataire.setText(first.email);
+                }
+                lblStatus.setText("");
+            },
+            err -> {
+                lblStatus.setText("Erreur chargement : " + err);
+                lblStatus.setForeground(VMSStyle.RED_PRIMARY);
             }
-        } catch (SQLException ex) {
-            lblStatus.setText("Erreur chargement: " + ex.getMessage());
-            lblStatus.setForeground(VMSStyle.RED_PRIMARY);
-        }
+        );
     }
 
     private void updateMontantTotal() {
@@ -207,11 +197,11 @@ public class FormulaireCreationBon extends JPanel {
     private void actionSubmit() {
         ClientDAO.ClientInfo client = (ClientDAO.ClientInfo) cbClient.getSelectedItem();
         ClientDAO.MagasinInfo magasin = (ClientDAO.MagasinInfo) cbMagasin.getSelectedItem();
-        String nbStr = txtNombreBons.getText().trim();
-        String valStr = txtValeurUnitaire.getText().trim();
+        String nbStr    = txtNombreBons.getText().trim();
+        String valStr   = txtValeurUnitaire.getText().trim();
         String validStr = txtValiditeJours.getText().trim();
-        String type = (String) cbType.getSelectedItem();
-        String motif = txtMotif.getText().trim();
+        String type     = (String) cbType.getSelectedItem();
+        String motif    = txtMotif.getText().trim();
         String emailDest = txtEmailDestinataire.getText().trim();
 
         if (client == null || magasin == null || nbStr.isEmpty() || valStr.isEmpty()) {
@@ -220,40 +210,46 @@ public class FormulaireCreationBon extends JPanel {
             return;
         }
 
+        int nombreBons;
+        double valeurUnitaire;
+        int validiteJours;
         try {
-            int nombreBons = Integer.parseInt(nbStr);
-            double valeurUnitaire = Double.parseDouble(valStr);
-            int validiteJours = validStr.isEmpty() ? 365 : Integer.parseInt(validStr);
+            nombreBons     = Integer.parseInt(nbStr);
+            valeurUnitaire = Double.parseDouble(valStr);
+            validiteJours  = validStr.isEmpty() ? 365 : Integer.parseInt(validStr);
+        } catch (NumberFormatException ex) {
+            lblStatus.setText("Nombre de bons ou valeur invalide.");
+            lblStatus.setForeground(VMSStyle.RED_PRIMARY);
+            return;
+        }
 
-            if (nombreBons <= 0 || valeurUnitaire <= 0) {
-                lblStatus.setText("Le nombre de bons et la valeur doivent être positifs.");
-                lblStatus.setForeground(VMSStyle.RED_PRIMARY);
-                return;
-            }
+        if (nombreBons <= 0 || valeurUnitaire <= 0) {
+            lblStatus.setText("Le nombre de bons et la valeur doivent être positifs.");
+            lblStatus.setForeground(VMSStyle.RED_PRIMARY);
+            return;
+        }
 
-            int demandeId = VoucherDAO.createVoucherRequest(
-                    userId, client.id, nombreBons, valeurUnitaire,
-                    type, magasin.id, validiteJours, motif, emailDest);
+        btnSubmit.setEnabled(false);
+        lblStatus.setText("Création en cours...");
+        lblStatus.setForeground(VMSStyle.TEXT_MUTED);
 
-            if (demandeId > 0) {
+        controller.creerDemande(userId, client.id, nombreBons, valeurUnitaire,
+            type, magasin.id, validiteJours, motif, emailDest,
+            demandeId -> {
+                btnSubmit.setEnabled(true);
                 lblStatus.setText("Demande créée avec succès ! (ID: " + demandeId + ")");
                 lblStatus.setForeground(VMSStyle.SUCCESS);
-                // Réinitialiser le formulaire
                 txtNombreBons.setText("1");
                 txtValeurUnitaire.setText("");
                 txtMotif.setText("");
                 updateMontantTotal();
-            } else {
-                lblStatus.setText("Erreur lors de la création.");
+            },
+            err -> {
+                btnSubmit.setEnabled(true);
+                lblStatus.setText("Erreur : " + err);
                 lblStatus.setForeground(VMSStyle.RED_PRIMARY);
             }
-        } catch (NumberFormatException ex) {
-            lblStatus.setText("Nombre de bons ou valeur invalide.");
-            lblStatus.setForeground(VMSStyle.RED_PRIMARY);
-        } catch (SQLException ex) {
-            lblStatus.setText("Erreur SQL: " + ex.getMessage());
-            lblStatus.setForeground(VMSStyle.RED_PRIMARY);
-        }
+        );
     }
 
     private JLabel buildLabel(String text) {

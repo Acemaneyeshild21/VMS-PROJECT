@@ -1,470 +1,1163 @@
 package pkg.vms;
 
-import pkg.vms.DAO.BonDAO;
-import pkg.vms.DAO.EmailLogDAO;
-import pkg.vms.DAO.SettingsDAO;
+/*
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *  EmailService — Service d'envoi SMTP production-ready
+ *  BTS SIO SLAM RP2 — VMS Intermart Maurice, Session 2026
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ *  ACTIVATION GMAIL EN PRODUCTION — App Password (obligatoire depuis mai 2022)
+ *  ─────────────────────────────────────────────────────────────────────────────
+ *  Gmail interdit l'authentification avec votre mot de passe normal.
+ *  Il faut un "Mot de passe d'application" de 16 caractères généré depuis
+ *  votre compte Google. La Validation en 2 étapes doit être activée au préalable.
+ *
+ *  ÉTAPES :
+ *   1. Ouvrez https://myaccount.google.com
+ *   2. Panneau gauche → "Sécurité"
+ *   3. Section "Comment vous connectez-vous à Google"
+ *      → Cliquez "Validation en 2 étapes" → Activez-la si ce n'est pas fait
+ *   4. Revenez sur Sécurité → cherchez "Mots de passe des applications"
+ *      URL directe : https://myaccount.google.com/apppasswords
+ *   5. Cliquez "Sélectionner une application" → "Autre (nom personnalisé)"
+ *      → Tapez "VMS" → Cliquez "Générer"
+ *   6. Copiez le code de 16 caractères affiché (ex : abcd efgh ijkl mnop)
+ *   7. Dans config.properties, renseignez :
+ *        mail.username=votre.compte@gmail.com
+ *        mail.password=abcdefghijklmnop      ← coller sans les espaces
+ *        mail.from=votre.compte@gmail.com
+ *
+ *  ⚠️  NE JAMMAIS committer config.properties avec mail.password renseigné !
+ *      Ajoutez config.properties à .gitignore ou utilisez une variable d'env.
+ *
+ *  ALTERNATIVE — Mailgun (5 000 emails/mois gratuits, plus fiable en prod réelle) :
+ *    mail.smtp.host=smtp.mailgun.org
+ *    mail.smtp.port=587
+ *    mail.username=postmaster@mg.votre-domaine.com
+ *    mail.password=<API Key Mailgun SMTP>
+ * ═══════════════════════════════════════════════════════════════════════════════
+ */
 
 import jakarta.mail.*;
 import jakarta.mail.internet.*;
+import pkg.vms.DAO.AuditDAO;
+import pkg.vms.DAO.BonDAO;
+import pkg.vms.DAO.EmailDAO;
+
+import javax.swing.SwingUtilities;
 import java.io.File;
-import java.sql.*;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 /**
- * Service d'envoi d'emails SMTP pour VMS.
+ * Service d'envoi d'emails SMTP production-ready.
  *
- * Priorite de configuration :
- *   1. Base de donnees (app_settings, setting_key='email') — configurable via Parametres
- *   2. config.properties (smtp.host / smtp.port / smtp.user / smtp.pass) — fallback
+ * <p>Tous les envois sont <b>asynchrones</b> (pool de 3 threads dédiés).
+ * Les callbacks {@code onSuccess} / {@code onError} sont toujours rappelés
+ * sur l'EDT Swing, prêts à mettre à jour l'interface sans risque.</p>
  *
- * Pour Gmail :
- *   - Activer la validation en deux etapes sur le compte Google
- *   - Creer un "Mot de passe d'application" (Securite > Mots de passe d'applications)
- *   - Utiliser ce code de 16 caracteres comme mot de passe SMTP
+ * <p>Si {@code mail.password} est vide dans {@code config.properties},
+ * l'email est loggué en console (mode simulation) sans jamais lancer d'erreur.</p>
+ *
+ * <p>En cas d'échec SMTP réel, l'erreur est persistée dans la table
+ * {@code email_errors} pour relance ultérieure via {@link #resendEmail}.</p>
  */
 public class EmailService {
 
-    // ── Chargement dynamique de la config SMTP ────────────────────────────────
+    // ── Config SMTP ──────────────────────────────────────────────────────────
+    private static final String SMTP_HOST    = Config.get("mail.smtp.host",           "smtp.gmail.com");
+    private static final String SMTP_PORT    = Config.get("mail.smtp.port",           "587");
+    private static final String SMTP_USER    = Config.get("mail.username",            "");
+    private static final String SMTP_PASS    = Config.get("mail.password",            "");
+    private static final String FROM_ADDR    = Config.get("mail.from",               SMTP_USER);
+    private static final String FROM_NAME    = Config.get("mail.from.name",          "Intermart VMS");
+    private static final String ADMIN_EMAIL  = Config.get("mail.admin.email",        "admin@intermart.mu");
+    private static final int    TIMEOUT_MS   = Config.getInt("mail.timeout",          10_000);
+    private static final int    CONN_TIMEOUT = Config.getInt("mail.connection.timeout", 10_000);
+
+    /** true si SMTP non configuré → mode simulation (log console uniquement) */
+    private static final boolean SIMULATION  = SMTP_PASS == null || SMTP_PASS.isBlank();
+
+    /** Pool de 3 threads dédiés email — daemon, ne bloque pas l'EDT */
+    private static final ExecutorService EMAIL_EXECUTOR =
+            Executors.newFixedThreadPool(3, r -> {
+                Thread t = new Thread(r, "vms-email");
+                t.setDaemon(true);
+                return t;
+            });
+
+    // ── Types d'email ────────────────────────────────────────────────────────
+    public enum EmailType {
+        VOUCHER, APPROVAL_REQUEST, PAYMENT_CONFIRMATION, ADMIN_RECAP
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  1. sendVoucherEmail — Bons PDF au client
+    // ─────────────────────────────────────────────────────────────────────────
 
     /**
-     * Charge la config SMTP depuis la BD, avec fallback sur config.properties.
-     * Appele a chaque envoi pour prendre en compte les modifications en cours de session.
+     * Envoie les bons PDF au client de façon asynchrone.
+     *
+     * @param toEmail     Adresse destinataire (client)
+     * @param clientName  Prénom / Nom affiché dans l'email
+     * @param bonsPDF     Liste des fichiers PDF à joindre (peut être vide)
+     * @param demandeRef  Référence de la demande (ex: "DEM-2026-0042")
+     * @param valeurTotale Montant total affiché dans l'email
+     * @param demandeId   ID de la demande pour l'audit
+     * @param userId      ID de l'utilisateur déclencheur
+     * @param onSuccess   Callback EDT — appelé si envoi OK
+     * @param onError     Callback EDT — appelé avec le message d'erreur si échec
      */
-    private static SmtpConfig loadConfig() {
-        // Essayer la BD d'abord
-        try {
-            SettingsDAO.EmailSettings dbSettings = SettingsDAO.getEmailSettings();
-            if (dbSettings != null
-                    && dbSettings.smtpServer != null && !dbSettings.smtpServer.isEmpty()
-                    && dbSettings.smtpUsername != null && !dbSettings.smtpUsername.isEmpty()
-                    && dbSettings.smtpPassword != null && !dbSettings.smtpPassword.isEmpty()) {
-                return new SmtpConfig(
-                        dbSettings.smtpServer,
-                        dbSettings.smtpPort > 0 ? dbSettings.smtpPort : 587,
-                        dbSettings.smtpUsername,
-                        dbSettings.smtpPassword,
-                        dbSettings.tlsEnabled,
-                        dbSettings.fromEmail != null ? dbSettings.fromEmail : dbSettings.smtpUsername,
-                        dbSettings.fromName  != null ? dbSettings.fromName  : "Intermart VMS",
-                        dbSettings.adminEmail
-                );
+    public static void sendVoucherEmail(String toEmail, String clientName,
+                                        List<File> bonsPDF, String demandeRef,
+                                        double valeurTotale,
+                                        int demandeId, int userId,
+                                        Runnable onSuccess, Consumer<String> onError) {
+        EMAIL_EXECUTOR.submit(() -> {
+            try {
+                String subject = "Vos bons cadeaux Intermart — " + demandeRef;
+                int nb = bonsPDF == null ? 0 : bonsPDF.size();
+                String body = buildVoucherTemplate(clientName, demandeRef, nb, valeurTotale);
+                sendMessage(toEmail, subject, body, bonsPDF, demandeId, EmailType.VOUCHER);
+                AuditDAO.logEnvoi(demandeId, true, userId,
+                        "Vouchers envoyés à " + toEmail + " (" + nb + " PDF)");
+                SwingUtilities.invokeLater(onSuccess);
+            } catch (Exception ex) {
+                persistError(demandeId, toEmail, demandeRef, EmailType.VOUCHER, ex);
+                AuditDAO.logEnvoi(demandeId, false, userId, ex.getMessage());
+                SwingUtilities.invokeLater(() -> onError.accept(ex.getMessage()));
             }
-        } catch (Exception e) {
-            System.err.println("[EmailService] Impossible de charger la config depuis la BD : " + e.getMessage());
-        }
-
-        // Fallback : config.properties
-        return new SmtpConfig(
-                Config.get("smtp.host",       "smtp.gmail.com"),
-                Integer.parseInt(Config.get("smtp.port", "587")),
-                Config.get("smtp.user",       "dimitriaceman614@gmail.com"),
-                Config.get("smtp.pass",       "rjlz olyf xhjq viaj"),
-                true,
-                Config.get("smtp.user",       "dimitriaceman614@gmail.com"),
-                Config.get("smtp.from.name",  "Intermart VMS"),
-                Config.get("smtp.admin.email","dimitriaceman614@gmail.com")
-        );
-    }
-
-    /** Conteneur immuable pour la config SMTP. */
-    private record SmtpConfig(
-            String host, int port, String user, String pass,
-            boolean tls, String fromEmail, String fromName, String adminEmail
-    ) {
-        boolean isConfigured() {
-            return pass != null && !pass.isEmpty()
-                && user != null && !user.isEmpty()
-                && host != null && !host.isEmpty();
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    // API PUBLIQUE
-    // ════════════════════════════════════════════════════════════════════════
-
-    /**
-     * Envoie les bons PDF par email au client + recapitulatif a l'admin.
-     * Marque la demande comme ENVOYE en BD apres succes.
-     */
-    public static void envoyerBonsParEmail(int demandeId,
-                                            List<BonDAO.BonInfo> bons,
-                                            int userId) throws Exception {
-        if (bons == null || bons.isEmpty()) return;
-
-        SmtpConfig cfg = loadConfig();
-
-        String clientEmail = bons.get(0).clientEmail;
-        String clientNom   = bons.get(0).clientNom;
-        String reference   = bons.get(0).reference;
-
-        // Priorite : email_destinataire de la demande, sinon email du client
-        String emailDest = getEmailDestinataire(demandeId);
-        if (emailDest == null || emailDest.isEmpty()) emailDest = clientEmail;
-
-        if (emailDest == null || emailDest.isEmpty()) {
-            throw new IllegalStateException("Aucune adresse email destinataire pour la demande #" + demandeId);
-        }
-
-        // 1. Envoyer les bons au client
-        String sujet = "Vos bons cadeau Intermart — " + reference;
-        String corps = buildCorpsEmailClient(clientNom, reference, bons);
-        envoyerEmail(cfg, emailDest, null, sujet, corps, bons, demandeId, userId);
-
-        // 2. Recapitulatif a l'admin
-        if (cfg.adminEmail() != null && !cfg.adminEmail().isEmpty()) {
-            String recapPath   = VoucherPDFGenerator.genererRecapPDF(demandeId, bons);
-            String sujetAdmin  = "Recap generation — " + reference + " (" + bons.size() + " bons)";
-            String corpsAdmin  = buildCorpsEmailAdmin(reference, bons);
-            BonDAO.BonInfo recap = new BonDAO.BonInfo();
-            recap.pdfPath = recapPath;
-            envoyerEmail(cfg, cfg.adminEmail(), null, sujetAdmin, corpsAdmin, List.of(recap), demandeId, userId);
-        }
-
-        // 3. Marquer comme envoye
-        pkg.vms.DAO.VoucherDAO.marquerCommeEnvoye(demandeId, userId);
+        });
     }
 
     /**
-     * Envoie un email de notification simple (sans piece jointe).
-     * Ne leve pas d'exception — echec silencieux avec log.
+     * Variante avec {@link BonDAO.BonInfo} — interopérabilité avec GestionDemande.
+     * Envoie les bons au client ET le récap PDF à l'admin dans la même opération.
+     * Le bon N'est PAS marqué "ENVOYE" ici : c'est l'appelant qui le fait
+     * uniquement si le callback onSuccess est déclenché (garantie de cohérence).
      */
+    public static void envoyerBonsParEmail(int demandeId, List<BonDAO.BonInfo> bons,
+                                           int userId,
+                                           Runnable onSuccess, Consumer<String> onError) {
+        if (bons == null || bons.isEmpty()) {
+            SwingUtilities.invokeLater(onSuccess);
+            return;
+        }
+        EMAIL_EXECUTOR.submit(() -> {
+            try {
+                BonDAO.BonInfo first = bons.get(0);
+                String dest    = (first.clientEmail != null && !first.clientEmail.isBlank())
+                                 ? first.clientEmail : "";
+                String ref     = first.reference != null ? first.reference : "DEM-" + demandeId;
+                double total   = bons.stream().mapToDouble(b -> b.valeur).sum();
+                List<File> pdfs = bons.stream()
+                        .filter(b -> b.pdfPath != null)
+                        .map(b -> new File(b.pdfPath))
+                        .filter(File::exists)
+                        .toList();
+
+                // Email client
+                sendMessage(dest,
+                        "Vos bons cadeaux Intermart — " + ref,
+                        buildVoucherTemplate(first.clientNom, ref, bons.size(), total),
+                        pdfs, demandeId, EmailType.VOUCHER);
+
+                // Email récap admin
+                String recapPath = VoucherPDFGenerator.genererRecapPDF(demandeId, bons);
+                List<File> recapPdfs = (recapPath != null && new File(recapPath).exists())
+                        ? List.of(new File(recapPath)) : List.of();
+                sendMessage(ADMIN_EMAIL,
+                        "Récapitulatif génération — " + ref + " (" + bons.size() + " bons)",
+                        buildAdminRecapTemplate(ref, bons.size(),
+                                bons.isEmpty() ? 0 : bons.get(0).valeur, total),
+                        recapPdfs, demandeId, EmailType.ADMIN_RECAP);
+
+                AuditDAO.logEnvoi(demandeId, true, userId,
+                        "Emails envoyés : client=" + dest + ", admin=" + ADMIN_EMAIL);
+                SwingUtilities.invokeLater(onSuccess);
+
+            } catch (Exception ex) {
+                BonDAO.BonInfo first = bons.get(0);
+                String ref = first.reference != null ? first.reference : "DEM-" + demandeId;
+                persistError(demandeId,
+                        first.clientEmail != null ? first.clientEmail : "",
+                        ref, EmailType.VOUCHER, ex);
+                AuditDAO.logEnvoi(demandeId, false, userId, ex.getMessage());
+                SwingUtilities.invokeLater(() -> onError.accept(ex.getMessage()));
+            }
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  2. sendApprovalRequestEmail — Notification à l'approbateur
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Notifie l'approbateur qu'une demande attend son action dans VMS.
+     */
+    public static void sendApprovalRequestEmail(String toEmail, String approbateurName,
+                                                String demandeRef, double montantTotal,
+                                                int demandeId, int userId,
+                                                Runnable onSuccess, Consumer<String> onError) {
+        EMAIL_EXECUTOR.submit(() -> {
+            try {
+                sendMessage(toEmail,
+                        "Action requise — Demande " + demandeRef + " en attente d'approbation",
+                        buildApprovalTemplate(approbateurName, demandeRef, montantTotal),
+                        null, demandeId, EmailType.APPROVAL_REQUEST);
+                AuditDAO.logSimple("demande", demandeId, "EMAIL_APPROBATION", userId,
+                        "Notification approbation → " + toEmail);
+                SwingUtilities.invokeLater(onSuccess);
+            } catch (Exception ex) {
+                persistError(demandeId, toEmail, demandeRef, EmailType.APPROVAL_REQUEST, ex);
+                SwingUtilities.invokeLater(() -> onError.accept(ex.getMessage()));
+            }
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  3. sendPaymentConfirmationEmail — Confirmation de paiement validé
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Confirme qu'un paiement a été validé dans VMS (envoyé au comptable / demandeur).
+     */
+    public static void sendPaymentConfirmationEmail(String toEmail, String comptableName,
+                                                    String demandeRef,
+                                                    int demandeId, int userId,
+                                                    Runnable onSuccess, Consumer<String> onError) {
+        EMAIL_EXECUTOR.submit(() -> {
+            try {
+                sendMessage(toEmail,
+                        "✅ Paiement confirmé — " + demandeRef,
+                        buildPaymentConfirmTemplate(comptableName, demandeRef),
+                        null, demandeId, EmailType.PAYMENT_CONFIRMATION);
+                AuditDAO.logSimple("demande", demandeId, "EMAIL_PAIEMENT", userId,
+                        "Confirmation paiement → " + toEmail);
+                SwingUtilities.invokeLater(onSuccess);
+            } catch (Exception ex) {
+                persistError(demandeId, toEmail, demandeRef, EmailType.PAYMENT_CONFIRMATION, ex);
+                SwingUtilities.invokeLater(() -> onError.accept(ex.getMessage()));
+            }
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  4. sendRecapEmail — Récapitulatif PDF à l'admin
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Envoie le récapitulatif de génération à l'administrateur avec PDF joint.
+     */
+    public static void sendRecapEmail(String adminEmail, String demandeRef,
+                                      int nombreBons, double valeurUnitaire,
+                                      File recapPdf,
+                                      int demandeId, int userId,
+                                      Runnable onSuccess, Consumer<String> onError) {
+        EMAIL_EXECUTOR.submit(() -> {
+            try {
+                double total = nombreBons * valeurUnitaire;
+                List<File> attach = (recapPdf != null && recapPdf.exists())
+                        ? List.of(recapPdf) : List.of();
+                sendMessage(adminEmail,
+                        "Récapitulatif génération bons — " + demandeRef,
+                        buildAdminRecapTemplate(demandeRef, nombreBons, valeurUnitaire, total),
+                        attach, demandeId, EmailType.ADMIN_RECAP);
+                AuditDAO.logSimple("demande", demandeId, "EMAIL_RECAP_ADMIN", userId,
+                        "Récap admin → " + adminEmail);
+                SwingUtilities.invokeLater(onSuccess);
+            } catch (Exception ex) {
+                persistError(demandeId, adminEmail, demandeRef, EmailType.ADMIN_RECAP, ex);
+                SwingUtilities.invokeLater(() -> onError.accept(ex.getMessage()));
+            }
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  5. resendEmail — Relance un email en erreur
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Relit l'enregistrement {@code email_errors} identifié par {@code emailErrorId},
+     * reconstruit l'email depuis la base de données et le renvoie.
+     * Incrémente {@code nb_tentatives} en cas d'échec, marque {@code resolved=true}
+     * si la relance réussit.
+     */
+    public static void resendEmail(long emailErrorId, int userId,
+                                   Runnable onSuccess, Consumer<String> onError) {
+        EMAIL_EXECUTOR.submit(() -> {
+            try {
+                EmailDAO.EmailError err = EmailDAO.getError(emailErrorId);
+                if (err == null)
+                    throw new Exception("Erreur email #" + emailErrorId + " introuvable en base.");
+
+                switch (err.emailType) {
+                    case VOUCHER -> {
+                        List<BonDAO.BonInfo> bons = BonDAO.getBonsByDemande(err.demandeId);
+                        if (bons.isEmpty())
+                            throw new Exception("Aucun bon trouvé pour demande #" + err.demandeId);
+                        BonDAO.BonInfo first = bons.get(0);
+                        List<File> pdfs = bons.stream()
+                                .filter(b -> b.pdfPath != null)
+                                .map(b -> new File(b.pdfPath))
+                                .filter(File::exists)
+                                .toList();
+                        double total = bons.stream().mapToDouble(b -> b.valeur).sum();
+                        sendMessage(err.toEmail,
+                                "Vos bons cadeaux Intermart — " + err.demandeRef,
+                                buildVoucherTemplate(first.clientNom, err.demandeRef,
+                                        bons.size(), total),
+                                pdfs, err.demandeId, EmailType.VOUCHER);
+                    }
+                    case APPROVAL_REQUEST -> sendMessage(err.toEmail,
+                            "Action requise — Demande " + err.demandeRef,
+                            buildApprovalTemplate("", err.demandeRef, 0),
+                            null, err.demandeId, EmailType.APPROVAL_REQUEST);
+
+                    case PAYMENT_CONFIRMATION -> sendMessage(err.toEmail,
+                            "✅ Paiement confirmé — " + err.demandeRef,
+                            buildPaymentConfirmTemplate("", err.demandeRef),
+                            null, err.demandeId, EmailType.PAYMENT_CONFIRMATION);
+
+                    case ADMIN_RECAP -> sendMessage(err.toEmail,
+                            "Récapitulatif génération bons — " + err.demandeRef,
+                            buildAdminRecapTemplate(err.demandeRef, 0, 0, 0),
+                            null, err.demandeId, EmailType.ADMIN_RECAP);
+                }
+
+                EmailDAO.markResolved(emailErrorId);
+                AuditDAO.logSimple("demande", err.demandeId, "EMAIL_RELANCE", userId,
+                        "Relance #" + emailErrorId + " réussie → " + err.toEmail);
+                SwingUtilities.invokeLater(onSuccess);
+
+            } catch (Exception ex) {
+                EmailDAO.incrementTentatives(emailErrorId, ex.getMessage());
+                SwingUtilities.invokeLater(() -> onError.accept(ex.getMessage()));
+            }
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  6. testConnection — Test SMTP (pour ParametresPanel)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Ouvre une connexion SMTP et la ferme immédiatement, SANS envoyer d'email.
+     *
+     * @return {@code true} si la connexion SMTP réussit
+     * @throws Exception message d'erreur détaillé si échec
+     */
+    public static boolean testConnection() throws Exception {
+        if (SIMULATION)
+            throw new Exception(
+                "SMTP non configuré — renseignez mail.password dans config.properties.\n" +
+                "Voir le commentaire en tête de EmailService.java pour la procédure Gmail App Password.");
+        Session session = buildSession();
+        try (Transport transport = session.getTransport("smtp")) {
+            transport.connect(SMTP_HOST, SMTP_USER, SMTP_PASS);
+        }
+        return true;
+    }
+
+    /**
+     * Version asynchrone de {@link #testConnection} pour ParametresController.
+     */
+    public static void testConnectionAsync(Consumer<Boolean> onResult, Consumer<String> onError) {
+        EMAIL_EXECUTOR.submit(() -> {
+            try {
+                boolean ok = testConnection();
+                SwingUtilities.invokeLater(() -> onResult.accept(ok));
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> onError.accept(ex.getMessage()));
+            }
+        });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Notification simple (best-effort, sans callback)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Envoie une notification simple sans pièce jointe ni callback. */
     public static void envoyerNotification(String destinataire, String sujet, String corps) {
-        try {
-            SmtpConfig cfg = loadConfig();
-            envoyerEmail(cfg, destinataire, null, sujet, corps, null, null, null);
-        } catch (Exception e) {
-            System.err.println("[EmailService] Notification non envoyee : " + e.getMessage());
-        }
+        EMAIL_EXECUTOR.submit(() -> {
+            try {
+                sendMessage(destinataire, sujet, corps, null, 0, null);
+            } catch (Exception e) {
+                System.err.println("[EmailService] Notification échouée → " + e.getMessage());
+            }
+        });
     }
 
     /**
-     * Envoie un code OTP de r\u00e9initialisation de mot de passe.
-     * Utilise la config BD/fichier standard. Ne l\u00e8ve pas d'exception.
+     * Envoie un code OTP de réinitialisation de mot de passe.
+     * Synchrone — appelé depuis un SwingWorker.doInBackground(), jamais depuis l'EDT.
      *
-     * @return null si succ\u00e8s, message d'erreur sinon
+     * @param email email du destinataire
+     * @param nom   prénom/nom ou username
+     * @param code  code OTP à 6 chiffres (15 min de validité)
+     * @return {@code null} si succès, message d'erreur si échec
      */
-    public static String envoyerCodeReset(String destinataire, String username, String code) {
-        try {
-            SmtpConfig cfg = loadConfig();
-            String sujet = "[Intermart VMS] Code de r\u00e9initialisation : " + code;
-            String corps = buildCorpsEmailReset(username, code);
-            envoyerEmail(cfg, destinataire, null, sujet, corps, null, null, null);
-            return null; // succ\u00e8s
-        } catch (AuthenticationFailedException e) {
-            return "Authentification SMTP \u00e9chou\u00e9e. Contactez l'administrateur.";
-        } catch (MessagingException e) {
-            return "Erreur SMTP : " + e.getMessage();
-        } catch (Exception e) {
-            return "Erreur : " + e.getMessage();
+    public static String envoyerCodeReset(String email, String nom, String code) {
+        if (SIMULATION) {
+            System.out.printf("[EmailService SIMULATION] Code reset → %s : %s%n", email, code);
+            return null; // succès simulé
         }
+        String sujet = "Réinitialisation de mot de passe — " + C_SYSTEME;
+        String corps = buildPasswordResetTemplate(nom, code);
+        try {
+            sendMessage(email, sujet, corps, null, 0, null);
+            return null;
+        } catch (Exception e) {
+            return e.getMessage();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Méthodes privées — Session SMTP & envoi
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static Session buildSession() {
+        Properties props = new Properties();
+        props.put("mail.smtp.auth",               "true");
+        props.put("mail.smtp.starttls.enable",    "true");
+        props.put("mail.smtp.starttls.required",  "true");
+        props.put("mail.smtp.host",               SMTP_HOST);
+        props.put("mail.smtp.port",               SMTP_PORT);
+        props.put("mail.smtp.ssl.trust",          SMTP_HOST);
+        props.put("mail.smtp.timeout",            String.valueOf(TIMEOUT_MS));
+        props.put("mail.smtp.connectiontimeout",  String.valueOf(CONN_TIMEOUT));
+        props.put("mail.smtp.writetimeout",       String.valueOf(TIMEOUT_MS));
+        return Session.getInstance(props, new Authenticator() {
+            @Override
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication(SMTP_USER, SMTP_PASS);
+            }
+        });
     }
 
     /**
-     * Envoie un email de test a l'adresse indiquee.
-     * Utilise la config passee en parametre (depuis le dialog de parametres).
-     *
-     * @return null si succes, message d'erreur sinon
+     * Méthode centrale : construit le message MIME et l'envoie via SMTP.
+     * En mode simulation (mail.password vide), log en console et retourne sans erreur.
      */
-    public static String envoyerEmailTest(SettingsDAO.EmailSettings settings, String destinataire) {
-        try {
-            SmtpConfig cfg = new SmtpConfig(
-                    settings.smtpServer,
-                    settings.smtpPort > 0 ? settings.smtpPort : 587,
-                    settings.smtpUsername,
-                    settings.smtpPassword,
-                    settings.tlsEnabled,
-                    settings.fromEmail != null ? settings.fromEmail : settings.smtpUsername,
-                    settings.fromName  != null ? settings.fromName  : "Intermart VMS",
-                    settings.adminEmail
-            );
-            if (!cfg.isConfigured()) return "Configuration SMTP incomplete (serveur, utilisateur ou mot de passe manquant)";
-            String corps = buildCorpsEmailTest(destinataire);
-            envoyerEmail(cfg, destinataire, null, "[VMS] Test de configuration email", corps, null, null, null);
-            return null; // succes
-        } catch (AuthenticationFailedException e) {
-            return "Authentification echouee. Verifiez le mot de passe SMTP (Gmail : utilisez un App Password).";
-        } catch (MessagingException e) {
-            return "Erreur SMTP : " + e.getMessage();
-        } catch (Exception e) {
-            return "Erreur : " + e.getMessage();
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    // ENVOI INTERNE
-    // ════════════════════════════════════════════════════════════════════════
-
-    private static void envoyerEmail(SmtpConfig cfg,
-                                      String to, String cc,
-                                      String subject, String body,
-                                      List<BonDAO.BonInfo> attachments,
-                                      Integer demandeId, Integer userId) throws Exception {
-        int nbPJ = attachments != null ? attachments.size() : 0;
-
-        // Mode simulation si SMTP non configure
-        if (!cfg.isConfigured()) {
-            System.out.println("══════════════════════════════════════════════════");
-            System.out.println("[VMS] EMAIL — mode simulation (SMTP non configure)");
-            System.out.println("  A       : " + to);
-            if (cc != null) System.out.println("  CC      : " + cc);
-            System.out.println("  Sujet   : " + subject);
-            System.out.println("  PJ      : " + nbPJ + " fichier(s)");
-            System.out.println("══════════════════════════════════════════════════");
-            System.out.println("[VMS] Pour activer l'envoi reel :");
-            System.out.println("      Parametres > Configuration Email > renseigner SMTP");
-            EmailLogDAO.log(demandeId, to, cc, subject, EmailLogDAO.STATUT_SIMULATION,
-                    "SMTP non configure", nbPJ, userId);
+    private static void sendMessage(String to, String subject, String htmlBody,
+                                    List<File> attachments,
+                                    int demandeId, EmailType type) throws Exception {
+        // ── Mode simulation ──────────────────────────────────────────────────
+        if (SIMULATION) {
+            System.out.println("┌─ EMAIL SIMULATION ─────────────────────────────────────");
+            System.out.println("│  À       : " + to);
+            System.out.println("│  Sujet   : " + subject);
+            System.out.println("│  Type    : " + type);
+            System.out.println("│  PJ      : " + (attachments != null ? attachments.size() : 0) + " fichier(s)");
+            System.out.println("│  → Renseignez mail.password dans config.properties pour activer l'envoi réel.");
+            System.out.println("└────────────────────────────────────────────────────────");
             return;
         }
 
-        Properties props = new Properties();
-        props.put("mail.smtp.auth",                "true");
-        props.put("mail.smtp.starttls.enable",     cfg.tls() ? "true" : "false");
-        props.put("mail.smtp.host",                cfg.host());
-        props.put("mail.smtp.port",                String.valueOf(cfg.port()));
-        props.put("mail.smtp.connectiontimeout",   "10000"); // 10 s
-        props.put("mail.smtp.timeout",             "15000"); // 15 s
-        props.put("mail.smtp.writetimeout",        "15000");
-        if (cfg.tls()) props.put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3");
+        if (to == null || to.isBlank())
+            throw new MessagingException("Adresse email destinataire vide ou nulle.");
 
-        Session session = Session.getInstance(props, new Authenticator() {
-            @Override
-            protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(cfg.user(), cfg.pass());
-            }
-        });
+        // ── Construction du message MIME ─────────────────────────────────────
+        Session session = buildSession();
+        MimeMessage msg = new MimeMessage(session);
+        msg.setFrom(new InternetAddress(FROM_ADDR, FROM_NAME, "UTF-8"));
+        msg.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
+        msg.setSubject(subject, "UTF-8");
 
-        try {
-            MimeMessage message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(cfg.fromEmail(),
-                    MimeUtility.encodeText(cfg.fromName(), "UTF-8", "B"), "UTF-8"));
-            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
-            if (cc != null && !cc.isEmpty()) {
-                message.setRecipients(Message.RecipientType.CC, InternetAddress.parse(cc));
-            }
-            message.setSubject(MimeUtility.encodeText(subject, "UTF-8", "B"));
-            message.setSentDate(new java.util.Date());
+        // Corps HTML
+        MimeBodyPart htmlPart = new MimeBodyPart();
+        htmlPart.setContent(htmlBody, "text/html; charset=UTF-8");
 
-            // Corps HTML + pieces jointes
-            Multipart multipart = new MimeMultipart();
+        Multipart multipart = new MimeMultipart();
+        multipart.addBodyPart(htmlPart);
 
-            MimeBodyPart htmlPart = new MimeBodyPart();
-            htmlPart.setContent(body, "text/html; charset=UTF-8");
-            multipart.addBodyPart(htmlPart);
-
-            if (attachments != null) {
-                for (BonDAO.BonInfo bon : attachments) {
-                    if (bon.pdfPath != null) {
-                        File pdfFile = new File(bon.pdfPath);
-                        if (pdfFile.exists()) {
-                            MimeBodyPart part = new MimeBodyPart();
-                            part.attachFile(pdfFile);
-                            part.setFileName(MimeUtility.encodeText(pdfFile.getName(), "UTF-8", "B"));
-                            multipart.addBodyPart(part);
-                        }
-                    }
+        // Pièces jointes PDF
+        if (attachments != null) {
+            for (File f : attachments) {
+                if (f != null && f.exists() && f.canRead()) {
+                    MimeBodyPart attach = new MimeBodyPart();
+                    attach.attachFile(f);
+                    // Encode le nom de fichier en Base64 pour les clients non-Latin (RFC 2047)
+                    attach.setFileName(MimeUtility.encodeText(f.getName(), "UTF-8", "B"));
+                    multipart.addBodyPart(attach);
                 }
             }
+        }
 
-            message.setContent(multipart);
-            Transport.send(message);
-            System.out.println("[VMS] Email envoye avec succes a : " + to);
-            EmailLogDAO.log(demandeId, to, cc, subject, EmailLogDAO.STATUT_ENVOYE,
-                    null, nbPJ, userId);
-        } catch (Exception ex) {
-            EmailLogDAO.log(demandeId, to, cc, subject, EmailLogDAO.STATUT_ECHEC,
-                    ex.getMessage(), nbPJ, userId);
-            throw ex;
+        msg.setContent(multipart);
+        msg.saveChanges();
+        Transport.send(msg);
+        System.out.println("[EmailService] ✅ Envoyé → " + to + " | " + subject);
+    }
+
+    private static void persistError(int demandeId, String toEmail, String demandeRef,
+                                     EmailType type, Exception ex) {
+        try {
+            EmailDAO.saveError(demandeId, toEmail, demandeRef, type,
+                    ex.getClass().getSimpleName() + ": " + ex.getMessage());
+        } catch (Exception e) {
+            System.err.println("[EmailService] Impossible de persister l'erreur en base : " + e.getMessage());
         }
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // TEMPLATES HTML
-    // ════════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────────────────────────────────────
+    //  Templates HTML — production-ready, compatibles tous clients email
+    //  Gmail · Apple Mail (iPhone/iPad) · Huawei Mail · Samsung Mail
+    //  Outlook · Yahoo Mail · tous les webmails
+    //
+    //  RÈGLES (email-safe) :
+    //  ✅ Layout 100% <table> — pas de Flexbox, pas de CSS Grid
+    //  ✅ Styles 100% inline — pas de <style> externe
+    //  ✅ Largeur max 600px, centré via align="center"
+    //  ✅ Police Arial/Helvetica (universelle sur tous les OS)
+    //  ✅ Couleurs HEX uniquement — pas de rgba()
+    //  ✅ Variables {PLACEHOLDER} remplacées par fill() avant envoi
+    //  ✅ Données dynamiques échappées via escHtml()
+    //  ❌ Pas de media queries · Pas de JavaScript
+    //
+    //  BRANDING Intermart VMS :
+    //  · Header principal  : #000099 (navy — professionnel, sobre)
+    //  · Header notice     : #0066cc (bleu clair — accessible, rassurant)
+    //  · Header interne    : #1e293b (gris foncé — confidentiel / admin)
+    //  · Accentuation      : #25255a (bleu marine foncé — titres info-box)
+    //  · Warning           : #fdf6e0 / #f2c94c / #975a00
+    // ─────────────────────────────────────────────────────────────────────────
 
-    private static String buildCorpsEmailClient(String clientNom, String reference,
-                                                 List<BonDAO.BonInfo> bons) {
-        double total = bons.stream().mapToDouble(b -> b.valeur).sum();
-        String expiration = bons.isEmpty() ? "---"
-                : (bons.get(0).dateExpiration != null && bons.get(0).dateExpiration.length() >= 10
-                   ? bons.get(0).dateExpiration.substring(0, 10) : "---");
+    // ── Constantes Intermart (modifier ici = propagé dans tous les templates) ──
+    private static final String C_SOCIETE  = "Intermart Maurice Ltd";
+    private static final String C_SYSTEME  = "VMS &ndash; Voucher Management System";
+    private static final String C_SUPPORT  = "support@intermart.mu";
+    private static final String C_ENTPR    = "bons@intermart.mu";
+    private static final String C_SITE     = "www.intermart.mu";
+    private static final String C_ADRESSE  = "Port-Louis, &Icirc;le Maurice";
+    private static final String C_REG      = "CCI Maurice";
 
-        StringBuilder bonRows = new StringBuilder();
-        for (BonDAO.BonInfo b : bons) {
-            bonRows.append("<tr>")
-                   .append("<td style='padding:8px 12px;border-bottom:1px solid #eee;font-family:monospace;font-size:12px;'>")
-                   .append(b.codeUnique).append("</td>")
-                   .append("<td style='padding:8px 12px;border-bottom:1px solid #eee;text-align:right;'>")
-                   .append(String.format("Rs %,.2f", b.valeur)).append("</td>")
-                   .append("</tr>");
-        }
-
-        return "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>"
-             + "<body style='margin:0;padding:0;background:#f5f6fa;font-family:Trebuchet MS,Arial,sans-serif;'>"
-             + "<table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f6fa;'><tr><td align='center' style='padding:30px 10px;'>"
-             + "<table width='600' cellpadding='0' cellspacing='0' style='background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);'>"
-             // Header
-             + "<tr><td style='background:#D2232D;padding:28px 36px;text-align:center;'>"
-             + "<h1 style='color:#ffffff;margin:0;font-family:Georgia,serif;font-size:26px;letter-spacing:2px;'>INTERMART</h1>"
-             + "<p style='color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px;'>Systeme de Gestion de Bons Cadeau</p>"
-             + "</td></tr>"
-             // Salutation
-             + "<tr><td style='padding:30px 36px 0;'>"
-             + "<p style='color:#161C2D;font-size:15px;margin:0 0 12px;'>Bonjour <strong>" + esc(clientNom) + "</strong>,</p>"
-             + "<p style='color:#5A6478;font-size:14px;line-height:1.6;margin:0 0 24px;'>"
-             + "Nous avons le plaisir de vous transmettre vos <strong>" + bons.size() + " bon(s) cadeau</strong> Intermart. "
-             + "Veuillez trouver les bons en pieces jointes (un PDF par bon).</p>"
-             // Recapitulatif
-             + "<table width='100%' cellpadding='0' cellspacing='0' style='border:1px solid #e4e6ec;border-radius:6px;margin-bottom:24px;'>"
-             + "<tr style='background:#f8f9fc;'>"
-             + "<td style='padding:10px 16px;font-size:12px;font-weight:bold;color:#5A6478;text-transform:uppercase;letter-spacing:1px;'>Detail</td>"
-             + "<td style='padding:10px 16px;font-size:12px;font-weight:bold;color:#5A6478;text-transform:uppercase;letter-spacing:1px;'>Valeur</td></tr>"
-             + "<tr><td style='padding:10px 16px;border-top:1px solid #e4e6ec;color:#161C2D;'>Reference</td>"
-             + "<td style='padding:10px 16px;border-top:1px solid #e4e6ec;color:#161C2D;font-family:monospace;'>" + esc(reference) + "</td></tr>"
-             + "<tr style='background:#f8f9fc;'><td style='padding:10px 16px;border-top:1px solid #e4e6ec;color:#161C2D;'>Nombre de bons</td>"
-             + "<td style='padding:10px 16px;border-top:1px solid #e4e6ec;color:#161C2D;'>" + bons.size() + "</td></tr>"
-             + "<tr><td style='padding:10px 16px;border-top:1px solid #e4e6ec;color:#161C2D;'>Valeur totale</td>"
-             + "<td style='padding:10px 16px;border-top:1px solid #e4e6ec;color:#D2232D;font-weight:bold;font-size:16px;'>Rs " + String.format("%,.2f", total) + "</td></tr>"
-             + "<tr style='background:#f8f9fc;'><td style='padding:10px 16px;border-top:1px solid #e4e6ec;color:#161C2D;'>Valable jusqu'au</td>"
-             + "<td style='padding:10px 16px;border-top:1px solid #e4e6ec;color:#161C2D;'>" + expiration + "</td></tr>"
-             + "</table>"
-             // Liste des codes
-             + "<p style='color:#161C2D;font-size:14px;font-weight:bold;margin:0 0 10px;'>Vos codes de bons :</p>"
-             + "<table width='100%' cellpadding='0' cellspacing='0' style='border:1px solid #e4e6ec;border-radius:6px;margin-bottom:24px;'>"
-             + "<tr style='background:#161C2D;'>"
-             + "<td style='padding:8px 12px;color:#fff;font-size:12px;font-weight:bold;'>Code unique</td>"
-             + "<td style='padding:8px 12px;color:#fff;font-size:12px;font-weight:bold;text-align:right;'>Valeur</td></tr>"
-             + bonRows
-             + "</table>"
-             // Instructions
-             + "<table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:24px;'>"
-             + "<tr><td style='background:#fff8f8;border-left:4px solid #D2232D;padding:16px;border-radius:4px;'>"
-             + "<p style='color:#161C2D;font-weight:bold;font-size:14px;margin:0 0 10px;'>Comment utiliser vos bons :</p>"
-             + "<ol style='color:#5A6478;font-size:13px;line-height:1.8;margin:0;padding-left:18px;'>"
-             + "<li>Imprimez le PDF du bon ou conservez-le sur votre telephone</li>"
-             + "<li>Presentez-le a la caisse d'un magasin Intermart participant</li>"
-             + "<li>Le superviseur scannera le QR code pour validation</li>"
-             + "</ol>"
-             + "</td></tr></table>"
-             // Mentions
-             + "<p style='color:#A0A8B9;font-size:11px;line-height:1.6;'>Chaque bon est a usage unique, non fractionnable et non remboursable.</p>"
-             + "<p style='color:#161C2D;font-size:14px;margin:20px 0 0;'>Cordialement,<br/><strong>L'equipe Intermart Maurice</strong></p>"
-             + "</td></tr>"
-             // Footer
-             + "<tr><td style='background:#f8f9fc;padding:16px 36px;text-align:center;border-top:1px solid #e4e6ec;'>"
-             + "<p style='color:#A0A8B9;font-size:11px;margin:0;'>© 2026 Intermart Maurice — Tous droits reserves</p>"
-             + "<p style='color:#A0A8B9;font-size:11px;margin:4px 0 0;'>contact@intermart.mu | +230 000 0000 | www.intermart.mu</p>"
-             + "</td></tr>"
-             + "</table></td></tr></table></body></html>";
+    // ─── Méthode utilitaire : remplace les {PLACEHOLDER} dans le template ───
+    private static String fill(String tpl, String... kvPairs) {
+        String out = tpl;
+        for (int i = 0; i + 1 < kvPairs.length; i += 2)
+            out = out.replace(kvPairs[i], kvPairs[i + 1]);
+        return out;
     }
 
-    private static String buildCorpsEmailAdmin(String reference, List<BonDAO.BonInfo> bons) {
-        double total = bons.stream().mapToDouble(b -> b.valeur).sum();
-        return "<!DOCTYPE html><html><body style='font-family:Trebuchet MS,Arial,sans-serif;color:#161C2D;'>"
-             + "<div style='background:#D2232D;padding:16px 24px;'>"
-             + "<h2 style='color:#fff;margin:0;'>VMS — Recap generation</h2></div>"
-             + "<div style='padding:20px 24px;'>"
-             + "<p>Reference : <strong>" + esc(reference) + "</strong></p>"
-             + "<p><strong>" + bons.size() + "</strong> bon(s) generes — Total : <strong>Rs "
-             + String.format("%,.2f", total) + "</strong></p>"
-             + "<p style='color:#5A6478;font-size:12px;'>Le recapitulatif PDF est en piece jointe.</p>"
-             + "<p style='color:#A0A8B9;font-size:11px;'>Email automatique — VMS Intermart</p>"
-             + "</div></body></html>";
+    // ── Formatage conditionnel des montants ───────────────────────────────────
+    private static String montant(double v) {
+        return v > 0 ? "Rs&nbsp;" + String.format("%,.2f", v) : "&mdash;";
     }
 
-    private static String buildCorpsEmailReset(String username, String code) {
-        // Espacement visuel du code : "123456" -> "1 2 3 4 5 6"
-        StringBuilder codeSpaced = new StringBuilder();
-        for (int i = 0; i < code.length(); i++) {
-            if (i > 0) codeSpaced.append(" ");
-            codeSpaced.append(code.charAt(i));
-        }
-        return "<!DOCTYPE html><html><head><meta charset='UTF-8'></head>"
-             + "<body style='margin:0;padding:0;background:#f5f6fa;font-family:Trebuchet MS,Arial,sans-serif;'>"
-             + "<table width='100%' cellpadding='0' cellspacing='0' style='background:#f5f6fa;'><tr><td align='center' style='padding:30px 10px;'>"
-             + "<table width='520' cellpadding='0' cellspacing='0' style='background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);'>"
-             // Header
-             + "<tr><td style='background:#D2232D;padding:28px 36px;text-align:center;'>"
-             + "<h1 style='color:#ffffff;margin:0;font-family:Georgia,serif;font-size:26px;letter-spacing:2px;'>INTERMART</h1>"
-             + "<p style='color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:13px;'>R\u00e9initialisation de mot de passe</p>"
-             + "</td></tr>"
-             // Salutation
-             + "<tr><td style='padding:30px 36px 0;'>"
-             + "<p style='color:#161C2D;font-size:15px;margin:0 0 12px;'>Bonjour <strong>" + esc(username) + "</strong>,</p>"
-             + "<p style='color:#5A6478;font-size:14px;line-height:1.6;margin:0 0 20px;'>"
-             + "Une demande de r\u00e9initialisation de mot de passe a \u00e9t\u00e9 enregistr\u00e9e pour votre compte VMS. "
-             + "Utilisez le code ci-dessous dans l'application pour cr\u00e9er un nouveau mot de passe :</p>"
-             // Code
-             + "<table width='100%' cellpadding='0' cellspacing='0' style='margin:0 0 24px;'>"
-             + "<tr><td style='background:#fff8f8;border:2px dashed #D2232D;border-radius:10px;padding:22px;text-align:center;'>"
-             + "<div style='color:#5A6478;font-size:11px;text-transform:uppercase;letter-spacing:2px;margin-bottom:6px;'>Votre code</div>"
-             + "<div style='color:#D2232D;font-family:Consolas,Menlo,monospace;font-size:34px;font-weight:bold;letter-spacing:6px;'>"
-             + codeSpaced + "</div>"
-             + "<div style='color:#A0A8B9;font-size:11px;margin-top:8px;'>Valable 15 minutes \u2014 usage unique</div>"
-             + "</td></tr></table>"
-             // S\u00e9curit\u00e9
-             + "<table width='100%' cellpadding='0' cellspacing='0' style='margin-bottom:24px;'>"
-             + "<tr><td style='background:#f8f9fc;border-left:4px solid #A0A8B9;padding:14px;border-radius:4px;'>"
-             + "<p style='color:#5A6478;font-size:12px;line-height:1.6;margin:0;'>"
-             + "<strong>Vous n'avez pas fait cette demande ?</strong><br>"
-             + "Ignorez simplement ce message. Votre mot de passe reste inchang\u00e9. "
-             + "Si vous recevez plusieurs de ces emails, contactez votre administrateur."
-             + "</p></td></tr></table>"
-             + "<p style='color:#A0A8B9;font-size:11px;line-height:1.6;'>Pour votre s\u00e9curit\u00e9, ne partagez jamais ce code.</p>"
-             + "<p style='color:#161C2D;font-size:14px;margin:20px 0 0;'>Cordialement,<br/><strong>L'\u00e9quipe Intermart Maurice</strong></p>"
-             + "</td></tr>"
-             // Footer
-             + "<tr><td style='background:#f8f9fc;padding:16px 36px;text-align:center;border-top:1px solid #e4e6ec;'>"
-             + "<p style='color:#A0A8B9;font-size:11px;margin:0;'>\u00a9 2026 Intermart Maurice \u2014 VMS</p>"
-             + "</td></tr>"
-             + "</table></td></tr></table></body></html>";
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TEMPLATE 1 — Bons cadeaux au client (standard, couleur #000099)
+    //  Basé sur la version "Standard professionnelle"
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TEMPLATE 1 RAW — Bons cadeaux au client (Standard #000099)
+    //  Variables : {CLIENT_NAME} {DEMANDE_REF} {NOMBRE_BONS}
+    //              {VALEUR_UNITAIRE} {VALEUR_TOTALE} {NB_PJ}
+    // ─────────────────────────────────────────────────────────────────────────
+    private static final String TPL_VOUCHER = """
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Vos bons cadeaux &ndash; Intermart VMS</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" border="0"
+             style="max-width:600px;width:100%;background-color:#ffffff;border-radius:4px;overflow:hidden;border:1px solid #e0e0e0;">
+
+        <!-- HEADER -->
+        <tr>
+          <td style="background-color:#000099;padding:24px 30px 20px;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="padding:0 0 6px;">
+                <h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">Intermart VMS</h1>
+              </td></tr>
+              <tr><td>
+                <p style="color:#e9e9ff;font-size:13px;margin:0;">Voucher &amp; Gift Management System</p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <tr>
+          <td style="padding:30px;line-height:1.5;">
+            <p style="color:#1a1a1a;font-size:16px;font-weight:500;margin:0 0 14px;">
+              Bonjour <strong>{CLIENT_NAME}</strong>,
+            </p>
+            <p style="color:#344054;font-size:14px;margin:0 0 20px;">
+              Les bons cadeaux associ&eacute;s &agrave; la demande <strong>{DEMANDE_REF}</strong> sont g&eacute;n&eacute;r&eacute;s et disponibles.
+              Vous trouverez <strong>{NB_PJ}</strong> en pi&egrave;ce(s) jointe(s) &agrave; cet email.
+            </p>
+
+            <!-- DETAILS BOX -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="border:1px solid #e0e0e0;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:16px 18px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr><td style="padding:0 0 8px;">
+                    <p style="color:#25255a;font-size:13px;font-weight:bold;margin:0;letter-spacing:0.1em;text-transform:uppercase;">
+                      D&Eacute;TAILS DE LA COMMANDE
+                    </p>
+                  </td></tr>
+                  <tr><td>
+                    <p style="color:#344054;font-size:13px;margin:0;line-height:1.7;">
+                      R&eacute;f&eacute;rence : <strong>{DEMANDE_REF}</strong><br>
+                      Nombre de bons : <strong>{NOMBRE_BONS}</strong><br>
+                      Valeur unitaire : <strong>{VALEUR_UNITAIRE}</strong><br>
+                      Valeur totale : <strong>{VALEUR_TOTALE}</strong>
+                    </p>
+                  </td></tr>
+                </table>
+              </td></tr>
+            </table>
+
+            <!-- WARNING -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#fdf6e0;border:1px solid #f2c94c;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:14px 16px;">
+                <p style="color:#975a00;font-size:13px;margin:0;line-height:1.5;">
+                  &#9888;&#65039; <strong>Utilisation</strong> : chaque bon est &agrave; <strong>usage unique</strong>,
+                  non fractionnable, et doit &ecirc;tre utilis&eacute; avant la date d&apos;expiration.
+                  Toute copie ou tentative de fraude est strictement interdite.
+                </p>
+              </td></tr>
+            </table>
+
+            <p style="color:#344054;font-size:14px;margin:0 0 10px;">
+              Pour toute question concernant cette commande, contactez notre service client :
+            </p>
+            <p style="margin:0 0 18px;">
+              <a href="mailto:{SUPPORT_EMAIL}" style="color:#000099;text-decoration:underline;font-size:14px;">{SUPPORT_EMAIL}</a>
+            </p>
+            <p style="color:#667085;font-size:12px;margin:0;">
+              Ce message est g&eacute;n&eacute;r&eacute; automatiquement, merci de ne pas y r&eacute;pondre directement.
+            </p>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background-color:#f0f0f0;padding:20px 30px;border-top:1px solid #e0e0e0;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="padding:0 0 4px;">
+                <p style="color:#4a4a4a;font-size:12px;font-weight:bold;margin:0;">
+                  Intermart VMS &ndash; Syst&egrave;me de gestion de bons cadeaux
+                </p>
+              </td></tr>
+              <tr><td style="padding:4px 0 0;">
+                <p style="color:#666666;font-size:11px;margin:0;line-height:1.6;">
+                  {C_SYSTEME}<br>
+                  {C_SOCIETE} &bull; {C_ADRESSE}<br>
+                  <a href="https://{C_SITE}" style="color:#000099;text-decoration:underline;font-size:11px;">{C_SITE}</a>
+                </p>
+              </td></tr>
+              <tr><td style="padding:10px 0 0;">
+                <p style="color:#999999;font-size:11px;margin:0;">
+                  Ce message est confidentiel et &agrave; usage exclusif du destinataire.
+                  Toute utilisation, reproduction ou diffusion non autoris&eacute;e est strictement interdite.
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+""";
+
+    /** Template 1 — Bons cadeaux envoyés au client */
+    private static String buildVoucherTemplate(String clientName, String demandeRef,
+                                               int nombreBons, double valeurTotale) {
+        String nbPj = nombreBons + " bon" + (nombreBons > 1 ? "s" : "") +
+                     " (" + nombreBons + " pièce" + (nombreBons > 1 ? "s" : "") + " jointe" + (nombreBons > 1 ? "s" : "") + ")";
+        return fill(TPL_VOUCHER,
+            "{CLIENT_NAME}",     escHtml(clientName),
+            "{DEMANDE_REF}",     escHtml(demandeRef),
+            "{NOMBRE_BONS}",     String.valueOf(nombreBons),
+            "{VALEUR_UNITAIRE}", "&mdash;",
+            "{VALEUR_TOTALE}",   montant(valeurTotale),
+            "{NB_PJ}",           nbPj,
+            "{SUPPORT_EMAIL}",   C_SUPPORT,
+            "{C_SYSTEME}",       C_SYSTEME,
+            "{C_SOCIETE}",       C_SOCIETE,
+            "{C_ADRESSE}",       C_ADRESSE,
+            "{C_SITE}",          C_SITE
+        );
     }
 
-    private static String buildCorpsEmailTest(String destinataire) {
-        return "<!DOCTYPE html><html><body style='font-family:Trebuchet MS,Arial,sans-serif;'>"
-             + "<div style='background:#D2232D;padding:20px 30px;text-align:center;'>"
-             + "<h1 style='color:#fff;margin:0;font-family:Georgia,serif;'>INTERMART VMS</h1></div>"
-             + "<div style='padding:24px 30px;'>"
-             + "<h2 style='color:#161C2D;'>Test de configuration email</h2>"
-             + "<p style='color:#5A6478;'>Cet email confirme que la configuration SMTP est correcte.</p>"
-             + "<div style='background:#f0fff4;border-left:4px solid #22b16e;padding:14px;border-radius:4px;margin:16px 0;'>"
-             + "<strong style='color:#22b16e;'>Configuration operationnelle !</strong><br>"
-             + "<span style='color:#5A6478;font-size:13px;'>Les bons cadeau pourront etre envoyes a : " + esc(destinataire) + "</span>"
-             + "</div>"
-             + "<p style='color:#A0A8B9;font-size:12px;'>Email automatique — VMS Intermart</p>"
-             + "</div></body></html>";
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TEMPLATE 2 RAW — Demande d'approbation (formelle #000099, workflow interne)
+    //  Adapté de la version "Enterprise / Grands comptes"
+    //  Variables : {APPROBATEUR_NAME} {DEMANDE_REF} {MONTANT_TOTAL}
+    // ─────────────────────────────────────────────────────────────────────────
+    private static final String TPL_APPROVAL = """
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Demande d&apos;approbation &ndash; Intermart VMS</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" border="0"
+             style="max-width:600px;width:100%;background-color:#ffffff;border-radius:4px;overflow:hidden;border:1px solid #e0e0e0;">
+
+        <!-- HEADER -->
+        <tr>
+          <td style="background-color:#000099;padding:24px 30px 20px;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td><h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">Intermart VMS</h1></td></tr>
+              <tr><td><p style="color:#e9e9ff;font-size:13px;margin:0;">Workflow d&apos;approbation &ndash; Enterprise Solutions</p></td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <tr>
+          <td style="padding:30px;line-height:1.5;">
+            <p style="color:#1a1a1a;font-size:16px;font-weight:500;margin:0 0 14px;">
+              Bonjour <strong>{APPROBATEUR_NAME}</strong>,
+            </p>
+            <p style="color:#344054;font-size:14px;margin:0 0 18px;">
+              Nous vous informons qu&apos;une demande de bons cadeaux associ&eacute;e &agrave; la r&eacute;f&eacute;rence
+              <strong>{DEMANDE_REF}</strong> est en attente de votre approbation dans le syst&egrave;me VMS Intermart.
+            </p>
+
+            <!-- DETAILS BOX -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="border:1px solid #e0e0e0;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:16px 18px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr><td>
+                    <p style="color:#25255a;font-size:13px;font-weight:bold;margin:0;letter-spacing:0.1em;text-transform:uppercase;">
+                      D&Eacute;TAILS DE LA DEMANDE
+                    </p>
+                  </td></tr>
+                  <tr><td style="padding:8px 0 0;">
+                    <p style="color:#344054;font-size:13px;margin:0;line-height:1.7;">
+                      R&eacute;f&eacute;rence : <strong>{DEMANDE_REF}</strong><br>
+                      Montant total : <strong>{MONTANT_TOTAL}</strong><br>
+                      Statut : <strong>En attente d&apos;approbation</strong>
+                    </p>
+                  </td></tr>
+                </table>
+              </td></tr>
+            </table>
+
+            <!-- WARNING -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#fdf6e0;border:1px solid #f2c94c;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:14px 16px;">
+                <p style="color:#975a00;font-size:13px;margin:0;line-height:1.5;">
+                  &#9888;&#65039; <strong>Action requise</strong> : veuillez vous connecter &agrave; l&apos;application VMS
+                  pour approuver ou rejeter cette demande. Toute d&eacute;cision doit &ecirc;tre trac&eacute;e dans le syst&egrave;me.
+                </p>
+              </td></tr>
+            </table>
+
+            <p style="color:#344054;font-size:14px;margin:0 0 10px;">
+              Pour toute question technique ou administrative, contactez :
+            </p>
+            <p style="margin:0 0 18px;">
+              <a href="mailto:{ENTPR_EMAIL}" style="color:#000099;text-decoration:underline;font-size:14px;">{ENTPR_EMAIL}</a>
+            </p>
+            <p style="color:#667085;font-size:12px;margin:0;">
+              Ce message est g&eacute;n&eacute;r&eacute; automatiquement dans le cadre du workflow VMS. Merci de ne pas y r&eacute;pondre directement.
+            </p>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background-color:#f0f0f0;padding:20px 30px;border-top:1px solid #e0e0e0;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="padding:0 0 4px;">
+                <p style="color:#4a4a4a;font-size:12px;font-weight:bold;margin:0;">
+                  Intermart VMS &ndash; Workflow &amp; Gestion des Bons Cadeaux
+                </p>
+              </td></tr>
+              <tr><td style="padding:4px 0 0;">
+                <p style="color:#666666;font-size:11px;margin:0;line-height:1.6;">
+                  {C_SYSTEME}<br>
+                  {C_SOCIETE} &bull; {C_ADRESSE}<br>
+                  <a href="https://{C_SITE}" style="color:#000099;text-decoration:underline;font-size:11px;">{C_SITE}</a>
+                </p>
+              </td></tr>
+              <tr><td style="padding:10px 0 0;">
+                <p style="color:#999999;font-size:11px;margin:0;">
+                  Ce message est confidentiel et &agrave; usage exclusif de l&apos;organisation destinataire.
+                  Toute utilisation, reproduction ou diffusion non autoris&eacute;e est strictement interdite.
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+""";
+
+    /** Template 2 — Demande d'approbation (pour l'approbateur) */
+    private static String buildApprovalTemplate(String approbateurName, String demandeRef,
+                                                double montantTotal) {
+        String nom = (approbateurName != null && !approbateurName.isBlank())
+                     ? escHtml(approbateurName) : "Madame, Monsieur";
+        return fill(TPL_APPROVAL,
+            "{APPROBATEUR_NAME}", nom,
+            "{DEMANDE_REF}",      escHtml(demandeRef),
+            "{MONTANT_TOTAL}",    montant(montantTotal),
+            "{ENTPR_EMAIL}",      C_ENTPR,
+            "{C_SYSTEME}",        C_SYSTEME,
+            "{C_SOCIETE}",        C_SOCIETE,
+            "{C_ADRESSE}",        C_ADRESSE,
+            "{C_SITE}",           C_SITE
+        );
     }
 
-    // ════════════════════════════════════════════════════════════════════════
-    // UTILITAIRES
-    // ════════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TEMPLATE 3 RAW — Confirmation de paiement (#0066cc, notice client)
+    //  Adapté de la version "Notice client simple et polie"
+    //  Variables : {COMPTABLE_NAME} {DEMANDE_REF}
+    // ─────────────────────────────────────────────────────────────────────────
+    private static final String TPL_PAYMENT = """
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Confirmation de paiement &ndash; Intermart VMS</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" border="0"
+             style="max-width:600px;width:100%;background-color:#ffffff;border-radius:4px;overflow:hidden;border:1px solid #e0e0e0;">
 
-    private static String getEmailDestinataire(int demandeId) {
-        String sql = "SELECT email_destinataire FROM demande WHERE demande_id = ?";
-        try (Connection conn = pkg.vms.DAO.DBconnect.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, demandeId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getString(1);
-            }
-        } catch (SQLException e) {
-            System.err.println("[EmailService] Email destinataire : " + e.getMessage());
-        }
-        return null;
+        <!-- HEADER -->
+        <tr>
+          <td style="background-color:#0066cc;padding:24px 30px 18px;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td><h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">Intermart VMS</h1></td></tr>
+              <tr><td><p style="color:#d9edf7;font-size:13px;margin:0;">Confirmation de validation de paiement</p></td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <tr>
+          <td style="padding:30px;line-height:1.5;">
+            <p style="color:#1a1a1a;font-size:16px;font-weight:500;margin:0 0 14px;">
+              Bonjour <strong>{COMPTABLE_NAME}</strong>,
+            </p>
+            <p style="color:#344054;font-size:14px;margin:0 0 18px;">
+              Nous vous confirmons que le paiement associ&eacute; &agrave; la demande
+              <strong>{DEMANDE_REF}</strong> a &eacute;t&eacute; valid&eacute; avec succ&egrave;s dans le syst&egrave;me VMS Intermart.
+            </p>
+
+            <!-- DETAILS BOX -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="border:1px solid #e0e0e0;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:16px 18px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr><td>
+                    <p style="color:#25255a;font-size:13px;font-weight:bold;margin:0;letter-spacing:0.1em;text-transform:uppercase;">
+                      PAIEMENT VALID&Eacute;
+                    </p>
+                  </td></tr>
+                  <tr><td style="padding:8px 0 0;">
+                    <p style="color:#344054;font-size:13px;margin:0;line-height:1.7;">
+                      R&eacute;f&eacute;rence : <strong>{DEMANDE_REF}</strong><br>
+                      Statut : <strong>Paiement confirm&eacute;</strong><br>
+                      Prochaine &eacute;tape : <strong>En attente d&apos;approbation</strong>
+                    </p>
+                  </td></tr>
+                </table>
+              </td></tr>
+            </table>
+
+            <!-- INFO CLIENT -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#f0f7ff;border:1px solid #0066cc;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:14px 16px;">
+                <p style="color:#003d7a;font-size:13px;margin:0;line-height:1.5;">
+                  &#10003; La demande peut d&eacute;sormais &ecirc;tre soumise &agrave; l&apos;approbateur d&eacute;sign&eacute;.
+                  Connectez-vous &agrave; VMS pour suivre l&apos;&eacute;volution du dossier.
+                </p>
+              </td></tr>
+            </table>
+
+            <p style="color:#344054;font-size:14px;margin:0 0 10px;">
+              Pour toute question ou assistance, contactez le support VMS :
+            </p>
+            <p style="margin:0 0 18px;">
+              <a href="mailto:{ENTPR_EMAIL}" style="color:#0066cc;text-decoration:underline;font-size:14px;">{ENTPR_EMAIL}</a>
+            </p>
+            <p style="color:#667085;font-size:12px;margin:0;">
+              Ce message est g&eacute;n&eacute;r&eacute; automatiquement. Merci de ne pas y r&eacute;pondre directement.
+            </p>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background-color:#f0f0f0;padding:20px 30px;border-top:1px solid #e0e0e0;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="padding:0 0 4px;">
+                <p style="color:#4a4a4a;font-size:12px;font-weight:bold;margin:0;">
+                  Intermart VMS &ndash; Syst&egrave;me de gestion de bons cadeaux
+                </p>
+              </td></tr>
+              <tr><td style="padding:4px 0 0;">
+                <p style="color:#666666;font-size:11px;margin:0;line-height:1.6;">
+                  {C_SYSTEME}<br>
+                  {C_SOCIETE} &bull; {C_ADRESSE}<br>
+                  <a href="https://{C_SITE}" style="color:#0066cc;text-decoration:underline;font-size:11px;">{C_SITE}</a>
+                </p>
+              </td></tr>
+              <tr><td style="padding:10px 0 0;">
+                <p style="color:#999999;font-size:11px;margin:0;">
+                  Ce message est g&eacute;n&eacute;r&eacute; automatiquement. Merci de ne pas y r&eacute;pondre directement.
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+""";
+
+    /** Template 3 — Confirmation de validation de paiement */
+    private static String buildPaymentConfirmTemplate(String comptableName, String demandeRef) {
+        String nom = (comptableName != null && !comptableName.isBlank())
+                     ? escHtml(comptableName) : "Madame, Monsieur";
+        return fill(TPL_PAYMENT,
+            "{COMPTABLE_NAME}", nom,
+            "{DEMANDE_REF}",   escHtml(demandeRef),
+            "{ENTPR_EMAIL}",   C_ENTPR,
+            "{C_SYSTEME}",     C_SYSTEME,
+            "{C_SOCIETE}",     C_SOCIETE,
+            "{C_ADRESSE}",     C_ADRESSE,
+            "{C_SITE}",        C_SITE
+        );
     }
 
-    /** Echappe les caracteres HTML pour eviter les injections. */
-    private static String esc(String s) {
-        if (s == null) return "";
-        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    // ─────────────────────────────────────────────────────────────────────────
+    //  TEMPLATE 4 RAW — Récapitulatif admin (#1e293b, confidentiel interne)
+    //  Adapté de la version "Enterprise" — usage administrateur uniquement
+    //  Variables : {DEMANDE_REF} {NOMBRE_BONS} {VALEUR_UNITAIRE} {VALEUR_TOTALE}
+    // ─────────────────────────────────────────────────────────────────────────
+    private static final String TPL_ADMIN_RECAP = """
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>R&eacute;capitulatif administrateur &ndash; Intermart VMS</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" border="0"
+             style="max-width:600px;width:100%;background-color:#ffffff;border-radius:4px;overflow:hidden;border:1px solid #e0e0e0;">
+
+        <!-- HEADER -->
+        <tr>
+          <td style="background-color:#1e293b;padding:24px 30px 20px;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td><h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">Intermart VMS</h1></td></tr>
+              <tr><td><p style="color:#94a3b8;font-size:13px;margin:0;">R&eacute;capitulatif administrateur &ndash; Usage confidentiel</p></td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- BODY -->
+        <tr>
+          <td style="padding:30px;line-height:1.5;">
+            <p style="color:#344054;font-size:14px;margin:0 0 18px;">
+              La g&eacute;n&eacute;ration de bons cadeaux associ&eacute;e &agrave; la demande de r&eacute;f&eacute;rence
+              <strong>{DEMANDE_REF}</strong> est termin&eacute;e. Le r&eacute;capitulatif PDF est joint &agrave; cet email.
+            </p>
+
+            <!-- DETAILS BOX -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="border:1px solid #e0e0e0;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:16px 18px;">
+                <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                  <tr><td>
+                    <p style="color:#25255a;font-size:13px;font-weight:bold;margin:0;letter-spacing:0.1em;text-transform:uppercase;">
+                      D&Eacute;TAILS DE LA G&Eacute;N&Eacute;RATION
+                    </p>
+                  </td></tr>
+                  <tr><td style="padding:8px 0 0;">
+                    <p style="color:#344054;font-size:13px;margin:0;line-height:1.7;">
+                      R&eacute;f&eacute;rence : <strong>{DEMANDE_REF}</strong><br>
+                      Nombre de bons g&eacute;n&eacute;r&eacute;s : <strong>{NOMBRE_BONS}</strong><br>
+                      Valeur unitaire : <strong>{VALEUR_UNITAIRE}</strong><br>
+                      Valeur totale : <strong>{VALEUR_TOTALE}</strong><br>
+                      Bons envoy&eacute;s au client : <strong>Oui</strong>
+                    </p>
+                  </td></tr>
+                </table>
+              </td></tr>
+            </table>
+
+            <!-- WARNING -->
+            <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background-color:#fdf6e0;border:1px solid #f2c94c;border-radius:6px;margin:0 0 20px;">
+              <tr><td style="padding:14px 16px;">
+                <p style="color:#975a00;font-size:13px;margin:0;line-height:1.5;">
+                  &#9888;&#65039; <strong>Confidentiel</strong> : ce r&eacute;capitulatif est r&eacute;serv&eacute; &agrave;
+                  l&apos;administrateur. Les bons g&eacute;n&eacute;r&eacute;s sont actifs et op&eacute;rationnels.
+                  Toute anomalie doit &ecirc;tre signal&eacute;e imm&eacute;diatement.
+                </p>
+              </td></tr>
+            </table>
+
+            <p style="color:#667085;font-size:12px;margin:0;">
+              Ce message est g&eacute;n&eacute;r&eacute; automatiquement par le syst&egrave;me VMS. Merci de ne pas y r&eacute;pondre directement.
+            </p>
+          </td>
+        </tr>
+
+        <!-- FOOTER -->
+        <tr>
+          <td style="background-color:#f0f0f0;padding:20px 30px;border-top:1px solid #e0e0e0;text-align:left;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="padding:0 0 4px;">
+                <p style="color:#4a4a4a;font-size:12px;font-weight:bold;margin:0;">
+                  Intermart VMS &ndash; Administration &amp; Gestion des Bons
+                </p>
+              </td></tr>
+              <tr><td style="padding:4px 0 0;">
+                <p style="color:#666666;font-size:11px;margin:0;line-height:1.6;">
+                  {C_SYSTEME}<br>
+                  {C_SOCIETE} &bull; {C_ADRESSE}
+                </p>
+              </td></tr>
+              <tr><td style="padding:10px 0 0;">
+                <p style="color:#999999;font-size:11px;margin:0;">
+                  Ce message est confidentiel et &agrave; usage exclusif de l&apos;organisation destinataire.
+                  Toute utilisation, reproduction ou diffusion non autoris&eacute;e est strictement interdite.
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+""";
+
+    /** Template 4 — Récapitulatif admin après génération des bons */
+    private static String buildAdminRecapTemplate(String demandeRef, int nombreBons,
+                                                  double valeurUnitaire, double valeurTotale) {
+        return fill(TPL_ADMIN_RECAP,
+            "{DEMANDE_REF}",     escHtml(demandeRef),
+            "{NOMBRE_BONS}",     String.valueOf(nombreBons),
+            "{VALEUR_UNITAIRE}", montant(valeurUnitaire),
+            "{VALEUR_TOTALE}",   montant(valeurTotale),
+            "{C_SYSTEME}",       C_SYSTEME,
+            "{C_SOCIETE}",       C_SOCIETE,
+            "{C_ADRESSE}",       C_ADRESSE,
+            "{C_SITE}",          C_SITE
+        );
+    }
+
+    // ── Template : réinitialisation mot de passe ──────────────────────────────
+
+    private static final String TPL_PASSWORD_RESET = """
+        <!DOCTYPE html>
+        <html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Réinitialisation de mot de passe</title></head>
+        <body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 0">
+          <tr><td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <!-- Header -->
+              <tr><td style="background:#000099;padding:32px 40px;text-align:center">
+                <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:1px">{C_SYSTEME}</p>
+                <p style="margin:6px 0 0;font-size:12px;color:rgba(255,255,255,0.7)">{C_SOCIETE}</p>
+              </td></tr>
+              <!-- Body -->
+              <tr><td style="padding:40px">
+                <p style="margin:0 0 16px;font-size:20px;font-weight:600;color:#1e293b">Réinitialisation de mot de passe</p>
+                <p style="margin:0 0 24px;color:#475569;font-size:14px;line-height:1.6">
+                  Bonjour <strong>{NOM}</strong>,<br>
+                  Vous avez demandé une réinitialisation de votre mot de passe.<br>
+                  Voici votre code à usage unique, valable <strong>15 minutes</strong> :
+                </p>
+                <!-- Code OTP -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0">
+                  <tr><td align="center">
+                    <div style="display:inline-block;background:#f1f5f9;border:2px solid #000099;border-radius:8px;padding:20px 40px">
+                      <span style="font-size:36px;font-weight:700;color:#000099;letter-spacing:12px;font-family:monospace">{CODE}</span>
+                    </div>
+                  </td></tr>
+                </table>
+                <p style="margin:24px 0 0;color:#64748b;font-size:12px;line-height:1.6;text-align:center">
+                  Si vous n&rsquo;avez pas demandé cette réinitialisation, ignorez cet email.<br>
+                  Ne partagez jamais ce code — notre équipe ne vous le demandera jamais.
+                </p>
+              </td></tr>
+              <!-- Footer -->
+              <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
+                <p style="margin:0;font-size:11px;color:#94a3b8">{C_SYSTEME} &mdash; {C_SOCIETE} &mdash; {C_ADRESSE}</p>
+                <p style="margin:4px 0 0;font-size:11px;color:#94a3b8">{C_SITE}</p>
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+        </body></html>
+        """;
+
+    private static String buildPasswordResetTemplate(String nom, String code) {
+        return fill(TPL_PASSWORD_RESET,
+            "{NOM}",       escHtml(nom),
+            "{CODE}",      escHtml(code),
+            "{C_SYSTEME}", C_SYSTEME,
+            "{C_SOCIETE}", C_SOCIETE,
+            "{C_ADRESSE}", C_ADRESSE,
+            "{C_SITE}",    C_SITE
+        );
     }
 
     /**
-     * Indique si le service email est configure et pret a envoyer.
-     * Utile pour afficher un badge d'etat dans l'UI.
+     * Échappe les caractères HTML dangereux dans toutes les données dynamiques.
+     * Indispensable pour éviter l'injection HTML dans les emails.
      */
-    public static boolean isConfigured() {
-        return loadConfig().isConfigured();
+    private static String escHtml(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 }
