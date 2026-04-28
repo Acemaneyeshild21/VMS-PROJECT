@@ -123,7 +123,7 @@ public class ArchivesView {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         table.setStyle("-fx-font-size:13;");
         VBox.setVgrow(table, Priority.ALWAYS);
-        table.setPlaceholder(new Label("Aucune entrée archivée."));
+        table.setPlaceholder(pkg.vms.VmsUI.emptyState("📁", "Aucune archive", "Les demandes archivées, rejetées ou annulées apparaissent ici."));
 
         table.getColumns().addAll(
             col("Référence",    1, 140),

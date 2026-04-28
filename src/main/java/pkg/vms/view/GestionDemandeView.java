@@ -115,7 +115,7 @@ public class GestionDemandeView {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         table.setStyle("-fx-font-size:13;");
         VBox.setVgrow(table, Priority.ALWAYS);
-        table.setPlaceholder(new Label("Aucune demande trouvée."));
+        table.setPlaceholder(pkg.vms.VmsUI.emptyState("📋", "Aucune demande", "Créez votre première demande de bons cadeaux."));
 
         table.getColumns().addAll(
             col("Référence",     1, 140),

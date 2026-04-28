@@ -116,7 +116,7 @@ public class ValidationView {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         table.setStyle("-fx-font-size:13;");
         VBox.setVgrow(table, Priority.ALWAYS);
-        table.setPlaceholder(new Label("Aucune demande pour ce filtre."));
+        table.setPlaceholder(pkg.vms.VmsUI.emptyState("✅", "Aucune demande", "Aucune demande ne correspond au filtre sélectionné."));
 
         table.getColumns().addAll(
             col("Référence",    1, 140),

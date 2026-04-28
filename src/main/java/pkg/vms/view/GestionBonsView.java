@@ -113,7 +113,7 @@ public class GestionBonsView {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         table.setStyle("-fx-font-size:13;");
         VBox.setVgrow(table, Priority.ALWAYS);
-        table.setPlaceholder(new Label("Aucun bon trouvé."));
+        table.setPlaceholder(pkg.vms.VmsUI.emptyState("🎟", "Aucun bon", "Les bons apparaissent ici après approbation d'une demande."));
 
         table.getColumns().addAll(
             col("Référence",    1, 140),

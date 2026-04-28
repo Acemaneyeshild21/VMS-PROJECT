@@ -94,7 +94,7 @@ public class GestionClientsView {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         table.setStyle("-fx-font-size:13;");
         VBox.setVgrow(table, Priority.ALWAYS);
-        table.setPlaceholder(new Label("Aucun client trouvé."));
+        table.setPlaceholder(pkg.vms.VmsUI.emptyState("👥", "Aucun client", "Ajoutez votre premier client avec le bouton ci-dessus."));
 
         TableColumn<Client, String> cNom = colStr("Nom", c -> c.getName(), 160);
         TableColumn<Client, String> cEmail = colStr("Email", c -> c.getEmail(), 200);
