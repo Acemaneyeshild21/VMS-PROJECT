@@ -193,7 +193,7 @@ public class VoucherDAO {
                 // Notification à l'approbateur après paiement
                 if ("PAYE".equals(newStatus)) {
                     // Pour le BTS, on peut notifier une adresse d'approbation centralisée ou via les rôles
-                    EmailService.envoyerNotification(pkg.vms.Config.get("smtp.approver.email", "approbations@intermart.mu"), 
+                    EmailService.envoyerNotification(pkg.vms.Config.get("smtp.approver.email", "approbations@vms.mu"),
                         "Demande PAYÉE — En attente d'approbation", 
                         "La demande #" + demandeId + " vient d'être payée. Merci de procéder à l'approbation.");
                 }

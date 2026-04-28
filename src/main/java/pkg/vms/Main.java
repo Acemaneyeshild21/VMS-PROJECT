@@ -1,22 +1,31 @@
 package pkg.vms;
 
+import javafx.application.Application;
+import javafx.stage.Stage;
 import pkg.vms.DAO.EmailLogDAO;
 import pkg.vms.DAO.PasswordResetDAO;
 
-import javax.swing.SwingUtilities;
+/**
+ * Point d'entrée JavaFX de l'application VoucherManager (VMS).
+ *
+ * <p>La classe {@link Launcher} appelle {@code Main.launch()} pour contourner
+ * la restriction du module system JavaFX sur les fat-JARs.</p>
+ *
+ * <p>Phase 2 : {@code start()} instanciera {@code LoginView} (JavaFX).</p>
+ */
+public class Main extends Application {
 
-public class Main {
-    public static void main(String[] args) {
-        // Charge le th\u00e8me (clair/sombre) avant d'afficher toute fen\u00eatre
-        ThemeManager.loadAndApply();
-
-        // Cr\u00e9e les tables auxiliaires si elles n'existent pas encore
-        // (d\u00e9ploiement \u00e0 chaud sans r\u00e9-ex\u00e9cuter schema.sql)
+    @Override
+    public void start(Stage primaryStage) {
+        // Initialisation des tables auxiliaires (hot-deploy sans re-exécuter schema.sql)
         EmailLogDAO.ensureSchema();
         PasswordResetDAO.ensureSchema();
 
-        SwingUtilities.invokeLater(() -> {
-            new LoginForm().setVisible(true);
-        });
+        // Phase 2 : LoginView JavaFX sera créée ici
+        // new LoginView(primaryStage).show();
+    }
+
+    public static void main(String[] args) {
+        launch(args);
     }
 }

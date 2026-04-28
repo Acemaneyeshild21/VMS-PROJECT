@@ -167,7 +167,7 @@ public class ImportClientsDialog extends JDialog {
     private void showExample() {
         String example =
                 "name;email;contact_number;company\n" +
-                "Jean Dupont;jean.dupont@example.com;+230 5123 4567;Intermart Ltd\n" +
+                "Jean Dupont;jean.dupont@example.com;+230 5123 4567;Société Exemple Ltd\n" +
                 "Marie Curie;marie@example.mu;5789 1234;Curie Boutique\n";
         JTextArea ta = new JTextArea(example);
         ta.setFont(new Font("Consolas", Font.PLAIN, 12));

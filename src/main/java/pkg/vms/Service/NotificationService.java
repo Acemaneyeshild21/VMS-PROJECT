@@ -18,7 +18,7 @@ public class NotificationService {
      */
     public static void notifyNewDemande(String reference, String clientNom, double montant) {
         try {
-            String comptableEmail = "comptable@intermart.mu";
+            String comptableEmail = "comptable@vms.mu";
 
             String corps = "<h2>📋 Nouvelle Demande à Valider</h2>" +
                     "<p>Une nouvelle demande de bons cadeau attend votre validation.</p>" +
@@ -55,7 +55,7 @@ public class NotificationService {
      */
     public static void notifyApprovalRequired(String reference, String clientNom, int nombreBons, double montant) {
         try {
-            String approbateurEmail = "approbateur@intermart.mu";
+            String approbateurEmail = "approbateur@vms.mu";
 
             String corps = "<h2>✅ Demande Prête pour Approbation</h2>" +
                     "<p>Une demande avec paiement validé attend votre approbation pour la génération des bons.</p>" +
@@ -152,7 +152,7 @@ public class NotificationService {
      */
     public static void notifyRedemption(String codeBon, String magasinNom, double montant) {
         try {
-            String managerEmail = "manager@intermart.mu";
+            String managerEmail = "manager@vms.mu";
 
             String corps = "<h2>🛍️ Bon Cadeau Rédimé en Magasin</h2>" +
                     "<p>Un bon cadeau vient d'être rédimé avec succès dans l'un de nos points de vente.</p>" +
@@ -191,7 +191,7 @@ public class NotificationService {
         try {
             String corps = "<h2>📧 Vos Bons Cadeau Ont Été Envoyés!</h2>" +
                     "<p>Bonjour <strong>" + clientNom + "</strong>,</p>" +
-                    "<p>Vos bons cadeau Intermart ont été générés et vous sont transmis par email.</p>" +
+                    "<p>Vos bons cadeau VMS ont été générés et vous sont transmis par email.</p>" +
                     "<table border='1' cellpadding='10' style='border-collapse: collapse;'>" +
                     "<tr style='background-color: #f0f0f0;'>" +
                     "<td><strong>Référence:</strong></td>" +
@@ -209,7 +209,7 @@ public class NotificationService {
                     "<p style='margin-top: 15px;'><strong>✓ Prochaine étape:</strong> Vous recevrez sous peu un email contenant vos bons en pièce jointe (format PDF).</p>" +
                     "<p style='color: #666; font-size: 12px;'>Chaque bon est à usage unique et doit être présenté en magasin pour validation.</p>";
 
-            EmailService.envoyerNotification(clientEmail, "🎁 Vos Bons Cadeau Intermart - " + reference, corps);
+            EmailService.envoyerNotification(clientEmail, "🎁 Vos Bons Cadeau VMS - " + reference, corps);
             System.out.println("✅ Notification envoi bons envoyée au client");
         } catch (Exception e) {
             System.err.println("❌ Erreur envoi notification client: " + e.getMessage());

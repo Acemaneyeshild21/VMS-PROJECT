@@ -235,7 +235,7 @@ INSERT INTO app_settings (setting_key, setting_value) VALUES
     ('email', 'Configuration SMTP'),
     ('bon_validite_defaut', '365'),
     ('bon_type_defaut', 'Standard'),
-    ('bon_entreprise', 'Intermart Maurice'),
+    ('bon_entreprise', 'VMS — Voucher Management System'),
     ('bon_format_qr', 'QR_CODE'),
     ('bon_signature', 'false')
 ON CONFLICT (setting_key) DO NOTHING;
@@ -506,21 +506,21 @@ GROUP BY s.societe_id, s.nom;
 -- 6. DONNÉES DE TEST
 -- ────────────────────────────────────────────────────────────────────────────
 
--- Société
+-- Société (exemple générique — à personnaliser selon le client)
 INSERT INTO societe (nom, adresse, email) VALUES
-    ('Intermart Maurice', 'Cybercité, Ebène', 'contact@intermart.mu')
+    ('VMS Enseigne Principale', 'Cybercité, Ebène, Île Maurice', 'contact@vms.mu')
 ON CONFLICT DO NOTHING;
 
--- Magasins
+-- Magasins (points de vente exemples)
 INSERT INTO magasin (societe_id, nom_magasin, adresse) VALUES
-    (1, 'Intermart Ebène',       'Cybercité, Ebène'),
-    (1, 'Intermart Port-Louis',  'Caudan Waterfront, Port-Louis'),
-    (1, 'Intermart Curepipe',    'Curepipe Road, Curepipe')
+    (1, 'VMS Point de Vente — Ebène',      'Cybercité, Ebène'),
+    (1, 'VMS Point de Vente — Port-Louis', 'Caudan Waterfront, Port-Louis'),
+    (1, 'VMS Point de Vente — Curepipe',   'Curepipe Road, Curepipe')
 ON CONFLICT DO NOTHING;
 
--- Utilisateur admin par defaut (mot de passe : admin)
+-- Utilisateur admin par défaut (mot de passe : admin → migré BCrypt à la 1ère connexion)
 INSERT INTO utilisateur (username, email, password, role) VALUES
-    ('admin', 'admin@intermart.mu', '$2a$10$IHLDj8FrYmsg3payhyc6x.mVUo7JdHH.kP5YaFg2K9MvqgOzG.0/6', 'Administrateur')
+    ('admin', 'admin@vms.mu', '$2a$10$IHLDj8FrYmsg3payhyc6x.mVUo7JdHH.kP5YaFg2K9MvqgOzG.0/6', 'Administrateur')
 ON CONFLICT (username) DO NOTHING;
 
 -- ────────────────────────────────────────────────────────────────────────────

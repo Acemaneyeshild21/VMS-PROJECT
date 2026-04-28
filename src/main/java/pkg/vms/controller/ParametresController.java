@@ -1,9 +1,9 @@
 package pkg.vms.controller;
 
+import javafx.concurrent.Task;
 import pkg.vms.ExcelExportService;
 import pkg.vms.DAO.*;
 
-import javax.swing.SwingWorker;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -12,132 +12,122 @@ public class ParametresController {
     // ── User profile ─────────────────────────────────────────────────────────
 
     public void chargerProfil(int userId, Consumer<UserDAO.UserProfile> onSuccess, Consumer<String> onError) {
-        new SwingWorker<UserDAO.UserProfile, Void>() {
-            @Override protected UserDAO.UserProfile doInBackground() throws Exception {
+        Task<UserDAO.UserProfile> task = new Task<>() {
+            @Override protected UserDAO.UserProfile call() throws Exception {
                 return UserDAO.getUserProfile(userId);
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void mettreAJourProfil(int userId, String username, String email,
                                    Consumer<Boolean> onSuccess, Consumer<String> onError) {
-        new SwingWorker<Boolean, Void>() {
-            @Override protected Boolean doInBackground() throws Exception {
+        Task<Boolean> task = new Task<>() {
+            @Override protected Boolean call() throws Exception {
                 return UserDAO.updateProfile(userId, username, email);
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void changerMotDePasse(int userId, String ancien, String nouveau,
                                    Consumer<Boolean> onSuccess, Consumer<String> onError) {
-        new SwingWorker<Boolean, Void>() {
-            @Override protected Boolean doInBackground() throws Exception {
+        Task<Boolean> task = new Task<>() {
+            @Override protected Boolean call() throws Exception {
                 return UserDAO.updatePassword(userId, ancien, nouveau);
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     // ── Users management ─────────────────────────────────────────────────────
 
     public void chargerUtilisateurs(Consumer<List<UserDAO.UserProfile>> onSuccess, Consumer<String> onError) {
-        new SwingWorker<List<UserDAO.UserProfile>, Void>() {
-            @Override protected List<UserDAO.UserProfile> doInBackground() throws Exception {
+        Task<List<UserDAO.UserProfile>> task = new Task<>() {
+            @Override protected List<UserDAO.UserProfile> call() throws Exception {
                 return UserDAO.getAllUsers();
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void chargerRolesDisponibles(Consumer<List<String>> onSuccess, Consumer<String> onError) {
-        new SwingWorker<List<String>, Void>() {
-            @Override protected List<String> doInBackground() throws Exception {
+        Task<List<String>> task = new Task<>() {
+            @Override protected List<String> call() throws Exception {
                 return UserDAO.getAllRoles();
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void creerUtilisateur(String username, String email, String password, String role,
                                   Consumer<Boolean> onSuccess, Consumer<String> onError) {
-        new SwingWorker<Boolean, Void>() {
-            @Override protected Boolean doInBackground() throws Exception {
+        Task<Boolean> task = new Task<>() {
+            @Override protected Boolean call() throws Exception {
                 return UserDAO.registerUser(username, email, password, role);
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void changerRoleUtilisateur(int uid, String newRole, Runnable onSuccess, Consumer<String> onError) {
-        new SwingWorker<Void, Void>() {
-            @Override protected Void doInBackground() throws Exception {
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
                 UserDAO.updateUserRole(uid, newRole);
                 return null;
             }
-            @Override protected void done() {
-                try { get(); onSuccess.run(); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     // ── DB monitoring ─────────────────────────────────────────────────────────
 
     public void chargerStatsDB(Consumer<StatistiquesDAO.DbStats> onSuccess, Consumer<String> onError) {
-        new SwingWorker<StatistiquesDAO.DbStats, Void>() {
-            @Override protected StatistiquesDAO.DbStats doInBackground() throws Exception {
+        Task<StatistiquesDAO.DbStats> task = new Task<>() {
+            @Override protected StatistiquesDAO.DbStats call() throws Exception {
                 return StatistiquesDAO.getDBStats();
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void vacuumDB(Runnable onSuccess, Consumer<String> onError) {
-        new SwingWorker<Void, Void>() {
-            @Override protected Void doInBackground() throws Exception {
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
                 StatistiquesDAO.vacuumDB();
                 return null;
             }
-            @Override protected void done() {
-                try { get(); onSuccess.run(); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void testerConnexionDB(Consumer<Boolean> onSuccess, Consumer<String> onError) {
-        new SwingWorker<Boolean, Void>() {
-            @Override protected Boolean doInBackground() throws Exception {
+        Task<Boolean> task = new Task<>() {
+            @Override protected Boolean call() throws Exception {
                 return DBconnect.testConnection();
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void testerConnexionEmail(Consumer<Boolean> onSuccess, Consumer<String> onError) {
@@ -147,116 +137,108 @@ public class ParametresController {
     // ── Email config ─────────────────────────────────────────────────────────
 
     public void chargerConfigEmail(Consumer<SettingsDAO.EmailSettings> onSuccess, Consumer<String> onError) {
-        new SwingWorker<SettingsDAO.EmailSettings, Void>() {
-            @Override protected SettingsDAO.EmailSettings doInBackground() throws Exception {
+        Task<SettingsDAO.EmailSettings> task = new Task<>() {
+            @Override protected SettingsDAO.EmailSettings call() throws Exception {
                 return SettingsDAO.getEmailSettings();
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void sauvegarderConfigEmail(SettingsDAO.EmailSettings settings,
                                         Consumer<Boolean> onSuccess, Consumer<String> onError) {
-        new SwingWorker<Boolean, Void>() {
-            @Override protected Boolean doInBackground() throws Exception {
+        Task<Boolean> task = new Task<>() {
+            @Override protected Boolean call() throws Exception {
                 return SettingsDAO.updateEmailSettings(settings);
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     // ── Audit logs ────────────────────────────────────────────────────────────
 
     public void chargerLogs(String role, int userId, Consumer<List<String[]>> onSuccess, Consumer<String> onError) {
-        new SwingWorker<List<String[]>, Void>() {
-            @Override protected List<String[]> doInBackground() throws Exception {
+        Task<List<String[]>> task = new Task<>() {
+            @Override protected List<String[]> call() throws Exception {
                 return AuditDAO.getAuditTrail(role, userId);
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     // ── Societies ─────────────────────────────────────────────────────────────
 
     public void chargerSocietes(Consumer<List<SocieteDAO.Societe>> onSuccess, Consumer<String> onError) {
-        new SwingWorker<List<SocieteDAO.Societe>, Void>() {
-            @Override protected List<SocieteDAO.Societe> doInBackground() throws Exception {
+        Task<List<SocieteDAO.Societe>> task = new Task<>() {
+            @Override protected List<SocieteDAO.Societe> call() throws Exception {
                 return SocieteDAO.getAllSocietes();
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void ajouterSociete(String nom, String adresse, String tel, String email,
                                 Runnable onSuccess, Consumer<String> onError) {
-        new SwingWorker<Void, Void>() {
-            @Override protected Void doInBackground() throws Exception {
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
                 SocieteDAO.addSociete(nom, adresse, tel, email);
                 return null;
             }
-            @Override protected void done() {
-                try { get(); onSuccess.run(); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void supprimerSociete(int id, Runnable onSuccess, Consumer<String> onError) {
-        new SwingWorker<Void, Void>() {
-            @Override protected Void doInBackground() throws Exception {
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
                 SocieteDAO.deleteSociete(id);
                 return null;
             }
-            @Override protected void done() {
-                try { get(); onSuccess.run(); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     // ── Magasins ──────────────────────────────────────────────────────────────
 
     public void chargerMagasins(Consumer<List<MagasinDAO.Magasin>> onSuccess, Consumer<String> onError) {
-        new SwingWorker<List<MagasinDAO.Magasin>, Void>() {
-            @Override protected List<MagasinDAO.Magasin> doInBackground() throws Exception {
+        Task<List<MagasinDAO.Magasin>> task = new Task<>() {
+            @Override protected List<MagasinDAO.Magasin> call() throws Exception {
                 return MagasinDAO.getAllMagasins();
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void ajouterMagasin(String nom, String adresse, Consumer<Boolean> onSuccess, Consumer<String> onError) {
-        new SwingWorker<Boolean, Void>() {
-            @Override protected Boolean doInBackground() throws Exception {
+        Task<Boolean> task = new Task<>() {
+            @Override protected Boolean call() throws Exception {
                 return MagasinDAO.addMagasin(nom, adresse, null);
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     // ── Config bons ───────────────────────────────────────────────────────────
 
     public void chargerConfigBons(Consumer<Map<String, String>> onSuccess, Consumer<String> onError) {
-        new SwingWorker<Map<String, String>, Void>() {
-            @Override protected Map<String, String> doInBackground() throws Exception {
+        Task<Map<String, String>> task = new Task<>() {
+            @Override protected Map<String, String> call() throws Exception {
                 Map<String, String> m = new LinkedHashMap<>();
                 String[] keys = {"bon_validite_defaut", "bon_type_defaut", "bon_entreprise", "bon_format_qr", "bon_signature"};
                 for (String k : keys) {
@@ -265,74 +247,69 @@ public class ParametresController {
                 }
                 return m;
             }
-            @Override protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void sauvegarderConfigBons(Map<String, String> settings, Runnable onSuccess, Consumer<String> onError) {
-        new SwingWorker<Void, Void>() {
-            @Override protected Void doInBackground() throws Exception {
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
                 for (Map.Entry<String, String> e : settings.entrySet())
                     SettingsDAO.updateSetting(e.getKey(), e.getValue());
                 return null;
             }
-            @Override protected void done() {
-                try { get(); onSuccess.run(); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     // ── Exports ───────────────────────────────────────────────────────────────
 
     public void exporterDemandes(String filePath, Runnable onSuccess, Consumer<String> onError) {
-        new SwingWorker<Void, Void>() {
-            @Override protected Void doInBackground() throws Exception {
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
                 String[] cols = {"ID", "Référence", "Facture", "Client", "Montant", "Nb Bons", "Statut", "Date"};
                 ExcelExportService.exportData(filePath, "Demandes", cols, BonDAO.getDemandesForExport());
                 return null;
             }
-            @Override protected void done() {
-                try { get(); onSuccess.run(); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void exporterBons(String filePath, Runnable onSuccess, Consumer<String> onError) {
-        new SwingWorker<Void, Void>() {
-            @Override protected Void doInBackground() throws Exception {
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
                 String[] cols = {"ID", "Code Unique", "Valeur", "Statut", "Émission", "Réf Demande", "Client"};
                 ExcelExportService.exportData(filePath, "Bons", cols, BonDAO.getBonsForExport());
                 return null;
             }
-            @Override protected void done() {
-                try { get(); onSuccess.run(); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void exporterClients(String filePath, Runnable onSuccess, Consumer<String> onError) {
-        new SwingWorker<Void, Void>() {
-            @Override protected Void doInBackground() throws Exception {
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
                 String[] cols = {"ID", "Nom", "Email", "Téléphone", "Société", "Création", "Actif"};
                 ExcelExportService.exportData(filePath, "Clients", cols, ClientDAO.getClientsForExport());
                 return null;
             }
-            @Override protected void done() {
-                try { get(); onSuccess.run(); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void exporterBonsExpiration(String filePath, Runnable onSuccess, Consumer<String> onError) {
-        new SwingWorker<Void, Void>() {
-            @Override protected Void doInBackground() throws Exception {
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
                 String seuilStr = SettingsDAO.getSetting("bon_expiration_seuil_jours");
                 int seuil = (seuilStr != null && !seuilStr.isEmpty()) ? Integer.parseInt(seuilStr) : 30;
                 String[] cols = {"ID", "Code Unique", "Valeur", "Réf Demande", "Client",
@@ -341,10 +318,9 @@ public class ParametresController {
                         BonDAO.getBonsProchesExpirationForExport(seuil));
                 return null;
             }
-            @Override protected void done() {
-                try { get(); onSuccess.run(); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 }

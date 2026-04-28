@@ -3,7 +3,7 @@ package pkg.vms;
 /*
  * ═══════════════════════════════════════════════════════════════════════════════
  *  EmailService — Service d'envoi SMTP production-ready
- *  BTS SIO SLAM RP2 — VMS Intermart Maurice, Session 2026
+ *  BTS SIO SLAM RP2 — VoucherManager (VMS), Session 2026
  * ═══════════════════════════════════════════════════════════════════════════════
  *
  *  ACTIVATION GMAIL EN PRODUCTION — App Password (obligatoire depuis mai 2022)
@@ -73,8 +73,8 @@ public class EmailService {
     private static final String SMTP_USER    = Config.get("mail.username",            "");
     private static final String SMTP_PASS    = Config.get("mail.password",            "");
     private static final String FROM_ADDR    = Config.get("mail.from",               SMTP_USER);
-    private static final String FROM_NAME    = Config.get("mail.from.name",          "Intermart VMS");
-    private static final String ADMIN_EMAIL  = Config.get("mail.admin.email",        "admin@intermart.mu");
+    private static final String FROM_NAME    = Config.get("mail.from.name",          "VoucherManager VMS");
+    private static final String ADMIN_EMAIL  = Config.get("mail.admin.email",        "admin@vms.mu");
     private static final int    TIMEOUT_MS   = Config.getInt("mail.timeout",          10_000);
     private static final int    CONN_TIMEOUT = Config.getInt("mail.connection.timeout", 10_000);
 
@@ -118,7 +118,7 @@ public class EmailService {
                                         Runnable onSuccess, Consumer<String> onError) {
         EMAIL_EXECUTOR.submit(() -> {
             try {
-                String subject = "Vos bons cadeaux Intermart — " + demandeRef;
+                String subject = "Vos bons cadeaux VMS — " + demandeRef;
                 int nb = bonsPDF == null ? 0 : bonsPDF.size();
                 String body = buildVoucherTemplate(clientName, demandeRef, nb, valeurTotale);
                 sendMessage(toEmail, subject, body, bonsPDF, demandeId, EmailType.VOUCHER);
@@ -161,7 +161,7 @@ public class EmailService {
 
                 // Email client
                 sendMessage(dest,
-                        "Vos bons cadeaux Intermart — " + ref,
+                        "Vos bons cadeaux VMS — " + ref,
                         buildVoucherTemplate(first.clientNom, ref, bons.size(), total),
                         pdfs, demandeId, EmailType.VOUCHER);
 
@@ -307,7 +307,7 @@ public class EmailService {
                                 .toList();
                         double total = bons.stream().mapToDouble(b -> b.valeur).sum();
                         sendMessage(err.toEmail,
-                                "Vos bons cadeaux Intermart — " + err.demandeRef,
+                                "Vos bons cadeaux VMS — " + err.demandeRef,
                                 buildVoucherTemplate(first.clientNom, err.demandeRef,
                                         bons.size(), total),
                                 pdfs, err.demandeId, EmailType.VOUCHER);
@@ -518,7 +518,7 @@ public class EmailService {
     //  ✅ Données dynamiques échappées via escHtml()
     //  ❌ Pas de media queries · Pas de JavaScript
     //
-    //  BRANDING Intermart VMS :
+    //  BRANDING VoucherManager VMS :
     //  · Header principal  : #000099 (navy — professionnel, sobre)
     //  · Header notice     : #0066cc (bleu clair — accessible, rassurant)
     //  · Header interne    : #1e293b (gris foncé — confidentiel / admin)
@@ -526,14 +526,14 @@ public class EmailService {
     //  · Warning           : #fdf6e0 / #f2c94c / #975a00
     // ─────────────────────────────────────────────────────────────────────────
 
-    // ── Constantes Intermart (modifier ici = propagé dans tous les templates) ──
-    private static final String C_SOCIETE  = "Intermart Maurice Ltd";
+    // ── Constantes VMS (modifier ici = propagé dans tous les templates) ──
+    private static final String C_SOCIETE  = "VoucherManager VMS";
     private static final String C_SYSTEME  = "VMS &ndash; Voucher Management System";
-    private static final String C_SUPPORT  = "support@intermart.mu";
-    private static final String C_ENTPR    = "bons@intermart.mu";
-    private static final String C_SITE     = "www.intermart.mu";
-    private static final String C_ADRESSE  = "Port-Louis, &Icirc;le Maurice";
-    private static final String C_REG      = "CCI Maurice";
+    private static final String C_SUPPORT  = "support@vms.mu";
+    private static final String C_ENTPR    = "bons@vms.mu";
+    private static final String C_SITE     = "www.vms.mu";
+    private static final String C_ADRESSE  = "Île Maurice";
+    private static final String C_REG      = "VMS Platform";
 
     // ─── Méthode utilitaire : remplace les {PLACEHOLDER} dans le template ───
     private static String fill(String tpl, String... kvPairs) {
@@ -565,7 +565,7 @@ public class EmailService {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Vos bons cadeaux &ndash; Intermart VMS</title>
+  <title>Vos bons cadeaux &ndash; VoucherManager VMS</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;padding:20px 0;">
@@ -578,7 +578,7 @@ public class EmailService {
           <td style="background-color:#000099;padding:24px 30px 20px;text-align:left;">
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr><td style="padding:0 0 6px;">
-                <h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">Intermart VMS</h1>
+                <h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">VoucherManager VMS</h1>
               </td></tr>
               <tr><td>
                 <p style="color:#e9e9ff;font-size:13px;margin:0;">Voucher &amp; Gift Management System</p>
@@ -650,7 +650,7 @@ public class EmailService {
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr><td style="padding:0 0 4px;">
                 <p style="color:#4a4a4a;font-size:12px;font-weight:bold;margin:0;">
-                  Intermart VMS &ndash; Syst&egrave;me de gestion de bons cadeaux
+                  VoucherManager VMS &ndash; Syst&egrave;me de gestion de bons cadeaux
                 </p>
               </td></tr>
               <tr><td style="padding:4px 0 0;">
@@ -709,7 +709,7 @@ public class EmailService {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Demande d&apos;approbation &ndash; Intermart VMS</title>
+  <title>Demande d&apos;approbation &ndash; VoucherManager VMS</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;padding:20px 0;">
@@ -721,7 +721,7 @@ public class EmailService {
         <tr>
           <td style="background-color:#000099;padding:24px 30px 20px;text-align:left;">
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
-              <tr><td><h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">Intermart VMS</h1></td></tr>
+              <tr><td><h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">VoucherManager VMS</h1></td></tr>
               <tr><td><p style="color:#e9e9ff;font-size:13px;margin:0;">Workflow d&apos;approbation &ndash; Enterprise Solutions</p></td></tr>
             </table>
           </td>
@@ -735,7 +735,7 @@ public class EmailService {
             </p>
             <p style="color:#344054;font-size:14px;margin:0 0 18px;">
               Nous vous informons qu&apos;une demande de bons cadeaux associ&eacute;e &agrave; la r&eacute;f&eacute;rence
-              <strong>{DEMANDE_REF}</strong> est en attente de votre approbation dans le syst&egrave;me VMS Intermart.
+              <strong>{DEMANDE_REF}</strong> est en attente de votre approbation dans le syst&egrave;me VoucherManager.
             </p>
 
             <!-- DETAILS BOX -->
@@ -788,7 +788,7 @@ public class EmailService {
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr><td style="padding:0 0 4px;">
                 <p style="color:#4a4a4a;font-size:12px;font-weight:bold;margin:0;">
-                  Intermart VMS &ndash; Workflow &amp; Gestion des Bons Cadeaux
+                  VoucherManager VMS &ndash; Workflow &amp; Gestion des Bons Cadeaux
                 </p>
               </td></tr>
               <tr><td style="padding:4px 0 0;">
@@ -844,7 +844,7 @@ public class EmailService {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Confirmation de paiement &ndash; Intermart VMS</title>
+  <title>Confirmation de paiement &ndash; VoucherManager VMS</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;padding:20px 0;">
@@ -856,7 +856,7 @@ public class EmailService {
         <tr>
           <td style="background-color:#0066cc;padding:24px 30px 18px;text-align:left;">
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
-              <tr><td><h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">Intermart VMS</h1></td></tr>
+              <tr><td><h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">VoucherManager VMS</h1></td></tr>
               <tr><td><p style="color:#d9edf7;font-size:13px;margin:0;">Confirmation de validation de paiement</p></td></tr>
             </table>
           </td>
@@ -870,7 +870,7 @@ public class EmailService {
             </p>
             <p style="color:#344054;font-size:14px;margin:0 0 18px;">
               Nous vous confirmons que le paiement associ&eacute; &agrave; la demande
-              <strong>{DEMANDE_REF}</strong> a &eacute;t&eacute; valid&eacute; avec succ&egrave;s dans le syst&egrave;me VMS Intermart.
+              <strong>{DEMANDE_REF}</strong> a &eacute;t&eacute; valid&eacute; avec succ&egrave;s dans le syst&egrave;me VoucherManager.
             </p>
 
             <!-- DETAILS BOX -->
@@ -923,7 +923,7 @@ public class EmailService {
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr><td style="padding:0 0 4px;">
                 <p style="color:#4a4a4a;font-size:12px;font-weight:bold;margin:0;">
-                  Intermart VMS &ndash; Syst&egrave;me de gestion de bons cadeaux
+                  VoucherManager VMS &ndash; Syst&egrave;me de gestion de bons cadeaux
                 </p>
               </td></tr>
               <tr><td style="padding:4px 0 0;">
@@ -976,7 +976,7 @@ public class EmailService {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>R&eacute;capitulatif administrateur &ndash; Intermart VMS</title>
+  <title>R&eacute;capitulatif administrateur &ndash; VoucherManager VMS</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f4;font-family:Arial,Helvetica,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f4f4;padding:20px 0;">
@@ -988,7 +988,7 @@ public class EmailService {
         <tr>
           <td style="background-color:#1e293b;padding:24px 30px 20px;text-align:left;">
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
-              <tr><td><h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">Intermart VMS</h1></td></tr>
+              <tr><td><h1 style="color:#ffffff;font-size:22px;font-weight:bold;margin:0;">VoucherManager VMS</h1></td></tr>
               <tr><td><p style="color:#94a3b8;font-size:13px;margin:0;">R&eacute;capitulatif administrateur &ndash; Usage confidentiel</p></td></tr>
             </table>
           </td>
@@ -1049,7 +1049,7 @@ public class EmailService {
             <table width="100%" cellpadding="0" cellspacing="0" border="0">
               <tr><td style="padding:0 0 4px;">
                 <p style="color:#4a4a4a;font-size:12px;font-weight:bold;margin:0;">
-                  Intermart VMS &ndash; Administration &amp; Gestion des Bons
+                  VoucherManager VMS &ndash; Administration &amp; Gestion des Bons
                 </p>
               </td></tr>
               <tr><td style="padding:4px 0 0;">

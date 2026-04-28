@@ -57,7 +57,7 @@ public class RapportExcelService {
     private static final byte[] COLOR_GRAY    = hexToRgb("#6B7280");
     private static final byte[] COLOR_ALTROW  = hexToRgb("#F8F9FF");
 
-    private static final String SOCIETE  = "Intermart Maurice Ltd";
+    private static final String SOCIETE  = "VoucherManager VMS";
     private static final String SYSTEME  = "VMS — Voucher Management System";
     private static final String DATE_FMT = "dd/MM/yyyy HH:mm";
     private static final String DATE_ONLY = "dd/MM/yyyy";

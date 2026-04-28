@@ -1,8 +1,8 @@
 package pkg.vms.controller;
 
+import javafx.concurrent.Task;
 import pkg.vms.DAO.VoucherDAO;
 
-import javax.swing.SwingWorker;
 import java.util.function.Consumer;
 
 public class BonController {
@@ -10,32 +10,28 @@ public class BonController {
     public void archiverDemandesExpirees(int userId,
                                           Consumer<Integer> onSuccess,
                                           Consumer<String> onError) {
-        new SwingWorker<Integer, Void>() {
+        Task<Integer> task = new Task<>() {
             @Override
-            protected Integer doInBackground() throws Exception {
+            protected Integer call() throws Exception {
                 return VoucherDAO.archiverDemandesExpirees(userId);
             }
-            @Override
-            protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void archiverDemande(int demandeId, int userId,
                                 Runnable onSuccess, Consumer<String> onError) {
-        new SwingWorker<Void, Void>() {
+        Task<Void> task = new Task<>() {
             @Override
-            protected Void doInBackground() throws Exception {
+            protected Void call() throws Exception {
                 VoucherDAO.updateVoucherStatus(demandeId, "ARCHIVE", userId);
                 return null;
             }
-            @Override
-            protected void done() {
-                try { get(); onSuccess.run(); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 }

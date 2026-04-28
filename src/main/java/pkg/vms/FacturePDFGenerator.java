@@ -8,7 +8,7 @@ import java.io.FileOutputStream;
 
 /**
  * Genere des factures PDF professionnelles pour les commandes de bons cadeau.
- * Format A4 portrait avec design Intermart.
+ * Format A4 portrait avec design VoucherManager VMS.
  */
 public class FacturePDFGenerator {
 
@@ -145,9 +145,9 @@ public class FacturePDFGenerator {
         canvas.beginText();
         canvas.setFontAndSize(bfBold, 18);
         canvas.setColorFill(WHITE);
-        canvas.showTextAligned(Element.ALIGN_CENTER, "INTERMART", logoX + logoW / 2, logoY + logoH / 2 + 4, 0f);
+        canvas.showTextAligned(Element.ALIGN_CENTER, "VMS", logoX + logoW / 2, logoY + logoH / 2 + 4, 0f);
         canvas.setFontAndSize(bfNormal, 8);
-        canvas.showTextAligned(Element.ALIGN_CENTER, "MAURICE", logoX + logoW / 2, logoY + logoH / 2 - 10, 0f);
+        canvas.showTextAligned(Element.ALIGN_CENTER, "VOUCHERS", logoX + logoW / 2, logoY + logoH / 2 - 10, 0f);
         canvas.endText();
 
         // ── Company details below logo ──
@@ -158,13 +158,13 @@ public class FacturePDFGenerator {
         canvas.beginText();
         canvas.setFontAndSize(bfBold, 8);
         canvas.setColorFill(TEXT_DARK);
-        canvas.showTextAligned(Element.ALIGN_LEFT, "Intermart Maurice Ltd", detailX, detailY, 0f);
+        canvas.showTextAligned(Element.ALIGN_LEFT, "VoucherManager VMS", detailX, detailY, 0f);
 
         canvas.setFontAndSize(bfNormal, 7.5f);
         canvas.setColorFill(TEXT_GRAY);
-        canvas.showTextAligned(Element.ALIGN_LEFT, "Cybercite, Ebene, Maurice", detailX, detailY - lineSpacing, 0f);
+        canvas.showTextAligned(Element.ALIGN_LEFT, "Cybercite, Ebene, Ile Maurice", detailX, detailY - lineSpacing, 0f);
         canvas.showTextAligned(Element.ALIGN_LEFT, "T: +230 000 0000", detailX, detailY - lineSpacing * 2, 0f);
-        canvas.showTextAligned(Element.ALIGN_LEFT, "E: contact@intermart.mu", detailX, detailY - lineSpacing * 3, 0f);
+        canvas.showTextAligned(Element.ALIGN_LEFT, "E: contact@vms.mu", detailX, detailY - lineSpacing * 3, 0f);
         canvas.showTextAligned(Element.ALIGN_LEFT, "TVA: MU-123456789", detailX, detailY - lineSpacing * 4, 0f);
         canvas.endText();
 

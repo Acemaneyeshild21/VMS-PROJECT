@@ -1,5 +1,7 @@
 package pkg.vms.controller;
 
+import javafx.application.Platform;
+import javafx.concurrent.Task;
 import pkg.vms.DAO.AuditDAO;
 import pkg.vms.DAO.BonDAO;
 import pkg.vms.DAO.ClientDAO;
@@ -7,7 +9,6 @@ import pkg.vms.DAO.VoucherDAO;
 import pkg.vms.EmailService;
 import pkg.vms.VoucherPDFGenerator;
 
-import javax.swing.SwingWorker;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
@@ -25,87 +26,82 @@ public class DemandeController {
     }
 
     public void chargerDonneesFormulaire(Consumer<FormData> onSuccess, Consumer<String> onError) {
-        new SwingWorker<FormData, Void>() {
+        Task<FormData> task = new Task<>() {
             @Override
-            protected FormData doInBackground() throws Exception {
+            protected FormData call() throws Exception {
                 return new FormData(
                     ClientDAO.getActiveClients(),
                     ClientDAO.getAllMagasins()
                 );
             }
-            @Override
-            protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void creerDemande(int userId, int clientId, int nbBons, double valeurUnit,
                               String type, int magasinId, int validiteJours,
                               String motif, String emailDest,
                               Consumer<Integer> onSuccess, Consumer<String> onError) {
-        new SwingWorker<Integer, Void>() {
+        Task<Integer> task = new Task<>() {
             @Override
-            protected Integer doInBackground() throws Exception {
+            protected Integer call() throws Exception {
                 return VoucherDAO.createVoucherRequest(userId, clientId, nbBons, valeurUnit,
                         type, magasinId, validiteJours, motif, emailDest);
             }
-            @Override
-            protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void changerStatut(int demandeId, String statut, int userId,
                                Runnable onSuccess, Consumer<String> onError) {
-        new SwingWorker<Void, Void>() {
+        Task<Void> task = new Task<>() {
             @Override
-            protected Void doInBackground() throws Exception {
+            protected Void call() throws Exception {
                 VoucherDAO.updateVoucherStatus(demandeId, statut, userId);
                 return null;
             }
-            @Override
-            protected void done() {
-                try { get(); onSuccess.run(); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     /**
-     * @param onProgress  called on EDT with {pctStr, label}
-     * @param onSuccess   called on EDT with number of vouchers generated (email OK)
-     * @param onError     called on EDT with error message (generation failed)
-     * @param onEmailEchec called on EDT with nb vouchers generated (generation OK, email failed)
+     * @param onProgress   appelé sur le FX Thread avec {pctStr, label}
+     * @param onSuccess    appelé sur le FX Thread avec le nombre de bons générés (email OK)
+     * @param onError      appelé sur le FX Thread avec le message d'erreur (génération échouée)
+     * @param onEmailEchec appelé sur le FX Thread avec nb bons générés (génération OK, email échoué)
      */
     public void genererBons(int demandeId, int userId,
                              Consumer<String[]> onProgress,
                              Consumer<Integer> onSuccess,
                              Consumer<String> onError,
                              Consumer<Integer> onEmailEchec) {
-        new SwingWorker<Integer, String[]>() {
-            boolean emailFailed = false;
 
+        boolean[] emailFailed = {false};
+
+        Task<Integer> task = new Task<>() {
             @Override
-            protected Integer doInBackground() throws Exception {
-                publish(new String[]{"10", "Génération des bons en base de données…"});
+            protected Integer call() throws Exception {
+                Platform.runLater(() -> onProgress.accept(new String[]{"10", "Génération des bons en base de données…"}));
                 int nbBons = BonDAO.genererBons(demandeId, userId);
 
-                publish(new String[]{"20", "Chargement des bons générés…"});
+                Platform.runLater(() -> onProgress.accept(new String[]{"20", "Chargement des bons générés…"}));
                 List<BonDAO.BonInfo> bons = BonDAO.getBonsByDemande(demandeId);
 
                 int total = bons.size();
                 for (int i = 0; i < total; i++) {
                     BonDAO.BonInfo bon = bons.get(i);
                     int pct = 20 + 60 * (i + 1) / Math.max(total, 1);
-                    publish(new String[]{String.valueOf(pct),
-                            "PDF " + (i + 1) + "/" + total + " — " + bon.codeUnique});
+                    final String label = "PDF " + (i + 1) + "/" + total + " — " + bon.codeUnique;
+                    final int finalPct = pct;
+                    Platform.runLater(() -> onProgress.accept(new String[]{String.valueOf(finalPct), label}));
                     String pdfPath = VoucherPDFGenerator.genererPDF(bon);
                     BonDAO.updatePdfPath(bon.bonId, pdfPath);
-                    // Lire les bytes pour persistance DB
                     try {
                         byte[] data = java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(pdfPath));
                         BonDAO.updatePdfData(bon.bonId, data);
@@ -115,73 +111,60 @@ public class DemandeController {
                     bon.pdfPath = pdfPath;
                 }
 
-                publish(new String[]{"85", "Envoi des emails…"});
+                Platform.runLater(() -> onProgress.accept(new String[]{"85", "Envoi des emails…"}));
                 String[] emailErr = {null};
                 CountDownLatch latch = new CountDownLatch(1);
                 EmailService.envoyerBonsParEmail(demandeId, bons, userId,
                         () -> latch.countDown(),
                         err -> { emailErr[0] = err; latch.countDown(); });
-                latch.await(); // bloque jusqu'à fin d'envoi (thread background, pas d'EDT)
+                latch.await();
                 if (emailErr[0] != null) {
-                    emailFailed = true;
+                    emailFailed[0] = true;
                     BonDAO.logEmailError(demandeId, emailErr[0]);
                 } else {
                     VoucherDAO.marquerCommeEnvoye(demandeId, userId);
                 }
 
-                publish(new String[]{"100", "Terminé !"});
+                Platform.runLater(() -> onProgress.accept(new String[]{"100", "Terminé !"}));
                 return nbBons;
             }
+        };
 
-            @Override
-            protected void process(List<String[]> chunks) {
-                onProgress.accept(chunks.get(chunks.size() - 1));
+        task.setOnSucceeded(e -> {
+            if (emailFailed[0]) {
+                onEmailEchec.accept(task.getValue());
+            } else {
+                onSuccess.accept(task.getValue());
             }
-
-            @Override
-            protected void done() {
-                try {
-                    int nb = get();
-                    if (emailFailed) {
-                        onEmailEchec.accept(nb);
-                    } else {
-                        onSuccess.accept(nb);
-                    }
-                } catch (Exception ex) {
-                    onError.accept(ex.getMessage());
-                }
-            }
-        }.execute();
+        });
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void renvoyerEmail(int demandeId, int userId,
                                Runnable onSuccess, Consumer<String> onError) {
-        new SwingWorker<Void, Void>() {
+        Task<Void> task = new Task<>() {
             @Override
-            protected Void doInBackground() throws Exception {
+            protected Void call() throws Exception {
                 List<BonDAO.BonInfo> bons = BonDAO.getBonsByDemande(demandeId);
-                String[] emailErr2 = {null};
-                CountDownLatch latch2 = new CountDownLatch(1);
+                String[] emailErr = {null};
+                CountDownLatch latch = new CountDownLatch(1);
                 EmailService.envoyerBonsParEmail(demandeId, bons, userId,
-                        () -> latch2.countDown(),
-                        err -> { emailErr2[0] = err; latch2.countDown(); });
-                latch2.await();
-                if (emailErr2[0] != null) throw new Exception("Email échec : " + emailErr2[0]);
+                        () -> latch.countDown(),
+                        err -> { emailErr[0] = err; latch.countDown(); });
+                latch.await();
+                if (emailErr[0] != null) throw new Exception("Email échec : " + emailErr[0]);
                 VoucherDAO.marquerCommeEnvoye(demandeId, userId);
                 BonDAO.resolveEmailErrors(demandeId);
                 AuditDAO.logEnvoi(demandeId, true, userId, null);
                 return null;
             }
-            @Override
-            protected void done() {
-                try {
-                    get();
-                    onSuccess.run();
-                } catch (Exception ex) {
-                    BonDAO.logEmailError(demandeId, "Renvoi échoué : " + ex.getMessage());
-                    onError.accept(ex.getMessage());
-                }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> {
+            BonDAO.logEmailError(demandeId, "Renvoi échoué : " + task.getException().getMessage());
+            onError.accept(task.getException().getMessage());
+        });
+        new Thread(task).start();
     }
 }

@@ -81,7 +81,7 @@ INSERT INTO app_settings (setting_key, setting_value) VALUES
     ('email', 'Configuration SMTP'),
     ('bon_validite_defaut', '365'),
     ('bon_type_defaut', 'Standard'),
-    ('bon_entreprise', 'Intermart Maurice'),
+    ('bon_entreprise', 'VMS — Voucher Management System'),
     ('bon_format_qr', 'QR_CODE'),
     ('bon_signature', 'false')
 ON CONFLICT (setting_key) DO NOTHING;

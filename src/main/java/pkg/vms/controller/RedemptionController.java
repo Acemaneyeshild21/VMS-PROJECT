@@ -1,55 +1,44 @@
 package pkg.vms.controller;
 
+import javafx.concurrent.Task;
 import pkg.vms.DAO.BonDAO;
 import pkg.vms.DAO.ClientDAO;
 
-import javax.swing.SwingWorker;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 public class RedemptionController {
 
     public void chargerMagasins(Consumer<List<ClientDAO.MagasinInfo>> onSuccess,
                                 Consumer<String> onError) {
-        new SwingWorker<List<ClientDAO.MagasinInfo>, Void>() {
+        Task<List<ClientDAO.MagasinInfo>> task = new Task<>() {
             @Override
-            protected List<ClientDAO.MagasinInfo> doInBackground() throws Exception {
+            protected List<ClientDAO.MagasinInfo> call() throws Exception {
                 return ClientDAO.getAllMagasins();
             }
-            @Override
-            protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 
     public void redimerBon(String code, int magasinId, int userId,
                            Consumer<BonDAO.RedemptionResult> onResult,
                            Consumer<String> onError) {
-        new SwingWorker<BonDAO.RedemptionResult, Void>() {
+        Task<BonDAO.RedemptionResult> task = new Task<>() {
             @Override
-            protected BonDAO.RedemptionResult doInBackground() throws Exception {
+            protected BonDAO.RedemptionResult call() throws Exception {
                 return BonDAO.redimerBon(code, magasinId, userId);
             }
-            @Override
-            protected void done() {
-                try {
-                    onResult.accept(get());
-                } catch (ExecutionException ex) {
-                    Throwable cause = ex.getCause();
-                    onResult.accept(new BonDAO.RedemptionResult(
-                        false,
-                        "Erreur : " + (cause != null ? cause.getMessage() : ex.getMessage()),
-                        0, BonDAO.RedemptionResult.ErrorType.UNKNOWN));
-                } catch (InterruptedException ex) {
-                    Thread.currentThread().interrupt();
-                    onResult.accept(new BonDAO.RedemptionResult(
-                        false, "Opération interrompue.", 0,
-                        BonDAO.RedemptionResult.ErrorType.UNKNOWN));
-                }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onResult.accept(task.getValue()));
+        task.setOnFailed(e -> {
+            Throwable cause = task.getException();
+            onResult.accept(new BonDAO.RedemptionResult(
+                false,
+                "Erreur : " + (cause != null ? cause.getMessage() : "inconnue"),
+                0, BonDAO.RedemptionResult.ErrorType.UNKNOWN));
+        });
+        new Thread(task).start();
     }
 }

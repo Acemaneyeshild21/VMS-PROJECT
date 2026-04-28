@@ -1,11 +1,11 @@
 package pkg.vms.controller;
 
+import javafx.concurrent.Task;
 import pkg.vms.DAO.AuditDAO;
 import pkg.vms.DAO.BonDAO;
 import pkg.vms.DAO.SettingsDAO;
 import pkg.vms.DAO.StatistiquesDAO;
 
-import javax.swing.SwingWorker;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,9 +27,9 @@ public class StatistiquesController {
     public void chargerDonnees(String role, int userId,
                                Consumer<StatsData> onSuccess,
                                Consumer<String> onError) {
-        new SwingWorker<StatsData, Void>() {
+        Task<StatsData> task = new Task<>() {
             @Override
-            protected StatsData doInBackground() {
+            protected StatsData call() {
                 StatsData data = new StatsData();
 
                 try {
@@ -74,12 +74,9 @@ public class StatistiquesController {
 
                 return data;
             }
-
-            @Override
-            protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
+        };
+        task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
     }
 }

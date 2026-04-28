@@ -41,7 +41,7 @@ public class RecuRedemptionPDFGenerator {
         public String codeBon;           // e.g., "VR0048-200-001"
         public double valeur;            // e.g., 500.00
         public String dateRedemption;    // e.g., "14/04/2026 14:35"
-        public String nomMagasin;        // e.g., "Intermart Ebene"
+        public String nomMagasin;        // e.g., "VMS Point de Vente — Ebène"
         public String codeMagasin;       // e.g., "MAG-001"
         public String superviseurNom;    // e.g., "Jean Dupont"
         public String superviseurCode;   // e.g., "USR-042"
@@ -78,7 +78,7 @@ public class RecuRedemptionPDFGenerator {
         float y = h;
 
         // ══════════════════════════════════════════════════════════
-        // 1. LOGO AREA : rectangle rouge avec "INTERMART" + "MAURICE"
+        // 1. LOGO AREA : rectangle rouge avec "VMS" + "VOUCHER SYSTEM"
         // ══════════════════════════════════════════════════════════
         y = drawLogoArea(canvas, w, y);
 
@@ -151,14 +151,14 @@ public class RecuRedemptionPDFGenerator {
     // ========================================================================
 
     /**
-     * Dessine le logo Intermart : rectangle rouge avec texte blanc.
+     * Dessine le logo VMS : rectangle rouge avec texte blanc.
      */
     private static float drawLogoArea(PdfContentByte canvas, float w, float y) {
         float logoH = 40;
         float logoY = y - logoH;
         float margin = 15;
 
-        // Rectangle rouge
+        // Rectangle accent
         canvas.setColorFill(RED);
         canvas.rectangle(margin, logoY, w - 2 * margin, logoH);
         canvas.fill();
@@ -167,18 +167,18 @@ public class RecuRedemptionPDFGenerator {
             BaseFont bfBold = BaseFont.createFont(BaseFont.HELVETICA_BOLD, BaseFont.CP1252, false);
             BaseFont bf = BaseFont.createFont(BaseFont.HELVETICA, BaseFont.CP1252, false);
 
-            // "INTERMART"
+            // "VMS"
             canvas.beginText();
             canvas.setFontAndSize(bfBold, 16);
             canvas.setColorFill(WHITE);
-            canvas.showTextAligned(Element.ALIGN_CENTER, "INTERMART", w / 2, logoY + 18, 0f);
+            canvas.showTextAligned(Element.ALIGN_CENTER, "VMS", w / 2, logoY + 18, 0f);
             canvas.endText();
 
-            // "MAURICE"
+            // "VOUCHER SYSTEM"
             canvas.beginText();
             canvas.setFontAndSize(bf, 8);
             canvas.setColorFill(new BaseColor(255, 200, 200));
-            canvas.showTextAligned(Element.ALIGN_CENTER, "MAURICE", w / 2, logoY + 6, 0f);
+            canvas.showTextAligned(Element.ALIGN_CENTER, "VOUCHER SYSTEM", w / 2, logoY + 6, 0f);
             canvas.endText();
         } catch (Exception e) {
             e.printStackTrace();

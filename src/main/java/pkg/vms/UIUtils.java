@@ -24,7 +24,7 @@ public class UIUtils {
         return buildPrimaryButton(text, w, h);
     }
 
-    /** Bouton primaire Intermart — rouge plein, coins arrondis. */
+    /** Bouton primaire VMS — rouge plein, coins arrondis. */
     public static JButton buildPrimaryButton(String text, int w, int h) {
         JButton btn = new JButton(text) {
             boolean hovered = false;

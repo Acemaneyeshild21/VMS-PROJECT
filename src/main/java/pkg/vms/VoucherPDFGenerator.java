@@ -43,7 +43,7 @@ public class VoucherPDFGenerator {
 
     // ── Palette commune ─────────────────────────────────────────────────────
     private static final BaseColor WHITE         = BaseColor.WHITE;
-    private static final BaseColor INTERMART_RED = new BaseColor(210, 35, 45);
+    private static final BaseColor VMS_ACCENT = new BaseColor(210, 35, 45);
 
     // ── Entree principale (template par defaut) ──────────────────────────────
     public static String genererPDF(BonDAO.BonInfo bon) throws Exception {
@@ -144,11 +144,11 @@ public class VoucherPDFGenerator {
         BaseFont bfC  = BaseFont.createFont(BaseFont.COURIER,       BaseFont.CP1252, false);
 
         // Logo
-        cb.setColorFill(INTERMART_RED); cb.roundRectangle(22,22,68,33,3); cb.fill();
+        cb.setColorFill(VMS_ACCENT); cb.roundRectangle(22,22,68,33,3); cb.fill();
         cb.beginText(); cb.setFontAndSize(bfBd,7); cb.setColorFill(WHITE);
-        cb.showTextAligned(Element.ALIGN_CENTER,"INTERMART",56,43,0f);
+        cb.showTextAligned(Element.ALIGN_CENTER,"VMS",56,43,0f);
         cb.setFontAndSize(bfN,5); cb.setColorFill(new BaseColor(255,200,200));
-        cb.showTextAligned(Element.ALIGN_CENTER,"MAURICE",56,33,0f); cb.endText();
+        cb.showTextAligned(Element.ALIGN_CENTER,"VOUCHERS",56,33,0f); cb.endText();
 
         // Titre "BON CADEAU"
         cb.beginText(); cb.setFontAndSize(bfB,30); cb.setColorFill(new BaseColor(160,120,40));
@@ -168,7 +168,7 @@ public class VoucherPDFGenerator {
         float ax=w-152, ay=h-108, aw=132, ah=56;
         cb.setColorFill(new BaseColor(255,248,225)); cb.roundRectangle(ax,ay,aw,ah,6); cb.fill();
         cb.setColorStroke(GOLD_M); cb.setLineWidth(1.5f); cb.roundRectangle(ax,ay,aw,ah,6); cb.stroke();
-        cb.beginText(); cb.setFontAndSize(bfB,22); cb.setColorFill(INTERMART_RED);
+        cb.beginText(); cb.setFontAndSize(bfB,22); cb.setColorFill(VMS_ACCENT);
         cb.showTextAligned(Element.ALIGN_CENTER,String.format("Rs %,.0f",bon.valeur),ax+aw/2,ay+ah/2+2,0f); cb.endText();
         cb.beginText(); cb.setFontAndSize(bfN,7); cb.setColorFill(TXT_M);
         cb.showTextAligned(Element.ALIGN_CENTER,"VALEUR DU BON",ax+aw/2,ay+7,0f); cb.endText();
@@ -191,7 +191,7 @@ public class VoucherPDFGenerator {
         cb.moveTo(22,55); cb.lineTo(w*.60f,55); cb.stroke();
         cb.beginText(); cb.setFontAndSize(bfN,5); cb.setColorFill(TXT_M);
         cb.showTextAligned(Element.ALIGN_LEFT,"Conditions : Usage unique, non remboursable, non fractionnable. Presentez en magasin.",22,67,0f);
-        cb.showTextAligned(Element.ALIGN_LEFT,"T. +230 000 0000  |  www.intermart.mu  |  contact@intermart.mu",95,9,0f);
+        cb.showTextAligned(Element.ALIGN_LEFT,"T. +230 000 0000  |  www.vms.mu  |  contact@vms.mu",95,9,0f);
         cb.endText();
         cb.beginText(); cb.setFontAndSize(bfBd,6); cb.setColorFill(TXT_M);
         cb.showTextAligned(Element.ALIGN_LEFT,"Signature autorisee:",22,78,0f); cb.endText();
@@ -244,7 +244,7 @@ public class VoucherPDFGenerator {
         cb.setColorFill(WHITE); cb.roundRectangle(20,h-60,70,44,3); cb.fill();
         cb.setColorFill(NAVY); cb.roundRectangle(20,h-60,70,44,3); cb.fill();
         cb.beginText(); cb.setFontAndSize(bfB,11); cb.setColorFill(GOLD);
-        cb.showTextAligned(Element.ALIGN_CENTER,"INTERMART",55,h-35,0f); cb.endText();
+        cb.showTextAligned(Element.ALIGN_CENTER,"VMS",55,h-35,0f); cb.endText();
         cb.beginText(); cb.setFontAndSize(bfN,7); cb.setColorFill(WHITE);
         cb.showTextAligned(Element.ALIGN_CENTER,"VOUCHER SYSTEM",55,h-48,0f); cb.endText();
 
@@ -284,7 +284,7 @@ public class VoucherPDFGenerator {
         // Footer silver
         cb.beginText(); cb.setFontAndSize(bfN,6); cb.setColorFill(TXT_G);
         cb.showTextAligned(Element.ALIGN_CENTER,
-                "Usage unique  |  Non remboursable  |  Non fractionnable  |  contact@intermart.mu",
+                "Usage unique  |  Non remboursable  |  Non fractionnable  |  contact@vms.mu",
                 w/2,16,0f); cb.endText();
 
         // Code unique en police monospace
@@ -347,7 +347,7 @@ public class VoucherPDFGenerator {
         cb.setColorFill(GOLD); cb.roundRectangle(20,h-68,75,48,3); cb.fill();
         cb.setColorFill(RED_D); cb.roundRectangle(21,h-67,73,46,3); cb.fill();
         cb.beginText(); cb.setFontAndSize(bfB,11); cb.setColorFill(GOLD);
-        cb.showTextAligned(Element.ALIGN_CENTER,"INTERMART",57,h-43,0f); cb.endText();
+        cb.showTextAligned(Element.ALIGN_CENTER,"VMS",57,h-43,0f); cb.endText();
         cb.beginText(); cb.setFontAndSize(bfN,6); cb.setColorFill(new BaseColor(230,200,200));
         cb.showTextAligned(Element.ALIGN_CENTER,"GIFT VOUCHER",57,h-56,0f); cb.endText();
 
@@ -357,7 +357,7 @@ public class VoucherPDFGenerator {
         cb.beginText(); cb.setFontAndSize(bfB,32); cb.setColorFill(GOLD);
         cb.showTextAligned(Element.ALIGN_LEFT,"BON CADEAU",111,h-37,0f); cb.endText();
         cb.beginText(); cb.setFontAndSize(bfN,9); cb.setColorFill(GOLD_L);
-        cb.showTextAligned(Element.ALIGN_LEFT,"Offert par Intermart Maurice",113,h-54,0f); cb.endText();
+        cb.showTextAligned(Element.ALIGN_LEFT,"Offert via VoucherManager VMS",113,h-54,0f); cb.endText();
 
         // Montant : grand, en or
         float ax=w-165, ay=h-72, aw=148, ah=66;
@@ -385,7 +385,7 @@ public class VoucherPDFGenerator {
         // Footer
         cb.beginText(); cb.setFontAndSize(bfN,5.5f); cb.setColorFill(new BaseColor(120,110,100));
         cb.showTextAligned(Element.ALIGN_CENTER,
-                "Usage unique  |  Non remboursable  |  contact@intermart.mu",
+                "Usage unique  |  Non remboursable  |  contact@vms.mu",
                 w/2,15,0f); cb.endText();
     }
 
@@ -438,7 +438,7 @@ public class VoucherPDFGenerator {
         cb.beginText(); cb.setFontAndSize(bfB,28); cb.setColorFill(GREEN_D);
         cb.showTextAligned(Element.ALIGN_LEFT,"BON CADEAU",108,h-38,0f); cb.endText();
         cb.beginText(); cb.setFontAndSize(bfN,9); cb.setColorFill(TXT_G);
-        cb.showTextAligned(Element.ALIGN_LEFT,"Intermart Maurice — Voucher System",108,h-52,0f); cb.endText();
+        cb.showTextAligned(Element.ALIGN_LEFT,"VoucherManager — Système de Bons Cadeaux",108,h-52,0f); cb.endText();
 
         // Montant dans un cadre vert arrondi
         float ax=w-165, ay=h-80, aw=148, ah=68;
@@ -466,7 +466,7 @@ public class VoucherPDFGenerator {
         cb.moveTo(93,20); cb.lineTo(w-10,20); cb.stroke();
         cb.beginText(); cb.setFontAndSize(bfN,5.5f); cb.setColorFill(TXT_G);
         cb.showTextAligned(Element.ALIGN_LEFT,
-                "Usage unique  |  Non remboursable  |  contact@intermart.mu",
+                "Usage unique  |  Non remboursable  |  contact@vms.mu",
                 95,10,0f); cb.endText();
     }
 
