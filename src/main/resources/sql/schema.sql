@@ -580,17 +580,35 @@ CREATE SEQUENCE IF NOT EXISTS seq_demande_ref START 1 INCREMENT 1 NO CYCLE;
 -- 8b. Colonne BYTEA pour stocker le PDF directement en base
 ALTER TABLE bon ADD COLUMN IF NOT EXISTS pdf_data BYTEA;
 
--- 8c. Table de suivi des erreurs d'envoi email avec historique des tentatives
+-- 8c. Table email_errors — schéma complet (EmailService + EmailDAO)
+--     CREATE TABLE crée la table si elle n'existe pas (fresh install).
+--     Les ALTER TABLE ADD COLUMN IF NOT EXISTS migrent une ancienne version
+--     (qui avait resolu/erreur/tentative) vers le schéma actuel.
 CREATE TABLE IF NOT EXISTS email_errors (
-    error_id    SERIAL PRIMARY KEY,
-    demande_id  INT  NOT NULL REFERENCES demande(demande_id),
-    tentative   INT  NOT NULL DEFAULT 1,
-    erreur      TEXT NOT NULL,
-    resolu      BOOLEAN DEFAULT FALSE,
-    date_erreur TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    id              SERIAL PRIMARY KEY,
+    demande_id      INTEGER REFERENCES demande(demande_id) ON DELETE SET NULL,
+    demande_ref     VARCHAR(50),
+    to_email        VARCHAR(255),
+    email_type      VARCHAR(50),
+    nb_tentatives   INTEGER   NOT NULL DEFAULT 1,
+    derniere_erreur TEXT,
+    payload         TEXT,
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    resolved        BOOLEAN   NOT NULL DEFAULT FALSE,
+    resolved_at     TIMESTAMP
 );
+-- Migration douce : ajouter les colonnes manquantes si la table était déjà créée
+ALTER TABLE email_errors ADD COLUMN IF NOT EXISTS demande_ref     VARCHAR(50);
+ALTER TABLE email_errors ADD COLUMN IF NOT EXISTS to_email        VARCHAR(255);
+ALTER TABLE email_errors ADD COLUMN IF NOT EXISTS email_type      VARCHAR(50);
+ALTER TABLE email_errors ADD COLUMN IF NOT EXISTS nb_tentatives   INTEGER   NOT NULL DEFAULT 1;
+ALTER TABLE email_errors ADD COLUMN IF NOT EXISTS derniere_erreur TEXT;
+ALTER TABLE email_errors ADD COLUMN IF NOT EXISTS payload         TEXT;
+ALTER TABLE email_errors ADD COLUMN IF NOT EXISTS created_at      TIMESTAMP NOT NULL DEFAULT NOW();
+ALTER TABLE email_errors ADD COLUMN IF NOT EXISTS resolved        BOOLEAN   NOT NULL DEFAULT FALSE;
+ALTER TABLE email_errors ADD COLUMN IF NOT EXISTS resolved_at     TIMESTAMP;
+
 CREATE INDEX IF NOT EXISTS idx_email_errors_demande ON email_errors(demande_id);
-CREATE INDEX IF NOT EXISTS idx_email_errors_resolu  ON email_errors(resolu) WHERE NOT resolu;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 9. AUDIT TRAIL COMPLET & REPORTING CONFIGURABLE
@@ -694,25 +712,9 @@ CREATE TRIGGER trg_redemption_auto_redime
     FOR EACH ROW
     EXECUTE FUNCTION trg_redemption_marquer_redime();
 
--- ────────────────────────────────────────────────────────────────────────────
--- TABLE : email_errors — Historique des échecs d'envoi SMTP
--- Permet la relance depuis ParametresPanel (EmailService.resendEmail)
--- ────────────────────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS email_errors (
-    id              SERIAL PRIMARY KEY,
-    demande_id      INTEGER REFERENCES demande(demande_id) ON DELETE SET NULL,
-    demande_ref     VARCHAR(50),
-    to_email        VARCHAR(255) NOT NULL,
-    email_type      VARCHAR(50)  NOT NULL,          -- VOUCHER | APPROVAL_REQUEST | PAYMENT_CONFIRMATION | ADMIN_RECAP
-    nb_tentatives   INTEGER      NOT NULL DEFAULT 1,
-    derniere_erreur TEXT,
-    payload         TEXT,                            -- données JSON pour la relance
-    created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
-    resolved        BOOLEAN      NOT NULL DEFAULT FALSE,
-    resolved_at     TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_email_errors_unresolved
+-- Index de performance sur resolved (utilisé par EmailService.getUnresolvedEmailErrors)
+DROP INDEX IF EXISTS idx_email_errors_unresolved;
+CREATE INDEX idx_email_errors_unresolved
     ON email_errors(resolved, created_at DESC)
     WHERE resolved = FALSE;
 
