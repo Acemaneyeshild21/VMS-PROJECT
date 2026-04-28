@@ -1,8 +1,6 @@
 package pkg.vms.view;
 
 import javafx.beans.property.SimpleStringProperty;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.geometry.*;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -22,12 +20,12 @@ public class GestionClientsView {
     private final AuthDAO.UserSession session;
     private final ClientController    ctrl = new ClientController();
 
-    private final ObservableList<Client> rows = FXCollections.observableArrayList();
-    private TableView<Client>            table;
-    private Label                        lblCount;
-    private TextField                    tfSearch;
-    private VBox                         tableCard;
-    private pkg.vms.SkeletonPane         skeleton;
+    private TableView<Client>    table;
+    private pkg.vms.Pager<Client> pager;
+    private Label                lblCount;
+    private TextField            tfSearch;
+    private VBox                 tableCard;
+    private pkg.vms.SkeletonPane skeleton;
 
     public GestionClientsView(AuthDAO.UserSession session) { this.session = session; }
 
@@ -97,7 +95,8 @@ public class GestionClientsView {
         VBox.setVgrow(skeleton, Priority.ALWAYS);
         tableCard.getChildren().add(skeleton);
 
-        table = new TableView<>(rows);
+        table = new TableView<>();
+        pager = new pkg.vms.Pager<>(table);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         table.setStyle("-fx-font-size:13;");
         VBox.setVgrow(table, Priority.ALWAYS);
@@ -154,17 +153,17 @@ public class GestionClientsView {
     private void loadData() {
         lblCount.setText("Chargement…");
         ctrl.chargerClients(data -> {
-            rows.setAll(data);
+            pager.setData(data);
             lblCount.setText(data.size() + " client(s)");
-            showTable(); // remplace skeleton par la table
+            showTable();
         }, err -> { showTable(); showErr(err); });
     }
 
-    /** Remplace le skeleton par la vraie table (idempotent). */
+    /** Remplace le skeleton par la vraie table + barre de pagination (idempotent). */
     private void showTable() {
         if (skeleton != null) {
             skeleton.stop();
-            tableCard.getChildren().setAll(table);
+            tableCard.getChildren().setAll(table, pager.getBar());
             skeleton = null;
         }
     }
@@ -172,7 +171,7 @@ public class GestionClientsView {
     private void rechercherClients(String q) {
         if (q == null || q.isBlank()) { loadData(); return; }
         ctrl.rechercherClients(q, data -> {
-            rows.setAll(data);
+            pager.setData(data);
             lblCount.setText(data.size() + " résultat(s)");
         }, err -> showErr(err));
     }

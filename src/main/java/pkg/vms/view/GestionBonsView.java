@@ -1,8 +1,6 @@
 package pkg.vms.view;
 
 import javafx.beans.property.SimpleStringProperty;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.geometry.*;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -23,10 +21,10 @@ public class GestionBonsView {
     private final BonController       ctrl  = new BonController();
     private final ValidationController vCtrl = new ValidationController();
 
-    private final ObservableList<String[]> rows = FXCollections.observableArrayList();
-    private TableView<String[]>            table;
-    private Label                          lblCount;
-    private TextField                      tfSearch;
+    private TableView<String[]>      table;
+    private pkg.vms.Pager<String[]>  pager;
+    private Label                    lblCount;
+    private TextField                tfSearch;
 
     public GestionBonsView(AuthDAO.UserSession session) { this.session = session; }
 
@@ -109,7 +107,8 @@ public class GestionBonsView {
                     + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.06),8,0,0,2);");
         VBox.setVgrow(card, Priority.ALWAYS);
 
-        table = new TableView<>(rows);
+        table = new TableView<>();
+        pager = new pkg.vms.Pager<>(table);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         table.setStyle("-fx-font-size:13;");
         VBox.setVgrow(table, Priority.ALWAYS);
@@ -126,7 +125,7 @@ public class GestionBonsView {
             colActions()
         );
 
-        card.getChildren().add(table);
+        card.getChildren().addAll(table, pager.getBar());
         return card;
     }
 
@@ -135,12 +134,11 @@ public class GestionBonsView {
     private void loadData(String statut) {
         lblCount.setText("Chargement…");
         vCtrl.chargerDemandes(statut, data -> {
-            // On ne montre que les demandes qui ont des bons (GENERE, ENVOYE, ARCHIVE)
             List<String[]> bons = data.stream()
                 .filter(r -> r[5] != null && (r[5].equals("GENERE") || r[5].equals("ENVOYE")
                           || r[5].equals("ARCHIVE") || statut != null))
                 .toList();
-            rows.setAll(bons);
+            pager.setData(bons);
             lblCount.setText(bons.size() + " demande(s) avec bons");
         }, err -> showErr(err));
     }
@@ -153,7 +151,7 @@ public class GestionBonsView {
                 .filter(r -> (r[1] != null && r[1].toLowerCase().contains(ql))
                           || (r[2] != null && r[2].toLowerCase().contains(ql)))
                 .toList();
-            rows.setAll(f);
+            pager.setData(f);
             lblCount.setText(f.size() + " résultat(s)");
         }, err -> showErr(err));
     }

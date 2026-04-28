@@ -23,11 +23,11 @@ public class GestionDemandeView {
     private final ValidationController  vCtrl = new ValidationController();
     private final DemandeController     dCtrl = new DemandeController();
 
-    private final ObservableList<String[]> rows = FXCollections.observableArrayList();
-    private TableView<String[]>            table;
-    private ComboBox<String>               cbFilter;
-    private TextField                      tfSearch;
-    private Label                          lblCount;
+    private TableView<String[]>       table;
+    private pkg.vms.Pager<String[]>   pager;
+    private ComboBox<String>          cbFilter;
+    private TextField                 tfSearch;
+    private Label                     lblCount;
 
     public GestionDemandeView(AuthDAO.UserSession session) { this.session = session; }
 
@@ -111,7 +111,8 @@ public class GestionDemandeView {
                     + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.06),8,0,0,2);");
         VBox.setVgrow(card, Priority.ALWAYS);
 
-        table = new TableView<>(rows);
+        table = new TableView<>();
+        pager = new pkg.vms.Pager<>(table);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         table.setStyle("-fx-font-size:13;");
         VBox.setVgrow(table, Priority.ALWAYS);
@@ -129,7 +130,7 @@ public class GestionDemandeView {
             colActions()
         );
 
-        card.getChildren().add(table);
+        card.getChildren().addAll(table, pager.getBar());
         return card;
     }
 
@@ -140,7 +141,7 @@ public class GestionDemandeView {
     private void loadData(String statut) {
         lblCount.setText("Chargement…");
         vCtrl.chargerDemandes(statut, data -> {
-            rows.setAll(data);
+            pager.setData(data);
             lblCount.setText(data.size() + " demande(s)");
         }, err -> showErr(err));
     }
@@ -156,7 +157,7 @@ public class GestionDemandeView {
                 .filter(r -> (r[1] != null && r[1].toLowerCase().contains(q))
                           || (r[2] != null && r[2].toLowerCase().contains(q)))
                 .toList();
-            rows.setAll(filtered);
+            pager.setData(filtered);
             lblCount.setText(filtered.size() + " résultat(s)");
         }, err -> showErr(err));
     }
