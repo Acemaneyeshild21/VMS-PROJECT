@@ -53,8 +53,10 @@ ALTER TABLE utilisateur
     ADD COLUMN IF NOT EXISTS verrouille_jusqua  TIMESTAMP          DEFAULT NULL;
 
 -- FK différée : superviseur_id dans magasin → utilisateur (créé après magasin)
+-- Note : ADD CONSTRAINT n'accepte pas IF NOT EXISTS en PostgreSQL — on DROP d'abord
+ALTER TABLE magasin DROP CONSTRAINT IF EXISTS fk_magasin_superviseur;
 ALTER TABLE magasin
-    ADD CONSTRAINT IF NOT EXISTS fk_magasin_superviseur
+    ADD CONSTRAINT fk_magasin_superviseur
     FOREIGN KEY (superviseur_id) REFERENCES utilisateur(userid);
 
 -- Clients (bénéficiaires des bons)
