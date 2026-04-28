@@ -536,15 +536,7 @@ ALTER TABLE audit_log
     ADD CONSTRAINT audit_log_utilisateur_id_fkey
     FOREIGN KEY (utilisateur_id) REFERENCES utilisateur(userid) ON DELETE SET NULL;
 
--- 7b. Ajout de l'action DECONNEXION dans la contrainte audit_log.chk_action
-ALTER TABLE audit_log DROP CONSTRAINT IF EXISTS chk_action;
-ALTER TABLE audit_log ADD CONSTRAINT chk_action CHECK (action IN (
-    'CREATION','MODIFICATION','SUPPRESSION','PAIEMENT','APPROBATION',
-    'GENERATION','ENVOI','REDEMPTION','REJET','ANNULATION',
-    'CONNEXION','CONNEXION_ECHOUEE','DECONNEXION','INSCRIPTION',
-    'CHANGEMENT_STATUT','ARCHIVAGE_MASSIF','UTILISATION_BON',
-    'UPDATE_EMAIL'
-));
+-- 7b. Mise à jour de chk_action — version finale complète en section 9a ci-dessous.
 
 -- 7c. Trigger : Séparation des tâches (SoD)
 --     Un même utilisateur ne peut pas valider le paiement ET approuver la même demande.
@@ -614,18 +606,22 @@ CREATE INDEX IF NOT EXISTS idx_email_errors_demande ON email_errors(demande_id);
 -- 9. AUDIT TRAIL COMPLET & REPORTING CONFIGURABLE
 -- ────────────────────────────────────────────────────────────────────────────
 
--- 9a. Étendre les actions autorisées dans l'audit trail
---     ENVOI_ECHEC  : envoi email échoué (bons générés mais non livrés)
---     REDEMPTION_ECHOUEE : tentative de rédemption refusée (code invalide / expiré / déjà utilisé)
+-- 9a. Contrainte chk_action — version finale complète (toutes les actions Java + DB)
 ALTER TABLE audit_log DROP CONSTRAINT IF EXISTS chk_action;
 ALTER TABLE audit_log ADD CONSTRAINT chk_action CHECK (action IN (
+    -- Cycle de vie demandes
     'CREATION','MODIFICATION','SUPPRESSION',
     'PAIEMENT','APPROBATION','GENERATION',
     'ENVOI','ENVOI_ECHEC',
     'REDEMPTION','REDEMPTION_ECHOUEE','UTILISATION_BON',
-    'REJET','ANNULATION',
-    'CONNEXION','CONNEXION_ECHOUEE','DECONNEXION','INSCRIPTION',
-    'CHANGEMENT_STATUT','ARCHIVAGE_MASSIF','UPDATE_EMAIL'
+    'REJET','ANNULATION','ARCHIVAGE_MASSIF','CHANGEMENT_STATUT',
+    -- Authentification (AuthDAO)
+    'CONNEXION','CONNEXION_ECHOUEE','CONNEXION_BLOQUEE','DECONNEXION','INSCRIPTION',
+    'COMPTE_VERROUILLE','DEVERROUILLAGE',
+    -- Gestion utilisateurs (UserDAO)
+    'CHANGE_PASSWORD','UPDATE_PROFILE','UPDATE_ROLE','DELETE','UPDATE_EMAIL',
+    -- Réinitialisation mot de passe (PasswordResetDAO)
+    'RESET_PASSWORD','RESET_PASSWORD_DEMANDE','RESET_PASSWORD_SUCCES','RESET_PASSWORD_ECHEC'
 ));
 
 -- 9b. Paramètre configurable : seuil d'expiration pour le rapport bons proches d'expiration
@@ -786,7 +782,9 @@ CREATE TRIGGER trg_anti_double_spend
 CREATE OR REPLACE FUNCTION trg_fn_demande_montant_coherence()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Validation : valeurs positives
+    -- Validation métier : valeurs positives
+    -- Complète les CHECK constraints (chk_nombre_bons, chk_valeur_unitaire)
+    -- pour un message d'erreur plus explicite côté application.
     IF NEW.nombre_bons <= 0 THEN
         RAISE EXCEPTION 'MONTANT_INVALIDE: nombre_bons doit être > 0 (reçu: %)', NEW.nombre_bons
             USING ERRCODE = 'P0003';
@@ -797,9 +795,8 @@ BEGIN
             USING ERRCODE = 'P0004';
     END IF;
 
-    -- Recalcul automatique du montant total
-    NEW.montant_total := NEW.nombre_bons * NEW.valeur_unitaire;
-
+    -- montant_total est défini GENERATED ALWAYS AS (nombre_bons * valeur_unitaire) STORED
+    -- dans le CREATE TABLE : PostgreSQL le recalcule automatiquement, aucune action requise ici.
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
