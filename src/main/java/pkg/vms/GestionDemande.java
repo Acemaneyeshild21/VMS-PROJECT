@@ -1,18 +1,20 @@
 package pkg.vms;
+import pkg.vms.DAO.BonDAO;
+import pkg.vms.DAO.DBconnect;
 import pkg.vms.DAO.VoucherDAO;
-import pkg.vms.controller.DemandeController;
 
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class GestionDemande extends JPanel {
 
-    // ── Palette (Centralisée via VMSStyle) ───────────────────────────────────────
+    // ── Palette (Centralisée via VMSStyle) ──────────────────────────────────
     private static final Color BG_ROOT      = VMSStyle.BG_ROOT;
     private static final Color BG_CARD      = VMSStyle.BG_CARD;
     private static final Color RED_PRIMARY  = VMSStyle.RED_PRIMARY;
@@ -35,14 +37,14 @@ public class GestionDemande extends JPanel {
     private static final String ST_REJETE           = "REJETE";
     private static final String ST_ENVOYE           = "ENVOYE";
 
-    // ── Fonts (Centralisées via VMSStyle) ────────────────────────────────────────────
+    // ── Fonts (Centralisées via VMSStyle) ────────────────────────────────────
     private static final Font FONT_PAGE_TITLE = VMSStyle.FONT_BRAND.deriveFont(24f);
     private static final Font FONT_SECTION    = VMSStyle.FONT_BADGE.deriveFont(9f);
     private static final Font FONT_TABLE_HDR  = VMSStyle.FONT_BADGE.deriveFont(12f);
-    private static final Font FONT_TABLE_CELL = new Font("Trebuchet MS", Font.PLAIN, 12);
-    private static final Font FONT_BADGE      = new Font("Trebuchet MS", Font.BOLD,  10);
-    private static final Font FONT_BTN        = new Font("Trebuchet MS", Font.BOLD,  12);
-    private static final Font FONT_FILTER     = new Font("Trebuchet MS", Font.PLAIN, 12);
+    private static final Font FONT_TABLE_CELL = new Font("Segoe UI", Font.PLAIN, 12);
+    private static final Font FONT_BADGE      = new Font("Segoe UI", Font.BOLD,  10);
+    private static final Font FONT_BTN        = new Font("Segoe UI", Font.BOLD,  12);
+    private static final Font FONT_FILTER     = new Font("Segoe UI", Font.PLAIN, 12);
 
     // Colonnes tableau
     private static final String[] COLS = {
@@ -63,7 +65,6 @@ public class GestionDemande extends JPanel {
 
     private final String role;
     private final int    userId;
-    private final DemandeController controller = new DemandeController();
 
     private JButton           btnNouveau;
     private DefaultTableModel tableModel;
@@ -71,123 +72,87 @@ public class GestionDemande extends JPanel {
     private JTextField        txtSearch;
     private JLabel            lblTotal;
     private String            filtreStatutActif = "TOUTES";
+    private CardLayout        tableCards;
+    private JPanel            tableCardHolder;
+    private boolean           canCreate;
 
     public GestionDemande(String role, int userId) {
         this.role   = role;
         this.userId = userId;
-        boolean canCreate = "Administrateur".equalsIgnoreCase(role) || "Manager".equalsIgnoreCase(role)
+        this.canCreate = "Administrateur".equalsIgnoreCase(role) || "Manager".equalsIgnoreCase(role)
                             || "Collaborateur".equalsIgnoreCase(role);
         setLayout(new BorderLayout());
         setOpaque(false);
         initComponents();
         chargerDemandes();
 
+        // Cacher le bouton "Nouvelle Demande" si pas autorisé
         if (!canCreate && btnNouveau != null) {
             btnNouveau.setVisible(false);
         }
     }
 
     private void initComponents() {
-        JPanel wrapper = new JPanel(new BorderLayout(0, 0));
+        JPanel wrapper = new JPanel(new BorderLayout(0, 14));
         wrapper.setOpaque(false);
-        wrapper.setBorder(BorderFactory.createEmptyBorder(28, 32, 28, 32));
+        wrapper.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
         wrapper.add(buildHeader(), BorderLayout.NORTH);
 
-        JPanel mid = new JPanel(new BorderLayout(0, 12));
+        JPanel mid = new JPanel(new BorderLayout(0, 14));
         mid.setOpaque(false);
-        mid.setBorder(BorderFactory.createEmptyBorder(18, 0, 0, 0));
         mid.add(buildToolbar(),   BorderLayout.NORTH);
         mid.add(buildTableCard(), BorderLayout.CENTER);
         wrapper.add(mid, BorderLayout.CENTER);
         add(wrapper, BorderLayout.CENTER);
     }
 
-    // ── HEADER ──────────────────────────────────────────────────────────────────────
+    // ── HEADER (PageLayout) ────────────────────────────────────────────────
     private JPanel buildHeader() {
-        JPanel h = new JPanel(new BorderLayout());
-        h.setOpaque(false);
-
-        JPanel left = new JPanel();
-        left.setOpaque(false);
-        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
-
-        JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0)) {
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                g.setColor(RED_PRIMARY);
-                g.fillRoundRect(0, 3, 4, getHeight() - 6, 4, 4);
-            }
-        };
-        titleRow.setOpaque(false);
-        titleRow.setBorder(BorderFactory.createEmptyBorder(0, 14, 0, 0));
-        JLabel icon  = new JLabel("📋");
-        icon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 26));
-        JLabel title = new JLabel("  Gestion des Demandes");
-        title.setFont(FONT_PAGE_TITLE);
-        title.setForeground(TEXT_PRIMARY);
-        titleRow.add(icon); titleRow.add(title);
-        titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JLabel sub = new JLabel("Suivi complet du cycle de vie des demandes de bons cadeau");
-        sub.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
-        sub.setForeground(TEXT_SECOND);
-        sub.setBorder(BorderFactory.createEmptyBorder(5, 14, 0, 0));
-        sub.setAlignmentX(Component.LEFT_ALIGNMENT);
-        left.add(titleRow); left.add(sub);
-
-        btnNouveau = UIUtils.buildRedButton("+ Nouvelle Demande");
+        btnNouveau = UIUtils.buildPrimaryButton("+ Nouvelle Demande", 200, 40);
         btnNouveau.addActionListener(e -> ouvrirNouvelledemande());
-        h.add(left,   BorderLayout.CENTER);
-        h.add(btnNouveau, BorderLayout.EAST);
-        return h;
+        return PageLayout.buildPageHeader(
+                "Demandes",
+                "Suivi complet du cycle de vie des demandes de bons cadeau",
+                btnNouveau
+        );
     }
 
-    // ── TOOLBAR ───────────────────────────────────────────────────────────────────────
+    // ── TOOLBAR (chips de statut + filter bar) ──────────────────────────────
     private JPanel buildToolbar() {
-        JPanel bar = new JPanel(new BorderLayout(16, 0));
-        bar.setOpaque(false);
+        JPanel outer = new JPanel(new BorderLayout(0, 10));
+        outer.setOpaque(false);
 
-        JPanel chips = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        chips.setOpaque(false);
-        chips.add(buildChip("Toutes",    null,         "TOUTES"));
-        chips.add(buildChip("En attente", WARNING,     ST_ATTENTE_PAIEMENT));
-        chips.add(buildChip("Payées",     ACCENT_BLUE, ST_PAYE));
-        chips.add(buildChip("Approuvées", ACCENT_PURP, ST_APPROUVE));
-        chips.add(buildChip("Générées",   SUCCESS,     ST_GENERE));
-        chips.add(buildChip("Envoyées",   new Color(20,170,190), ST_ENVOYE));
-        chips.add(buildChip("Rejetées",   RED_PRIMARY, ST_REJETE));
+        // Chips — Envoyées/Rejetées déplacés vers Archives
+        JPanel chipsCard = PageLayout.buildCard(new FlowLayout(FlowLayout.LEFT, 8, 0), 12);
+        chipsCard.add(buildChip("Toutes",    null,         "TOUTES"));
+        chipsCard.add(buildChip("En attente", WARNING,     ST_ATTENTE_PAIEMENT));
+        chipsCard.add(buildChip("Payées",     ACCENT_BLUE, ST_PAYE));
+        chipsCard.add(buildChip("Approuvées", ACCENT_PURP, ST_APPROUVE));
+        chipsCard.add(buildChip("Générées",   SUCCESS,     ST_GENERE));
+        outer.add(chipsCard, BorderLayout.NORTH);
 
-        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        right.setOpaque(false);
-        txtSearch = new JTextField(18) {
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                if (getText().isEmpty()) {
-                    Graphics2D g2 = (Graphics2D) g;
-                    g2.setFont(FONT_FILTER); g2.setColor(TEXT_MUTED);
-                    Insets i = getInsets();
-                    g2.drawString("🔍  Rechercher...", i.left, getHeight() - i.bottom - 4);
-                }
-            }
-        };
-        txtSearch.setFont(FONT_FILTER);
-        txtSearch.setForeground(TEXT_PRIMARY);
-        txtSearch.setBackground(BG_CARD);
-        txtSearch.setCaretColor(RED_PRIMARY);
-        txtSearch.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(BORDER_LIGHT, 1),
-                BorderFactory.createEmptyBorder(7, 12, 7, 12)));
-        txtSearch.setPreferredSize(new Dimension(220, 36));
+        // Barre recherche + réinitialiser
+        PageLayout.FilterBar fb = PageLayout.buildFilterBar("Rechercher une demande (référence, client, magasin)...");
+        txtSearch = fb.search();
         txtSearch.addKeyListener(new KeyAdapter() {
             public void keyReleased(KeyEvent e) { filtrerTable(); }
         });
-        JButton btnRefresh = buildIconButton("↻", "Actualiser");
-        btnRefresh.addActionListener(e -> chargerDemandes());
-        right.add(txtSearch); right.add(btnRefresh);
+        JButton btnRefresh = UIUtils.buildGhostButton("Réinitialiser", 130, 38);
+        btnRefresh.setToolTipText("Vider les filtres et recharger (F5)");
+        btnRefresh.addActionListener(e -> reinitialiser());
+        fb.addSlot(btnRefresh);
 
-        bar.add(chips, BorderLayout.CENTER);
-        bar.add(right, BorderLayout.EAST);
-        return bar;
+        // Raccourci F5 : réinitialiser
+        registerKeyboardAction(
+                e -> reinitialiser(),
+                KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0),
+                WHEN_IN_FOCUSED_WINDOW);
+
+        JPanel wrap = new JPanel(new BorderLayout(0, 10));
+        wrap.setOpaque(false);
+        wrap.add(chipsCard, BorderLayout.NORTH);
+        wrap.add(fb.panel(), BorderLayout.CENTER);
+        return wrap;
     }
 
     private JButton buildChip(String label, Color color, String statut) {
@@ -231,72 +196,35 @@ public class GestionDemande extends JPanel {
         return chip;
     }
 
-    // ── TABLE CARD ───────────────────────────────────────────────────────────────────
+    // ── TABLE CARD (ModernTable) ────────────────────────────────────────────
     private JPanel buildTableCard() {
-        JPanel card = new JPanel(new BorderLayout()) {
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(BG_CARD);
-                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 14, 14));
-                g2.setColor(BORDER_LIGHT); g2.setStroke(new BasicStroke(1f));
-                g2.draw(new RoundRectangle2D.Double(0.5, 0.5, getWidth()-1, getHeight()-1, 14, 14));
-                g2.dispose();
-            }
-        };
-        card.setOpaque(false);
-
         tableModel = new DefaultTableModel(COLS, 0) {
             @Override public boolean isCellEditable(int r, int c) { return c == COL_ACTIONS; }
         };
 
-        table = new JTable(tableModel) {
-            @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
-                Component c = super.prepareRenderer(r, row, col);
-                if (!isRowSelected(row))
-                    c.setBackground(row % 2 == 0 ? BG_CARD : new Color(249, 250, 252));
-                else c.setBackground(RED_LIGHT);
-                return c;
-            }
-        };
-        table.setFont(FONT_TABLE_CELL);
-        table.setRowHeight(44);
-        table.setShowHorizontalLines(true);
-        table.setShowVerticalLines(false);
-        table.setGridColor(new Color(240, 242, 246));
-        table.setSelectionBackground(RED_LIGHT);
-        table.setSelectionForeground(TEXT_PRIMARY);
-        table.setFocusable(false);
-        table.getTableHeader().setReorderingAllowed(false);
-
-        JTableHeader header = table.getTableHeader();
-        header.setFont(FONT_TABLE_HDR);
-        header.setBackground(new Color(248, 249, 252));
-        header.setForeground(TEXT_SECOND);
-        header.setPreferredSize(new Dimension(0, 42));
-        header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, BORDER_LIGHT));
+        table = new JTable(tableModel);
+        ModernTable.apply(table);
+        table.setAutoCreateRowSorter(false); // Gestion via RowSorter custom plus bas
 
         int[] widths = {40, 120, 150, 55, 95, 110, 120, 110, 80, 130, 80};
         for (int i = 0; i < widths.length; i++)
-            table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
+            ModernTable.setColumnWidth(table, i, widths[i]);
         table.getColumnModel().getColumn(COL_ID).setMaxWidth(40);
 
-        table.getColumnModel().getColumn(COL_STATUT).setCellRenderer(new StatutRenderer());
+        // Renderers spécifiques (badge statut, montants)
+        ModernTable.setColumnRenderer(table, COL_REF, ModernTable.boldRenderer());
+        ModernTable.setColumnRenderer(table, COL_STATUT, new StatutRenderer());
+        ModernTable.setColumnRenderer(table, COL_NB, ModernTable.centerRenderer());
+        ModernTable.setColumnRenderer(table, COL_VU, ModernTable.moneyRenderer());
+        ModernTable.setColumnRenderer(table, COL_TOTAL, ModernTable.moneyRenderer());
         table.getColumnModel().getColumn(COL_ACTIONS).setCellRenderer(new ActionRenderer());
         table.getColumnModel().getColumn(COL_ACTIONS).setCellEditor(new ActionEditor());
 
-        DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
-        rightRenderer.setHorizontalAlignment(SwingConstants.RIGHT);
-        table.getColumnModel().getColumn(COL_NB).setCellRenderer(rightRenderer);
-        table.getColumnModel().getColumn(COL_VU).setCellRenderer(rightRenderer);
-        table.getColumnModel().getColumn(COL_TOTAL).setCellRenderer(rightRenderer);
+        // Carte contenant table + footer compteur
+        JPanel card = PageLayout.buildCard(new BorderLayout(), 0);
 
-        JScrollPane scroll = new JScrollPane(table);
-        scroll.setBorder(null); scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        scroll.getVerticalScrollBar().setUnitIncrement(16);
-        scroll.getViewport().setBackground(BG_CARD);
+        JScrollPane scroll = ModernTable.wrap(table);
+        scroll.setBorder(null);
 
         JPanel footer = new JPanel(new BorderLayout());
         footer.setOpaque(false);
@@ -304,33 +232,121 @@ public class GestionDemande extends JPanel {
                 BorderFactory.createMatteBorder(1, 0, 0, 0, BORDER_LIGHT),
                 BorderFactory.createEmptyBorder(10, 16, 10, 16)));
         lblTotal = new JLabel("Chargement...");
-        lblTotal.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        lblTotal.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         lblTotal.setForeground(TEXT_MUTED);
         footer.add(lblTotal, BorderLayout.WEST);
 
-        card.add(scroll,  BorderLayout.CENTER);
-        card.add(footer,  BorderLayout.SOUTH);
-        return card;
+        card.add(scroll, BorderLayout.CENTER);
+        card.add(footer, BorderLayout.SOUTH);
+
+        // Empty states : table / no-data / no-result
+        JPanel emptyNoData = PageLayout.buildCard(new BorderLayout(), 0);
+        emptyNoData.add(PageLayout.buildEmptyState(
+                "Aucune demande",
+                "Les demandes apparaîtront ici dès qu'elles seront créées.",
+                canCreate ? "+ Nouvelle Demande" : null,
+                canCreate ? this::ouvrirNouvelledemande : null
+        ), BorderLayout.CENTER);
+
+        JPanel emptyNoResult = PageLayout.buildCard(new BorderLayout(), 0);
+        emptyNoResult.add(PageLayout.buildEmptyState(
+                "Aucun résultat",
+                "Aucune demande ne correspond au filtre ou à la recherche.",
+                "Réinitialiser les filtres",
+                () -> { txtSearch.setText(""); filtreStatutActif = "TOUTES"; filtrerTable(); }
+        ), BorderLayout.CENTER);
+
+        tableCards = new CardLayout();
+        tableCardHolder = new JPanel(tableCards);
+        tableCardHolder.setOpaque(false);
+        tableCardHolder.add(card, "table");
+        tableCardHolder.add(emptyNoData, "empty-no-data");
+        tableCardHolder.add(emptyNoResult, "empty-no-result");
+        return tableCardHolder;
     }
 
+    private void updateTableView() {
+        if (tableCards == null) return;
+        int total = tableModel.getRowCount();
+        int visible = table.getRowCount();
+        if (total == 0) {
+            tableCards.show(tableCardHolder, "empty-no-data");
+        } else if (visible == 0) {
+            tableCards.show(tableCardHolder, "empty-no-result");
+        } else {
+            tableCards.show(tableCardHolder, "table");
+        }
+    }
+
+    // ── CHARGEMENT BD ───────────────────────────────────────────────────────
+    // Colonnes réelles de la table demande :
+    // demande_id, email, contact_number, company, statuts, invoice_reference,
+    // valeur_et_nombre, client_id, date_creation, date_modification, cree_par,
+    // nombre_bons, valeur_unitaire, montant_total, date_paiement, paiement_valide,
+    // valide_par, approuve, approuve_par, date_approbation, date_demande,
+    // utilisateur_creation_id, description, statut, magasin_id, validite_jours,
+    // email_destinataire, reference
     private void chargerDemandes() {
-        controller.chargerDemandes(
-            rows -> {
-                tableModel.setRowCount(0);
-                for (VoucherDAO.DemandeComplet dc : rows) {
-                    tableModel.addRow(new Object[]{
-                        dc.id, dc.reference, dc.client, dc.nbBons,
-                        dc.valeurUnit, dc.montantTotal, dc.magasin,
-                        dc.dateCreation, dc.validiteJours, dc.statut, "actions"
-                    });
+        new SwingWorker<List<Object[]>, Void>() {
+            @Override
+            protected List<Object[]> doInBackground() throws Exception {
+                List<Object[]> data = new ArrayList<>();
+                // Archives exclues : ENVOYE/REJETE/ARCHIVE → gérés dans ArchivesPanel
+                String sql = "SELECT d.demande_id, d.invoice_reference, c.name AS nom_client, " +
+                             "d.nombre_bons, d.valeur_unitaire, d.montant_total, m.nom_magasin, " +
+                             "d.date_creation, d.validite_jours, d.statuts " +
+                             "FROM demande d LEFT JOIN client c ON d.clientid = c.clientid " +
+                             "LEFT JOIN magasin m ON d.magasin_id = m.magasin_id " +
+                             "WHERE d.statuts NOT IN ('ENVOYE','REJETE','ARCHIVE') " +
+                             "ORDER BY d.date_creation DESC";
+                try (Connection conn = DBconnect.getConnection();
+                     Statement st = conn.createStatement();
+                     ResultSet rs = st.executeQuery(sql)) {
+                    while (rs.next()) {
+                        data.add(new Object[]{
+                            rs.getInt("demande_id"),
+                            rs.getString("invoice_reference"),
+                            rs.getString("nom_client"),
+                            rs.getInt("nombre_bons"),
+                            rs.getDouble("valeur_unitaire"),
+                            rs.getDouble("montant_total"),
+                            rs.getString("nom_magasin"),
+                            rs.getString("date_creation"),
+                            rs.getInt("validite_jours"),
+                            rs.getString("statuts"),
+                            "actions"
+                        });
+                    }
                 }
-                lblTotal.setText(rows.size() + " demande" + (rows.size() > 1 ? "s" : "") + " au total");
-            },
-            err -> lblTotal.setText("Erreur chargement : " + err)
-        );
+                return data;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    tableModel.setRowCount(0);
+                    List<Object[]> data = get();
+                    for (Object[] row : data) {
+                        tableModel.addRow(row);
+                    }
+                    lblTotal.setText(data.size() + " demande" + (data.size() > 1 ? "s" : "") + " au total");
+                    updateTableView();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }.execute();
     }
 
-    // ── FILTRES ───────────────────────────────────────────────────────────────────────────
+    // ── RÉINITIALISATION (F5 / bouton) ─────────────────────────────────────
+    private void reinitialiser() {
+        txtSearch.setText("");
+        filtreStatutActif = "TOUTES";
+        chargerDemandes();
+        ToastManager.info(this, "Filtres r\u00e9initialis\u00e9s \u2014 donn\u00e9es recharg\u00e9es");
+    }
+
+    // ── FILTRES ─────────────────────────────────────────────────────────────
     private void filtrerParStatut(String statut) {
         filtreStatutActif = statut;
         filtrerTable();
@@ -351,9 +367,10 @@ public class GestionDemande extends JPanel {
 
         int visible = table.getRowCount();
         lblTotal.setText(visible + " demande" + (visible > 1 ? "s" : "") + " affichée" + (visible > 1 ? "s" : ""));
+        updateTableView();
     }
 
-    // ── RENDERER STATUT ───────────────────────────────────────────────────────────────────
+    // ── RENDERER STATUT ─────────────────────────────────────────────────────
     private class StatutRenderer extends DefaultTableCellRenderer {
         @Override public Component getTableCellRendererComponent(
                 JTable t, Object val, boolean sel, boolean foc, int row, int col) {
@@ -399,18 +416,18 @@ public class GestionDemande extends JPanel {
         }
         private String badgeLabel(String s) {
             switch (s) {
-                case ST_ATTENTE_PAIEMENT: return "⏳  En attente";
-                case ST_PAYE:            return "💳  Payée";
-                case ST_APPROUVE:        return "✅  Approuvée";
-                case ST_GENERE:          return "🎟  Générée";
-                case ST_ENVOYE:          return "📨  Envoyée";
-                case ST_REJETE:          return "❌  Rejetée";
+                case ST_ATTENTE_PAIEMENT: return "\u23F3  En attente";
+                case ST_PAYE:            return "\uD83D\uDCB3  Pay\u00e9e";
+                case ST_APPROUVE:        return "\u2705  Approuv\u00e9e";
+                case ST_GENERE:          return "\uD83C\uDF9F  G\u00e9n\u00e9r\u00e9e";
+                case ST_ENVOYE:          return "\uD83D\uDCE8  Envoy\u00e9e";
+                case ST_REJETE:          return "\u274C  Rejet\u00e9e";
                 default:                 return s;
             }
         }
     }
 
-    // ── RENDERER ACTIONS ────────────────────────────────────────────────────────────────────
+    // ── RENDERER ACTIONS ────────────────────────────────────────────────────
     private class ActionRenderer extends DefaultTableCellRenderer {
         private final JPanel   p   = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
         private final JButton  btn;
@@ -425,7 +442,7 @@ public class GestionDemande extends JPanel {
         }
     }
 
-    // ── EDITOR ACTIONS ─────────────────────────────────────────────────────────────────────
+    // ── EDITOR ACTIONS ──────────────────────────────────────────────────────
     private class ActionEditor extends AbstractCellEditor implements TableCellEditor {
         private final JPanel  p   = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
         private final JButton btn;
@@ -469,103 +486,122 @@ public class GestionDemande extends JPanel {
         return btn;
     }
 
-    // ── DETAIL DEMANDE ────────────────────────────────────────────────────────────────────
+    // ── DETAIL DEMANDE ──────────────────────────────────────────────────────
     private void afficherDetailDemande(int demandeId) {
-        controller.chargerDetail(demandeId,
-            detail -> buildAndShowDetailDialog(demandeId, detail),
-            err -> JOptionPane.showMessageDialog(this,
-                "Erreur : " + err, "Erreur", JOptionPane.ERROR_MESSAGE)
-        );
+        // Utilise les vraies colonnes de la BD
+        String sql =
+                "SELECT d.demande_id, d.invoice_reference, d.nombre_bons, " +
+                        "       d.valeur_unitaire, d.montant_total, d.validite_jours, " +
+                        "       d.statuts, d.date_creation, d.email, d.cree_par, " +
+                        "       c.name AS nom_client, c.email AS email_client, " +
+                        "       m.nom_magasin, " +
+                        "       u.username AS createur " +
+                        "FROM demande d " +
+                        "LEFT JOIN client      c ON d.clientid   = c.clientid " +
+                        "LEFT JOIN magasin     m ON d.magasin_id  = m.magasin_id " +
+                        "LEFT JOIN utilisateur u ON d.cree_par    = u.userid " +
+                        "WHERE d.demande_id = ?";
+
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, demandeId);
+            ResultSet rs = ps.executeQuery();
+            if (!rs.next()) return;
+
+            String ref      = rs.getString("invoice_reference");
+            String client   = rs.getString("nom_client");
+            String emailCli = rs.getString("email_client");
+            String emailEnv = rs.getString("email");
+            int    nbBons   = rs.getInt("nombre_bons");
+            double valUnit  = rs.getDouble("valeur_unitaire");
+            double total    = rs.getDouble("montant_total");
+            int    validite = rs.getInt("validite_jours");
+            String magasin  = rs.getString("nom_magasin");
+            String dateD    = rs.getString("date_creation");
+            String statut   = rs.getString("statuts");
+            String createur = rs.getString("createur");
+
+            JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
+                    "D\u00e9tail \u2014 " + (ref != null ? ref : "#" + demandeId), true);
+            dlg.setUndecorated(true);
+            dlg.setSize(520, 520);
+            dlg.setLocationRelativeTo(this);
+
+            JPanel root = new JPanel(new BorderLayout()) {
+                @Override protected void paintComponent(Graphics g) {
+                    super.paintComponent(g); g.setColor(BG_ROOT);
+                    g.fillRect(0, 0, getWidth(), getHeight());
+                }
+            };
+            root.setBorder(BorderFactory.createLineBorder(BORDER_LIGHT, 1));
+
+            // Header rouge
+            JPanel hdr = new JPanel() {
+                @Override protected void paintComponent(Graphics g) {
+                    super.paintComponent(g);
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setPaint(new GradientPaint(0, 0, RED_PRIMARY, getWidth(), 0, RED_DARK));
+                    g2.fillRect(0, 0, getWidth(), getHeight()); g2.dispose();
+                }
+            };
+            hdr.setPreferredSize(new Dimension(0, 72));
+            hdr.setLayout(new BorderLayout());
+            hdr.setBorder(BorderFactory.createEmptyBorder(16, 24, 16, 20));
+
+            JPanel hdrLeft = new JPanel();
+            hdrLeft.setOpaque(false);
+            hdrLeft.setLayout(new BoxLayout(hdrLeft, BoxLayout.Y_AXIS));
+            JLabel lblRef = new JLabel("\uD83D\uDCCB  " + (ref != null ? ref : "#" + demandeId));
+            lblRef.setFont(new Font("Georgia", Font.BOLD, 18));
+            lblRef.setForeground(Color.WHITE);
+            JLabel lblSt = new JLabel(statut != null ? statut : "—");
+            lblSt.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+            lblSt.setForeground(new Color(255,255,255,180));
+            hdrLeft.add(lblRef); hdrLeft.add(lblSt);
+            hdr.add(hdrLeft, BorderLayout.CENTER);
+            hdr.add(buildCloseBtn(() -> dlg.dispose()), BorderLayout.EAST);
+            root.add(hdr, BorderLayout.NORTH);
+
+            // Body
+            JPanel body = new JPanel();
+            body.setOpaque(false);
+            body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
+            body.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
+
+            body.add(buildDetailSection("B\u00c9N\u00c9FICIAIRE"));
+            body.add(buildDetailRow("Client",       client  != null ? client  : "\u2014"));
+            body.add(buildDetailRow("Email client", emailCli != null ? emailCli : "\u2014"));
+            body.add(buildDetailRow("Email envoi",  emailEnv != null ? emailEnv : "\u2014"));
+            body.add(Box.createVerticalStrut(14));
+
+            body.add(buildDetailSection("BON D'ACHAT"));
+            body.add(buildDetailRow("Nombre de bons",  String.valueOf(nbBons)));
+            body.add(buildDetailRow("Valeur unitaire",  String.format("Rs %,.2f", valUnit)));
+            body.add(buildDetailRow("Montant total",    String.format("Rs %,.2f", total)));
+            body.add(buildDetailRow("Validit\u00e9",   validite > 0 ? validite + " jours" : "\u2014"));
+            body.add(Box.createVerticalStrut(14));
+
+            body.add(buildDetailSection("POINT DE VENTE & TRA\u00c7ABILIT\u00c9"));
+            body.add(buildDetailRow("Magasin",      magasin  != null ? magasin  : "\u2014"));
+            body.add(buildDetailRow("Cr\u00e9\u00e9 par", createur != null ? createur : "\u2014"));
+            body.add(buildDetailRow("Date cr\u00e9ation",
+                    dateD != null && dateD.length() >= 10 ? dateD.substring(0, 10) : "\u2014"));
+
+            JScrollPane sc = new JScrollPane(body);
+            sc.setBorder(null); sc.setOpaque(false); sc.getViewport().setOpaque(false);
+            root.add(sc, BorderLayout.CENTER);
+            root.add(buildDialogActions(demandeId, statut != null ? statut : "", dlg), BorderLayout.SOUTH);
+
+            dlg.add(root);
+            dlg.setVisible(true);
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            ToastManager.error(this, "Erreur : " + e.getMessage());
+        }
     }
 
-    private void buildAndShowDetailDialog(int demandeId, VoucherDAO.DemandeDetail detail) {
-        String ref      = detail.reference;
-        String client   = detail.client;
-        String emailCli = detail.emailClient;
-        String emailEnv = detail.emailEnvoi;
-        int    nbBons   = detail.nbBons;
-        double valUnit  = detail.valeurUnit;
-        double total    = detail.total;
-        int    validite = detail.validite;
-        String magasin  = detail.magasin;
-        String dateD    = detail.dateCreation;
-        String statut   = detail.statut;
-        String createur = detail.createur;
-
-        JDialog dlg = new JDialog((Frame) SwingUtilities.getWindowAncestor(this),
-                "Détail — " + (ref != null ? ref : "#" + demandeId), true);
-        dlg.setUndecorated(true);
-        dlg.setSize(520, 520);
-        dlg.setLocationRelativeTo(this);
-
-        JPanel root = new JPanel(new BorderLayout()) {
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g); g.setColor(BG_ROOT);
-                g.fillRect(0, 0, getWidth(), getHeight());
-            }
-        };
-        root.setBorder(BorderFactory.createLineBorder(BORDER_LIGHT, 1));
-
-        JPanel hdr = new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                Graphics2D g2 = (Graphics2D) g.create();
-                g2.setPaint(new GradientPaint(0, 0, RED_PRIMARY, getWidth(), 0, RED_DARK));
-                g2.fillRect(0, 0, getWidth(), getHeight()); g2.dispose();
-            }
-        };
-        hdr.setPreferredSize(new Dimension(0, 72));
-        hdr.setLayout(new BorderLayout());
-        hdr.setBorder(BorderFactory.createEmptyBorder(16, 24, 16, 20));
-
-        JPanel hdrLeft = new JPanel();
-        hdrLeft.setOpaque(false);
-        hdrLeft.setLayout(new BoxLayout(hdrLeft, BoxLayout.Y_AXIS));
-        JLabel lblRef = new JLabel("📋  " + (ref != null ? ref : "#" + demandeId));
-        lblRef.setFont(new Font("Georgia", Font.BOLD, 18));
-        lblRef.setForeground(Color.WHITE);
-        JLabel lblSt = new JLabel(statut != null ? statut : "—");
-        lblSt.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
-        lblSt.setForeground(new Color(255,255,255,180));
-        hdrLeft.add(lblRef); hdrLeft.add(lblSt);
-        hdr.add(hdrLeft, BorderLayout.CENTER);
-        hdr.add(buildCloseBtn(() -> dlg.dispose()), BorderLayout.EAST);
-        root.add(hdr, BorderLayout.NORTH);
-
-        JPanel body = new JPanel();
-        body.setOpaque(false);
-        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
-        body.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
-
-        body.add(buildDetailSection("BÉNÉFICIAIRE"));
-        body.add(buildDetailRow("Client",       client   != null ? client   : "—"));
-        body.add(buildDetailRow("Email client", emailCli != null ? emailCli : "—"));
-        body.add(buildDetailRow("Email envoi",  emailEnv != null ? emailEnv : "—"));
-        body.add(Box.createVerticalStrut(14));
-
-        body.add(buildDetailSection("BON D'ACHAT"));
-        body.add(buildDetailRow("Nombre de bons",  String.valueOf(nbBons)));
-        body.add(buildDetailRow("Valeur unitaire",  String.format("Rs %,.2f", valUnit)));
-        body.add(buildDetailRow("Montant total",    String.format("Rs %,.2f", total)));
-        body.add(buildDetailRow("Validité",   validite > 0 ? validite + " jours" : "—"));
-        body.add(Box.createVerticalStrut(14));
-
-        body.add(buildDetailSection("POINT DE VENTE & TRAÇABILITÉ"));
-        body.add(buildDetailRow("Magasin",         magasin  != null ? magasin  : "—"));
-        body.add(buildDetailRow("Créé par", createur != null ? createur : "—"));
-        body.add(buildDetailRow("Date création",
-                dateD != null && dateD.length() >= 10 ? dateD.substring(0, 10) : "—"));
-
-        JScrollPane sc = new JScrollPane(body);
-        sc.setBorder(null); sc.setOpaque(false); sc.getViewport().setOpaque(false);
-        root.add(sc, BorderLayout.CENTER);
-        root.add(buildDialogActions(demandeId, statut != null ? statut : "", dlg), BorderLayout.SOUTH);
-
-        dlg.add(root);
-        dlg.setVisible(true);
-    }
-
-    // ── ACTIONS DIALOG ────────────────────────────────────────────────────────────────────
+    // ── ACTIONS DIALOG ──────────────────────────────────────────────────────
     private JPanel buildDialogActions(int demandeId, String statut, JDialog dlg) {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 12));
         p.setOpaque(false);
@@ -575,23 +611,26 @@ public class GestionDemande extends JPanel {
         btnClose.addActionListener(e -> dlg.dispose());
         p.add(btnClose);
 
+        // Étape 1 : Valider paiement (Comptable / Admin / Manager)
         if (ST_ATTENTE_PAIEMENT.equals(statut) &&
                 (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Comptable") || role.equalsIgnoreCase("Manager"))) {
             JButton btn = UIUtils.buildRedButton("Valider Paiement");
-            btn.addActionListener(e -> { dlg.dispose(); changerStatut(demandeId, ST_PAYE); });
+            btn.addActionListener(e -> { changerStatut(demandeId, ST_PAYE); dlg.dispose(); chargerDemandes(); });
             p.add(btn);
         }
 
+        // Étape 2 : Approuver (Approbateur / Admin / Manager)
         if (ST_PAYE.equals(statut) &&
                 (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Approbateur") || role.equalsIgnoreCase("Manager"))) {
             JButton btn = UIUtils.buildRedButton("Approuver");
-            btn.addActionListener(e -> { dlg.dispose(); changerStatut(demandeId, ST_APPROUVE); });
+            btn.addActionListener(e -> { changerStatut(demandeId, ST_APPROUVE); dlg.dispose(); chargerDemandes(); });
             p.add(btn);
         }
 
+        // Étape 3 : Générer les bons (Admin / Manager / Approbateur) — après approbation
         if (ST_APPROUVE.equals(statut) &&
                 (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Manager") || role.equalsIgnoreCase("Approbateur"))) {
-            JButton btn = UIUtils.buildRedButton("🎟 Générer les Bons");
+            JButton btn = UIUtils.buildRedButton("\uD83C\uDF9F Générer les Bons");
             btn.addActionListener(e -> {
                 int conf = JOptionPane.showConfirmDialog(dlg,
                         "Générer les bons PDF pour cette demande ?\nLes bons seront créés et envoyés par email.",
@@ -603,14 +642,7 @@ public class GestionDemande extends JPanel {
             p.add(btn);
         }
 
-        if (ST_GENERE.equals(statut) &&
-                (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Manager"))) {
-            JButton btn = UIUtils.buildOutlineButton("↺ Renvoyer Email");
-            btn.setForeground(ACCENT_BLUE);
-            btn.addActionListener(e -> { dlg.dispose(); renvoyerEmail(demandeId); });
-            p.add(btn);
-        }
-
+        // Rejeter (Admin / Manager / Approbateur, tant que pas généré/envoyé)
         if (!ST_REJETE.equals(statut) && !ST_GENERE.equals(statut) && !ST_ENVOYE.equals(statut)
                 && (role.equalsIgnoreCase("Administrateur") || role.equalsIgnoreCase("Manager") || role.equalsIgnoreCase("Approbateur"))) {
             JButton btn = UIUtils.buildOutlineButton("Rejeter");
@@ -618,145 +650,62 @@ public class GestionDemande extends JPanel {
             btn.addActionListener(e -> {
                 int conf = JOptionPane.showConfirmDialog(dlg, "Confirmer le rejet ?",
                         "Rejeter", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
-                if (conf == JOptionPane.YES_OPTION) { dlg.dispose(); changerStatut(demandeId, ST_REJETE); }
+                if (conf == JOptionPane.YES_OPTION) { changerStatut(demandeId, ST_REJETE); dlg.dispose(); chargerDemandes(); }
             });
             p.add(btn);
         }
         return p;
     }
 
-    // ── CHANGER STATUT ──────────────────────────────────────────────────────────────────────
+    // ── CHANGER STATUT (avec traçabilité userId) ────────────────────────────
     private void changerStatut(int demandeId, String nouveauStatut) {
-        controller.changerStatut(demandeId, nouveauStatut, userId,
-            () -> chargerDemandes(),
-            err -> JOptionPane.showMessageDialog(this,
-                "Erreur : " + err, "Erreur", JOptionPane.ERROR_MESSAGE)
-        );
+        try {
+            VoucherDAO.updateVoucherStatus(demandeId, nouveauStatut, userId);
+            chargerDemandes();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            ToastManager.error(this, "Erreur : " + e.getMessage());
+        }
     }
 
-    // ── GENERER LES BONS ───────────────────────────────────────────────────────────────────
+    // ── GÉNÉRER LES BONS (appel procédure stockée + choix template + PDF + email) ──
     private void genererBonsDemande(int demandeId, JDialog dlg) {
         dlg.dispose();
 
-        JDialog progressDlg = new JDialog(
-            (java.awt.Frame) SwingUtilities.getWindowAncestor(this),
-            "Génération en cours…", true);
-        progressDlg.setUndecorated(true);
-        progressDlg.setSize(420, 130);
-        progressDlg.setLocationRelativeTo(this);
-        progressDlg.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE);
-
-        JPanel pRoot = new JPanel(new BorderLayout(0, 0));
-        pRoot.setBackground(BG_CARD);
-        pRoot.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(BORDER_LIGHT, 1),
-            BorderFactory.createEmptyBorder(20, 24, 20, 24)));
-
-        JLabel lblStep = new JLabel("Initialisation…");
-        lblStep.setFont(FONT_TABLE_CELL);
-        lblStep.setForeground(TEXT_PRIMARY);
-
-        JProgressBar bar = new JProgressBar(0, 100);
-        bar.setStringPainted(true);
-        bar.setForeground(RED_PRIMARY);
-        bar.setBackground(new Color(240, 242, 246));
-        bar.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
-
-        pRoot.add(lblStep, BorderLayout.NORTH);
-        pRoot.add(bar, BorderLayout.CENTER);
-        progressDlg.add(pRoot);
-
-        controller.genererBons(demandeId, userId,
-            progress -> {
-                bar.setValue(Integer.parseInt(progress[0]));
-                bar.setString(progress[0] + " %");
-                lblStep.setText(progress[1]);
-            },
-            nb -> {
-                progressDlg.dispose();
-                chargerDemandes();
-                JOptionPane.showMessageDialog(GestionDemande.this,
-                    nb + " bon(s) générés et envoyés avec succès !",
-                    "Génération terminée", JOptionPane.INFORMATION_MESSAGE);
-            },
-            err -> {
-                progressDlg.dispose();
-                JOptionPane.showMessageDialog(GestionDemande.this,
-                    "Erreur lors de la génération : " + err,
-                    "Erreur", JOptionPane.ERROR_MESSAGE);
-            },
-            nb -> {
-                progressDlg.dispose();
-                chargerDemandes();
-                afficherAlerteEmailEchec(demandeId, nb);
+        // 1. Créer les bons en BD via la procédure stockée
+        SwingWorker<java.util.List<BonDAO.BonInfo>, Void> worker = new SwingWorker<>() {
+            @Override
+            protected java.util.List<BonDAO.BonInfo> doInBackground() throws Exception {
+                BonDAO.genererBons(demandeId, userId);
+                return BonDAO.getBonsByDemande(demandeId);
             }
-        );
 
-        progressDlg.setVisible(true);
+            @Override
+            protected void done() {
+                try {
+                    java.util.List<BonDAO.BonInfo> bons = get();
+                    if (bons.isEmpty()) {
+                        ToastManager.info(GestionDemande.this, "Aucun bon généré");
+                        return;
+                    }
+
+                    // 2. Ouvrir le sélecteur de template (modal, sur l'EDT)
+                    Frame parentFrame = (Frame) SwingUtilities.getWindowAncestor(GestionDemande.this);
+                    VoucherTemplateChooser.afficherEtGenerer(parentFrame, demandeId, bons, userId);
+
+                    // 3. Rafraîchir la liste des demandes
+                    chargerDemandes();
+
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    ToastManager.error(GestionDemande.this, "Erreur génération : " + ex.getMessage());
+                }
+            }
+        };
+        worker.execute();
     }
 
-    // ── ALERTE ECHEC EMAIL ───────────────────────────────────────────────────────────────────
-    private void afficherAlerteEmailEchec(int demandeId, int nbBons) {
-        JDialog errDlg = new JDialog(
-            (java.awt.Frame) SwingUtilities.getWindowAncestor(this),
-            "Échec envoi email", true);
-        errDlg.setUndecorated(true);
-        errDlg.setSize(460, 200);
-        errDlg.setLocationRelativeTo(this);
-
-        JPanel root = new JPanel(new BorderLayout());
-        root.setBorder(BorderFactory.createLineBorder(BORDER_LIGHT, 1));
-        root.setBackground(BG_CARD);
-
-        JPanel hdr = new JPanel(new BorderLayout());
-        hdr.setBackground(WARNING);
-        hdr.setPreferredSize(new Dimension(0, 52));
-        hdr.setBorder(BorderFactory.createEmptyBorder(14, 20, 14, 20));
-        JLabel hdrLbl = new JLabel("⚠  Échec de l'envoi email");
-        hdrLbl.setFont(new Font("Georgia", Font.BOLD, 15));
-        hdrLbl.setForeground(Color.WHITE);
-        hdr.add(hdrLbl, BorderLayout.CENTER);
-
-        JPanel body = new JPanel();
-        body.setOpaque(false);
-        body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
-        body.setBorder(BorderFactory.createEmptyBorder(16, 22, 12, 22));
-        JLabel l1 = new JLabel(nbBons + " bon(s) générés avec succès — l'envoi email a échoué.");
-        l1.setFont(FONT_TABLE_CELL); l1.setForeground(TEXT_PRIMARY);
-        JLabel l2 = new JLabel("L'erreur est enregistrée dans email_errors. Vous pouvez relancer.");
-        l2.setFont(new Font("Trebuchet MS", Font.PLAIN, 11)); l2.setForeground(TEXT_SECOND);
-        body.add(l1); body.add(Box.createVerticalStrut(5)); body.add(l2);
-
-        JPanel btns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 10));
-        btns.setOpaque(false);
-        JButton btnFermer = UIUtils.buildOutlineButton("Fermer");
-        btnFermer.addActionListener(e -> errDlg.dispose());
-        JButton btnRenvoyer = UIUtils.buildRedButton("↺ Renvoyer");
-        btnRenvoyer.addActionListener(e -> { errDlg.dispose(); renvoyerEmail(demandeId); });
-        btns.add(btnFermer); btns.add(btnRenvoyer);
-
-        root.add(hdr, BorderLayout.NORTH);
-        root.add(body, BorderLayout.CENTER);
-        root.add(btns, BorderLayout.SOUTH);
-        errDlg.add(root);
-        errDlg.setVisible(true);
-    }
-
-    // ── RELANCE EMAIL ─────────────────────────────────────────────────────────────────────────
-    private void renvoyerEmail(int demandeId) {
-        controller.renvoyerEmail(demandeId, userId,
-            () -> {
-                chargerDemandes();
-                JOptionPane.showMessageDialog(GestionDemande.this,
-                    "Emails renvoyés avec succès !", "Succès", JOptionPane.INFORMATION_MESSAGE);
-            },
-            err -> JOptionPane.showMessageDialog(GestionDemande.this,
-                "Échec du renvoi : " + err + "\n\nL'erreur a été enregistrée (tentative supplémentaire).",
-                "Erreur", JOptionPane.ERROR_MESSAGE)
-        );
-    }
-
-    // ── NOUVELLE DEMANDE ────────────────────────────────────────────────────────────────────
+    // ── NOUVELLE DEMANDE ────────────────────────────────────────────────────
     private void ouvrirNouvelledemande() {
         Dashboard db = (Dashboard) SwingUtilities.getWindowAncestor(this);
         if (db != null) {
@@ -764,7 +713,7 @@ public class GestionDemande extends JPanel {
         }
     }
 
-    // ── HELPERS UI ───────────────────────────────────────────────────────────────────────────
+    // ── HELPERS UI ──────────────────────────────────────────────────────────
     private JPanel buildDetailSection(String text) {
         JLabel lbl = new JLabel(text);
         lbl.setFont(FONT_SECTION); lbl.setForeground(RED_PRIMARY);
@@ -783,19 +732,21 @@ public class GestionDemande extends JPanel {
         row.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 28));
         JLabel k = new JLabel(key);
-        k.setFont(new Font("Trebuchet MS", Font.BOLD, 12));
+        k.setFont(new Font("Segoe UI", Font.BOLD, 12));
         k.setForeground(TEXT_SECOND); k.setPreferredSize(new Dimension(130, 20));
         JLabel v = new JLabel(value);
-        v.setFont(new Font("Trebuchet MS", Font.PLAIN, 12));
+        v.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         v.setForeground(TEXT_PRIMARY);
         row.add(k, BorderLayout.WEST); row.add(v, BorderLayout.CENTER);
         return row;
     }
 
+
+
     private JButton buildIconButton(String symbol, String tooltip) {
         JButton btn = new JButton(symbol) {
             boolean h = false;
-            { setFont(new Font("Trebuchet MS", Font.BOLD, 16)); setForeground(TEXT_SECOND);
+            { setFont(new Font("Segoe UI", Font.BOLD, 16)); setForeground(TEXT_SECOND);
                 setOpaque(false); setContentAreaFilled(false);
                 setBorderPainted(false); setFocusPainted(false);
                 setToolTipText(tooltip); setCursor(new Cursor(Cursor.HAND_CURSOR));
@@ -820,8 +771,8 @@ public class GestionDemande extends JPanel {
     }
 
     private JButton buildCloseBtn(Runnable action) {
-        JButton btn = new JButton("✕") {
-            { setFont(new Font("Trebuchet MS", Font.BOLD, 13));
+        JButton btn = new JButton("\u2715") {
+            { setFont(new Font("Segoe UI", Font.BOLD, 13));
                 setForeground(new Color(255,255,255,180));
                 setOpaque(false); setContentAreaFilled(false);
                 setBorderPainted(false); setFocusPainted(false);

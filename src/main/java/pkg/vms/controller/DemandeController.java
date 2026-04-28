@@ -24,37 +24,6 @@ public class DemandeController {
         }
     }
 
-    public void chargerDemandes(Consumer<List<VoucherDAO.DemandeComplet>> onSuccess,
-                                 Consumer<String> onError) {
-        new SwingWorker<List<VoucherDAO.DemandeComplet>, Void>() {
-            @Override
-            protected List<VoucherDAO.DemandeComplet> doInBackground() throws Exception {
-                return VoucherDAO.getDemandesComplet();
-            }
-            @Override
-            protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
-    }
-
-    public void chargerDetail(int demandeId,
-                               Consumer<VoucherDAO.DemandeDetail> onSuccess,
-                               Consumer<String> onError) {
-        new SwingWorker<VoucherDAO.DemandeDetail, Void>() {
-            @Override
-            protected VoucherDAO.DemandeDetail doInBackground() throws Exception {
-                return VoucherDAO.getDemandeDetail(demandeId);
-            }
-            @Override
-            protected void done() {
-                try { onSuccess.accept(get()); }
-                catch (Exception ex) { onError.accept(ex.getMessage()); }
-            }
-        }.execute();
-    }
-
     public void chargerDonneesFormulaire(Consumer<FormData> onSuccess, Consumer<String> onError) {
         new SwingWorker<FormData, Void>() {
             @Override
@@ -134,10 +103,16 @@ public class DemandeController {
                     int pct = 20 + 60 * (i + 1) / Math.max(total, 1);
                     publish(new String[]{String.valueOf(pct),
                             "PDF " + (i + 1) + "/" + total + " — " + bon.codeUnique});
-                    VoucherPDFGenerator.PdfResult pdf = VoucherPDFGenerator.genererPDF(bon);
-                    BonDAO.updatePdfPath(bon.bonId, pdf.filePath());
-                    BonDAO.updatePdfData(bon.bonId, pdf.data());
-                    bon.pdfPath = pdf.filePath();
+                    String pdfPath = VoucherPDFGenerator.genererPDF(bon);
+                    BonDAO.updatePdfPath(bon.bonId, pdfPath);
+                    // Lire les bytes pour persistance DB
+                    try {
+                        byte[] data = java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(pdfPath));
+                        BonDAO.updatePdfData(bon.bonId, data);
+                    } catch (Exception readEx) {
+                        System.err.println("[DemandeController] PDF bytes non persistés : " + readEx.getMessage());
+                    }
+                    bon.pdfPath = pdfPath;
                 }
 
                 publish(new String[]{"85", "Envoi des emails…"});

@@ -391,6 +391,30 @@ public class EmailService {
         });
     }
 
+    /**
+     * Envoie un code OTP de réinitialisation de mot de passe.
+     * Synchrone — appelé depuis un SwingWorker.doInBackground(), jamais depuis l'EDT.
+     *
+     * @param email email du destinataire
+     * @param nom   prénom/nom ou username
+     * @param code  code OTP à 6 chiffres (15 min de validité)
+     * @return {@code null} si succès, message d'erreur si échec
+     */
+    public static String envoyerCodeReset(String email, String nom, String code) {
+        if (SIMULATION) {
+            System.out.printf("[EmailService SIMULATION] Code reset → %s : %s%n", email, code);
+            return null; // succès simulé
+        }
+        String sujet = "Réinitialisation de mot de passe — " + C_SYSTEME;
+        String corps = buildPasswordResetTemplate(nom, code);
+        try {
+            sendMessage(email, sujet, corps, null, 0, null);
+            return null;
+        } catch (Exception e) {
+            return e.getMessage();
+        }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  Méthodes privées — Session SMTP & envoi
     // ─────────────────────────────────────────────────────────────────────────
@@ -1063,6 +1087,64 @@ public class EmailService {
             "{C_SOCIETE}",       C_SOCIETE,
             "{C_ADRESSE}",       C_ADRESSE,
             "{C_SITE}",          C_SITE
+        );
+    }
+
+    // ── Template : réinitialisation mot de passe ──────────────────────────────
+
+    private static final String TPL_PASSWORD_RESET = """
+        <!DOCTYPE html>
+        <html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>Réinitialisation de mot de passe</title></head>
+        <body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:40px 0">
+          <tr><td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <!-- Header -->
+              <tr><td style="background:#000099;padding:32px 40px;text-align:center">
+                <p style="margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:1px">{C_SYSTEME}</p>
+                <p style="margin:6px 0 0;font-size:12px;color:rgba(255,255,255,0.7)">{C_SOCIETE}</p>
+              </td></tr>
+              <!-- Body -->
+              <tr><td style="padding:40px">
+                <p style="margin:0 0 16px;font-size:20px;font-weight:600;color:#1e293b">Réinitialisation de mot de passe</p>
+                <p style="margin:0 0 24px;color:#475569;font-size:14px;line-height:1.6">
+                  Bonjour <strong>{NOM}</strong>,<br>
+                  Vous avez demandé une réinitialisation de votre mot de passe.<br>
+                  Voici votre code à usage unique, valable <strong>15 minutes</strong> :
+                </p>
+                <!-- Code OTP -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0">
+                  <tr><td align="center">
+                    <div style="display:inline-block;background:#f1f5f9;border:2px solid #000099;border-radius:8px;padding:20px 40px">
+                      <span style="font-size:36px;font-weight:700;color:#000099;letter-spacing:12px;font-family:monospace">{CODE}</span>
+                    </div>
+                  </td></tr>
+                </table>
+                <p style="margin:24px 0 0;color:#64748b;font-size:12px;line-height:1.6;text-align:center">
+                  Si vous n&rsquo;avez pas demandé cette réinitialisation, ignorez cet email.<br>
+                  Ne partagez jamais ce code — notre équipe ne vous le demandera jamais.
+                </p>
+              </td></tr>
+              <!-- Footer -->
+              <tr><td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:20px 40px;text-align:center">
+                <p style="margin:0;font-size:11px;color:#94a3b8">{C_SYSTEME} &mdash; {C_SOCIETE} &mdash; {C_ADRESSE}</p>
+                <p style="margin:4px 0 0;font-size:11px;color:#94a3b8">{C_SITE}</p>
+              </td></tr>
+            </table>
+          </td></tr>
+        </table>
+        </body></html>
+        """;
+
+    private static String buildPasswordResetTemplate(String nom, String code) {
+        return fill(TPL_PASSWORD_RESET,
+            "{NOM}",       escHtml(nom),
+            "{CODE}",      escHtml(code),
+            "{C_SYSTEME}", C_SYSTEME,
+            "{C_SOCIETE}", C_SOCIETE,
+            "{C_ADRESSE}", C_ADRESSE,
+            "{C_SITE}",    C_SITE
         );
     }
 

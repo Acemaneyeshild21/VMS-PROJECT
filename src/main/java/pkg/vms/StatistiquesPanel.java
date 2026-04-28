@@ -1,17 +1,20 @@
 package pkg.vms;
 
-import pkg.vms.controller.StatistiquesController;
+import pkg.vms.DAO.DBconnect;
 
 import javax.swing.*;
 import javax.swing.table.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
+import java.sql.*;
 import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Panneau Statistiques & Rapports du VMS Intermart Maurice.
+ * Panneau Statistiques & Rapports du Voucher System.
  * Affiche les KPI, la repartition par statut, l'activite recente et le top clients.
  */
 public class StatistiquesPanel extends JPanel {
@@ -36,12 +39,12 @@ public class StatistiquesPanel extends JPanel {
     // ── Fonts (Centralisees via VMSStyle) ────────────────────────────────────
     private static final Font FONT_PAGE_TITLE = VMSStyle.FONT_BRAND.deriveFont(24f);
     private static final Font FONT_SECTION    = new Font("Georgia", Font.BOLD, 15);
-    private static final Font FONT_TABLE_HDR  = new Font("Trebuchet MS", Font.BOLD, 12);
-    private static final Font FONT_TABLE_CELL = new Font("Trebuchet MS", Font.PLAIN, 12);
-    private static final Font FONT_BADGE      = new Font("Trebuchet MS", Font.BOLD, 10);
+    private static final Font FONT_TABLE_HDR  = new Font("Segoe UI", Font.BOLD, 12);
+    private static final Font FONT_TABLE_CELL = new Font("Segoe UI", Font.PLAIN, 12);
+    private static final Font FONT_BADGE      = new Font("Segoe UI", Font.BOLD, 10);
     private static final Font FONT_KPI_VAL    = VMSStyle.FONT_KPI_VAL;
     private static final Font FONT_KPI_LBL    = VMSStyle.FONT_KPI_LBL;
-    private static final Font FONT_BTN        = new Font("Trebuchet MS", Font.BOLD, 12);
+    private static final Font FONT_BTN        = new Font("Segoe UI", Font.BOLD, 12);
 
     private static final DecimalFormat FMT_MONTANT = new DecimalFormat("#,##0.00");
     private static final DecimalFormat FMT_PERCENT = new DecimalFormat("0.0");
@@ -64,15 +67,8 @@ public class StatistiquesPanel extends JPanel {
     private DefaultTableModel statutTableModel;
     private DefaultTableModel auditTableModel;
     private DefaultTableModel topClientsTableModel;
-    private DefaultTableModel bonsExpirationTableModel;
 
-    private final String role;
-    private final int    userId;
-    private final StatistiquesController controller = new StatistiquesController();
-
-    public StatistiquesPanel(String role, int userId) {
-        this.role   = role;
-        this.userId = userId;
+    public StatistiquesPanel() {
         setLayout(new BorderLayout());
         setOpaque(false);
         initComponents();
@@ -97,8 +93,6 @@ public class StatistiquesPanel extends JPanel {
         content.add(buildMiddleSection());
         content.add(Box.createVerticalStrut(22));
         content.add(buildTopClientsSection());
-        content.add(Box.createVerticalStrut(22));
-        content.add(buildBonsExpirationSection());
 
         JScrollPane scroll = new JScrollPane(content);
         scroll.setBorder(null);
@@ -130,7 +124,7 @@ public class StatistiquesPanel extends JPanel {
         };
         titleRow.setOpaque(false);
         titleRow.setBorder(BorderFactory.createEmptyBorder(0, 14, 0, 0));
-        JLabel icon = new JLabel("≡");
+        JLabel icon = new JLabel("\u2261");
         icon.setFont(new Font("Georgia", Font.BOLD, 26));
         icon.setForeground(RED_PRIMARY);
         JLabel title = new JLabel("  Statistiques & Rapports");
@@ -140,8 +134,8 @@ public class StatistiquesPanel extends JPanel {
         titleRow.add(title);
         titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel sub = new JLabel("Vue d'ensemble des indicateurs et de l'activité du système VMS");
-        sub.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
+        JLabel sub = new JLabel("Vue d'ensemble des indicateurs et de l'activit\u00e9 du syst\u00e8me VMS");
+        sub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         sub.setForeground(TEXT_SECOND);
         sub.setBorder(BorderFactory.createEmptyBorder(5, 14, 0, 0));
         sub.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -149,7 +143,7 @@ public class StatistiquesPanel extends JPanel {
         left.add(titleRow);
         left.add(sub);
 
-        JButton btnRefresh = buildIconButton("↻", "Actualiser les données");
+        JButton btnRefresh = buildIconButton("\u21BB", "Actualiser les donn\u00e9es");
         btnRefresh.addActionListener(e -> chargerDonneesAsync());
 
         h.add(left, BorderLayout.CENTER);
@@ -169,10 +163,10 @@ public class StatistiquesPanel extends JPanel {
         kpiBonsActifsVal    = new JLabel("...");
         kpiTauxRedemptionVal = new JLabel("...");
 
-        strip.add(buildKpiCard(ACCENT_BLUE, "⌂", "Total Demandes", kpiTotalDemandesVal));
+        strip.add(buildKpiCard(ACCENT_BLUE, "\u2302", "Total Demandes", kpiTotalDemandesVal));
         strip.add(buildKpiCard(SUCCESS, "Rs", "Montant Total Bons", kpiMontantTotalVal));
-        strip.add(buildKpiCard(WARNING, "◈", "Bons Actifs", kpiBonsActifsVal));
-        strip.add(buildKpiCard(RED_PRIMARY, "%", "Taux Rédemption", kpiTauxRedemptionVal));
+        strip.add(buildKpiCard(WARNING, "\u25C8", "Bons Actifs", kpiBonsActifsVal));
+        strip.add(buildKpiCard(RED_PRIMARY, "%", "Taux R\u00e9demption", kpiTauxRedemptionVal));
 
         return strip;
     }
@@ -262,7 +256,7 @@ public class StatistiquesPanel extends JPanel {
         card.setLayout(new BorderLayout(0, 10));
         card.setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
 
-        JLabel titleL = new JLabel("Répartition par Statut");
+        JLabel titleL = new JLabel("R\u00e9partition par Statut");
         titleL.setFont(FONT_SECTION);
         titleL.setForeground(TEXT_PRIMARY);
         card.add(titleL, BorderLayout.NORTH);
@@ -310,7 +304,7 @@ public class StatistiquesPanel extends JPanel {
         card.setLayout(new BorderLayout(0, 10));
         card.setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
 
-        JLabel titleL = new JLabel("Activité Récente");
+        JLabel titleL = new JLabel("Activit\u00e9 R\u00e9cente");
         titleL.setFont(FONT_SECTION);
         titleL.setForeground(TEXT_PRIMARY);
         card.add(titleL, BorderLayout.NORTH);
@@ -357,7 +351,7 @@ public class StatistiquesPanel extends JPanel {
         titleL.setForeground(TEXT_PRIMARY);
 
         JLabel subtitleL = new JLabel("  (par montant total des demandes)");
-        subtitleL.setFont(new Font("Trebuchet MS", Font.ITALIC, 11));
+        subtitleL.setFont(new Font("Segoe UI", Font.ITALIC, 11));
         subtitleL.setForeground(TEXT_MUTED);
 
         JPanel headerRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
@@ -409,102 +403,156 @@ public class StatistiquesPanel extends JPanel {
 
     // ── ASYNC DATA LOADING ──────────────────────────────────────────────────
     private void chargerDonneesAsync() {
-        controller.chargerDonnees(role, userId,
-            data -> {
-                kpiTotalDemandesVal.setText(String.valueOf(data.totalDemandes));
-                kpiMontantTotalVal.setText(FMT_MONTANT.format(data.montantTotal));
-                kpiBonsActifsVal.setText(String.valueOf(data.bonsActifs));
-                kpiTauxRedemptionVal.setText(FMT_PERCENT.format(data.tauxRedemption) + " %");
+        new SwingWorker<StatsData, Void>() {
+            @Override
+            protected StatsData doInBackground() {
+                StatsData data = new StatsData();
+                try (Connection conn = DBconnect.getConnection()) {
+                    // KPI 1: Total demandes
+                    try (Statement st = conn.createStatement();
+                         ResultSet rs = st.executeQuery("SELECT COUNT(*) AS cnt FROM demande")) {
+                        if (rs.next()) data.totalDemandes = rs.getInt("cnt");
+                    }
 
-                statutTableModel.setRowCount(0);
-                for (Object[] row : data.statutRows) {
-                    statutTableModel.addRow(new Object[]{
-                        row[0], row[1], FMT_MONTANT.format((Double) row[2])
-                    });
-                }
+                    // KPI 2: Montant total bons (approved/generated/paid/sent)
+                    try (Statement st = conn.createStatement();
+                         ResultSet rs = st.executeQuery(
+                                 "SELECT COALESCE(SUM(montant_total), 0) AS total FROM demande " +
+                                 "WHERE statuts IN ('APPROUVE','GENERE','PAYE','ENVOYE')")) {
+                        if (rs.next()) data.montantTotal = rs.getDouble("total");
+                    }
 
-                auditTableModel.setRowCount(0);
-                for (Object[] row : data.auditRows) {
-                    auditTableModel.addRow(row);
-                }
+                    // KPI 3: Bons actifs
+                    try (Statement st = conn.createStatement();
+                         ResultSet rs = st.executeQuery("SELECT COUNT(*) AS cnt FROM bon WHERE statut = 'ACTIF'")) {
+                        if (rs.next()) data.bonsActifs = rs.getInt("cnt");
+                    }
 
-                topClientsTableModel.setRowCount(0);
-                for (Object[] row : data.topClientsRows) {
-                    topClientsTableModel.addRow(new Object[]{
-                        row[0], row[1], row[2], FMT_MONTANT.format((Double) row[3])
-                    });
-                }
+                    // KPI 4: Taux redemption
+                    int totalBons = 0;
+                    int redeemedBons = 0;
+                    try (Statement st = conn.createStatement();
+                         ResultSet rs = st.executeQuery("SELECT COUNT(*) AS cnt FROM bon")) {
+                        if (rs.next()) totalBons = rs.getInt("cnt");
+                    }
+                    try (Statement st = conn.createStatement();
+                         ResultSet rs = st.executeQuery("SELECT COUNT(*) AS cnt FROM bon WHERE statut = 'REDIME'")) {
+                        if (rs.next()) redeemedBons = rs.getInt("cnt");
+                    }
+                    data.tauxRedemption = totalBons > 0 ? (redeemedBons * 100.0 / totalBons) : 0.0;
 
-                bonsExpirationTableModel.setRowCount(0);
-                for (Object[] row : data.bonsExpirationRows) {
-                    bonsExpirationTableModel.addRow(row);
+                    // Repartition par statut
+                    try (Statement st = conn.createStatement();
+                         ResultSet rs = st.executeQuery(
+                                 "SELECT statuts, COUNT(*) AS nombre, COALESCE(SUM(montant_total),0) AS montant " +
+                                 "FROM demande GROUP BY statuts ORDER BY nombre DESC")) {
+                        while (rs.next()) {
+                            data.statutRows.add(new Object[]{
+                                rs.getString("statuts"),
+                                rs.getInt("nombre"),
+                                rs.getDouble("montant")
+                            });
+                        }
+                    }
+
+                    // Activite recente (audit_log)
+                    try (Statement st = conn.createStatement();
+                         ResultSet rs = st.executeQuery(
+                                 "SELECT action, contexte, date_action, username " +
+                                 "FROM audit_log ORDER BY date_action DESC LIMIT 10")) {
+                        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+                        while (rs.next()) {
+                            Timestamp ts = rs.getTimestamp("date_action");
+                            String dateStr = ts != null ? sdf.format(ts) : "";
+                            data.auditRows.add(new Object[]{
+                                rs.getString("action"),
+                                rs.getString("contexte"),
+                                dateStr,
+                                rs.getString("username")
+                            });
+                        }
+                    }
+
+                    // Top clients
+                    try (Statement st = conn.createStatement();
+                         ResultSet rs = st.executeQuery(
+                                 "SELECT c.name, COUNT(d.demande_id) AS nb_demandes, " +
+                                 "COALESCE(SUM(d.montant_total),0) AS total_montant " +
+                                 "FROM client c LEFT JOIN demande d ON c.clientid = d.clientid " +
+                                 "WHERE c.actif = true " +
+                                 "GROUP BY c.clientid, c.name " +
+                                 "ORDER BY total_montant DESC LIMIT 5")) {
+                        int rank = 1;
+                        while (rs.next()) {
+                            data.topClientsRows.add(new Object[]{
+                                rank++,
+                                rs.getString("name"),
+                                rs.getInt("nb_demandes"),
+                                rs.getDouble("total_montant")
+                            });
+                        }
+                    }
+
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
-            },
-            err -> System.err.println("Erreur chargement stats: " + err)
-        );
+                return data;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    StatsData data = get();
+
+                    // Update KPIs
+                    kpiTotalDemandesVal.setText(String.valueOf(data.totalDemandes));
+                    kpiMontantTotalVal.setText(FMT_MONTANT.format(data.montantTotal));
+                    kpiBonsActifsVal.setText(String.valueOf(data.bonsActifs));
+                    kpiTauxRedemptionVal.setText(FMT_PERCENT.format(data.tauxRedemption) + " %");
+
+                    // Populate statut table
+                    statutTableModel.setRowCount(0);
+                    for (Object[] row : data.statutRows) {
+                        statutTableModel.addRow(new Object[]{
+                            row[0],
+                            row[1],
+                            FMT_MONTANT.format((Double) row[2])
+                        });
+                    }
+
+                    // Populate audit table
+                    auditTableModel.setRowCount(0);
+                    for (Object[] row : data.auditRows) {
+                        auditTableModel.addRow(row);
+                    }
+
+                    // Populate top clients table
+                    topClientsTableModel.setRowCount(0);
+                    for (Object[] row : data.topClientsRows) {
+                        topClientsTableModel.addRow(new Object[]{
+                            row[0],
+                            row[1],
+                            row[2],
+                            FMT_MONTANT.format((Double) row[3])
+                        });
+                    }
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }.execute();
     }
 
-    // ── Bons Proches Expiration ─────────────────────────────────────────────
-    private JPanel buildBonsExpirationSection() {
-        JPanel card = buildCardPanel();
-        card.setLayout(new BorderLayout(0, 10));
-        card.setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 280));
-        card.setPreferredSize(new Dimension(0, 280));
-
-        JPanel titleBlock = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        titleBlock.setOpaque(false);
-        JLabel titleL = new JLabel("Bons Proches d'Expiration");
-        titleL.setFont(FONT_SECTION);
-        titleL.setForeground(TEXT_PRIMARY);
-        JLabel subtitleL = new JLabel("  (seuil configurable dans Paramètres → Bons Cadeau)");
-        subtitleL.setFont(new Font("Trebuchet MS", Font.ITALIC, 11));
-        subtitleL.setForeground(TEXT_MUTED);
-        titleBlock.add(titleL);
-        titleBlock.add(subtitleL);
-        card.add(titleBlock, BorderLayout.NORTH);
-
-        String[] cols = {"Code Unique", "Valeur (Rs)", "Client", "Expiration", "Jours restants"};
-        bonsExpirationTableModel = new DefaultTableModel(cols, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-        };
-
-        JTable table = new JTable(bonsExpirationTableModel) {
-            @Override public Component prepareRenderer(TableCellRenderer r, int row, int col) {
-                Component c = super.prepareRenderer(r, row, col);
-                if (!isRowSelected(row))
-                    c.setBackground(row % 2 == 0 ? BG_CARD : new Color(249, 250, 252));
-                else c.setBackground(RED_LIGHT);
-                // Rouge pale si < 7 jours restants
-                try {
-                    Object joursObj = getValueAt(row, 4);
-                    if (joursObj != null && !isRowSelected(row)) {
-                        double jours = Double.parseDouble(joursObj.toString());
-                        if (jours < 7) c.setBackground(new Color(254, 226, 226));
-                    }
-                } catch (NumberFormatException ignored) {}
-                return c;
-            }
-        };
-        styleTable(table);
-        table.getColumnModel().getColumn(0).setPreferredWidth(160);
-        table.getColumnModel().getColumn(1).setPreferredWidth(90);
-        table.getColumnModel().getColumn(2).setPreferredWidth(160);
-        table.getColumnModel().getColumn(3).setPreferredWidth(130);
-        table.getColumnModel().getColumn(4).setPreferredWidth(90);
-
-        DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
-        rightRenderer.setHorizontalAlignment(SwingConstants.RIGHT);
-        table.getColumnModel().getColumn(1).setCellRenderer(rightRenderer);
-        table.getColumnModel().getColumn(4).setCellRenderer(rightRenderer);
-
-        JScrollPane sp = new JScrollPane(table);
-        sp.setBorder(null);
-        sp.setOpaque(false);
-        sp.getViewport().setOpaque(false);
-        sp.getViewport().setBackground(BG_CARD);
-        card.add(sp, BorderLayout.CENTER);
-        return card;
+    // ── Data holder ─────────────────────────────────────────────────────────
+    private static class StatsData {
+        int totalDemandes;
+        double montantTotal;
+        int bonsActifs;
+        double tauxRedemption;
+        List<Object[]> statutRows = new ArrayList<>();
+        List<Object[]> auditRows = new ArrayList<>();
+        List<Object[]> topClientsRows = new ArrayList<>();
     }
 
     // ── STYLE HELPERS ───────────────────────────────────────────────────────
@@ -606,12 +654,12 @@ public class StatistiquesPanel extends JPanel {
 
         private String badgeLabel(String s) {
             switch (s) {
-                case ST_ATTENTE_PAIEMENT: return "⏳  En attente";
-                case ST_PAYE:             return "✓  Payée";
-                case ST_APPROUVE:         return "✓  Approuvée";
-                case ST_GENERE:           return "◈  Générée";
-                case ST_ENVOYE:           return "→  Envoyée";
-                case ST_REJETE:           return "✕  Rejetée";
+                case ST_ATTENTE_PAIEMENT: return "\u23F3  En attente";
+                case ST_PAYE:             return "\u2713  Pay\u00e9e";
+                case ST_APPROUVE:         return "\u2713  Approuv\u00e9e";
+                case ST_GENERE:           return "\u25C8  G\u00e9n\u00e9r\u00e9e";
+                case ST_ENVOYE:           return "\u2192  Envoy\u00e9e";
+                case ST_REJETE:           return "\u2715  Rejet\u00e9e";
                 default:                  return s;
             }
         }
@@ -622,7 +670,7 @@ public class StatistiquesPanel extends JPanel {
         JButton btn = new JButton(symbol) {
             boolean h = false;
             {
-                setFont(new Font("Trebuchet MS", Font.BOLD, 16));
+                setFont(new Font("Segoe UI", Font.BOLD, 16));
                 setForeground(TEXT_SECOND);
                 setOpaque(false);
                 setContentAreaFilled(false);

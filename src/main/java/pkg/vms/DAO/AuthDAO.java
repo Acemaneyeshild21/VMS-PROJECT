@@ -240,6 +240,54 @@ public class AuthDAO {
     }
 
     /**
+     * Recherche un utilisateur par son email.
+     * Utilisé dans le flux de réinitialisation de mot de passe (ResetPasswordDialog).
+     *
+     * @return UserSession si trouvé, {@code null} sinon
+     */
+    public static UserSession findByEmail(String email) throws SQLException {
+        String query = "SELECT userid, username, role, email FROM utilisateur WHERE email = ? AND actif = TRUE";
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(query)) {
+            ps.setString(1, email);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new UserSession(
+                        rs.getInt("userid"),
+                        rs.getString("username"),
+                        rs.getString("role"),
+                        rs.getString("email")
+                    );
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Réinitialise directement le mot de passe d'un utilisateur (flux OTP reset).
+     * Ne demande PAS l'ancien mot de passe — à appeler uniquement après validation OTP.
+     *
+     * @return {@code true} si la mise à jour a réussi
+     */
+    public static boolean updatePassword(int userId, String newPassword) throws SQLException {
+        String hashed = org.mindrot.jbcrypt.BCrypt.hashpw(newPassword, org.mindrot.jbcrypt.BCrypt.gensalt());
+        try (Connection conn = DBconnect.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "UPDATE utilisateur SET password = ? WHERE userid = ?")) {
+            ps.setString(1, hashed);
+            ps.setInt(2, userId);
+            int rows = ps.executeUpdate();
+            if (rows > 0) {
+                AuditDAO.logSimple("utilisateur", userId, "RESET_PASSWORD", userId,
+                        "Mot de passe réinitialisé via OTP");
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Retourne le nombre de tentatives échouées en cours pour un utilisateur.
      * Utilisé dans la vue de gestion des utilisateurs (ParametresPanel).
      */

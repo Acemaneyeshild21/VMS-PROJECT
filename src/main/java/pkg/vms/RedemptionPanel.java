@@ -2,37 +2,44 @@ package pkg.vms;
 
 import pkg.vms.DAO.BonDAO;
 import pkg.vms.DAO.ClientDAO;
-import pkg.vms.controller.RedemptionController;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
 
+/**
+ * Panneau de rédemption en magasin.
+ * Le superviseur saisit ou scanne le code du bon, le système valide en ligne
+ * (anti-fraude, anti double-utilisation, vérification expiration).
+ */
 public class RedemptionPanel extends JPanel {
 
+    private static final Color BG_ROOT     = VMSStyle.BG_ROOT;
     private static final Color BG_CARD     = VMSStyle.BG_CARD;
     private static final Color RED_PRIMARY = VMSStyle.RED_PRIMARY;
     private static final Color RED_DARK    = VMSStyle.RED_DARK;
+    private static final Color RED_LIGHT   = VMSStyle.RED_LIGHT;
     private static final Color BORDER      = VMSStyle.BORDER_LIGHT;
     private static final Color TEXT_P      = VMSStyle.TEXT_PRIMARY;
     private static final Color TEXT_S      = VMSStyle.TEXT_SECONDARY;
     private static final Color TEXT_M      = VMSStyle.TEXT_MUTED;
     private static final Color SUCCESS     = VMSStyle.SUCCESS;
+    private static final Color WARNING     = VMSStyle.WARNING;
 
     private final int userId;
     private final String username;
     private final String role;
-    private final RedemptionController controller = new RedemptionController();
+    private int magasinId = -1;
 
     private JTextField txtCode;
     private JPanel resultPanel;
     private JComboBox<ClientDAO.MagasinInfo> cbMagasin;
 
     public RedemptionPanel(int userId, String username, String role) {
-        this.userId   = userId;
+        this.userId = userId;
         this.username = username;
-        this.role     = role;
+        this.role = role;
 
         setLayout(new BorderLayout());
         setOpaque(false);
@@ -52,7 +59,7 @@ public class RedemptionPanel extends JPanel {
 
         JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         titleRow.setOpaque(false);
-        JLabel icon = new JLabel("📱");
+        JLabel icon = new JLabel("\uD83D\uDCF1");
         icon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 28));
         JLabel title = new JLabel("  Rédemption de Bon Cadeau");
         title.setFont(VMSStyle.FONT_BRAND.deriveFont(24f));
@@ -61,7 +68,7 @@ public class RedemptionPanel extends JPanel {
         titleRow.add(title);
 
         JLabel sub = new JLabel("Scannez ou saisissez le code du bon pour le valider");
-        sub.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
+        sub.setFont(new Font("Segoe UI", Font.PLAIN, 13));
         sub.setForeground(TEXT_S);
 
         titleBlock.add(titleRow);
@@ -82,7 +89,7 @@ public class RedemptionPanel extends JPanel {
         magasinCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 80));
 
         JLabel lblMagasin = new JLabel("POINT DE VENTE");
-        lblMagasin.setFont(new Font("Trebuchet MS", Font.BOLD, 9));
+        lblMagasin.setFont(new Font("Segoe UI", Font.BOLD, 9));
         lblMagasin.setForeground(TEXT_M);
         cbMagasin = new JComboBox<>();
         cbMagasin.setFont(VMSStyle.FONT_CARD_DSC);
@@ -101,7 +108,7 @@ public class RedemptionPanel extends JPanel {
         scanCard.setMaximumSize(new Dimension(Integer.MAX_VALUE, 160));
 
         JLabel lblScan = new JLabel("CODE DU BON");
-        lblScan.setFont(new Font("Trebuchet MS", Font.BOLD, 9));
+        lblScan.setFont(new Font("Segoe UI", Font.BOLD, 9));
         lblScan.setForeground(TEXT_M);
 
         JPanel inputRow = new JPanel(new BorderLayout(10, 0));
@@ -115,7 +122,7 @@ public class RedemptionPanel extends JPanel {
         txtCode.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(BORDER, 2),
                 BorderFactory.createEmptyBorder(8, 14, 8, 14)));
-        txtCode.addActionListener(e -> validerBon());
+        txtCode.addActionListener(e -> validerBon()); // Entrée = valider
 
         JButton btnValider = new JButton("Valider") {
             boolean h = false;
@@ -146,13 +153,13 @@ public class RedemptionPanel extends JPanel {
         inputRow.add(txtCode, BorderLayout.CENTER);
         inputRow.add(btnValider, BorderLayout.EAST);
 
-        JLabel hint = new JLabel("🔍 Saisissez le code ou scannez le QR code avec un lecteur USB");
-        hint.setFont(new Font("Trebuchet MS", Font.ITALIC, 11));
+        JLabel hint = new JLabel("\uD83D\uDD0D Saisissez le code ou scannez le QR code avec un lecteur USB");
+        hint.setFont(new Font("Segoe UI", Font.ITALIC, 11));
         hint.setForeground(TEXT_M);
 
-        scanCard.add(lblScan,   BorderLayout.NORTH);
-        scanCard.add(inputRow,  BorderLayout.CENTER);
-        scanCard.add(hint,      BorderLayout.SOUTH);
+        scanCard.add(lblScan, BorderLayout.NORTH);
+        scanCard.add(inputRow, BorderLayout.CENTER);
+        scanCard.add(hint, BorderLayout.SOUTH);
         center.add(scanCard);
         center.add(Box.createVerticalStrut(16));
 
@@ -163,7 +170,7 @@ public class RedemptionPanel extends JPanel {
         resultPanel.setPreferredSize(new Dimension(0, 200));
 
         JLabel placeholder = new JLabel("Le résultat de la validation apparaîtra ici");
-        placeholder.setFont(new Font("Trebuchet MS", Font.ITALIC, 13));
+        placeholder.setFont(new Font("Segoe UI", Font.ITALIC, 13));
         placeholder.setForeground(TEXT_M);
         placeholder.setHorizontalAlignment(SwingConstants.CENTER);
         resultPanel.add(placeholder, BorderLayout.CENTER);
@@ -171,16 +178,17 @@ public class RedemptionPanel extends JPanel {
         center.add(resultPanel);
         add(center, BorderLayout.CENTER);
 
+        // Focus automatique sur le champ code
         SwingUtilities.invokeLater(() -> txtCode.requestFocusInWindow());
     }
 
     private void chargerMagasins() {
-        controller.chargerMagasins(
-            magasins -> {
-                for (ClientDAO.MagasinInfo m : magasins) cbMagasin.addItem(m);
-            },
-            err -> System.err.println("Erreur chargement magasins: " + err)
-        );
+        try {
+            java.util.List<ClientDAO.MagasinInfo> magasins = ClientDAO.getAllMagasins();
+            for (ClientDAO.MagasinInfo m : magasins) cbMagasin.addItem(m);
+        } catch (Exception e) {
+            System.err.println("Erreur chargement magasins: " + e.getMessage());
+        }
     }
 
     private void validerBon() {
@@ -196,33 +204,53 @@ public class RedemptionPanel extends JPanel {
             return;
         }
 
-        controller.redimerBon(code, magasin.id, userId,
-            result -> {
-                afficherResultatDB(result);
-                if (result.succes) txtCode.setText("");
+        // Validation en arrière-plan
+        SwingWorker<BonDAO.RedemptionResult, Void> worker = new SwingWorker<>() {
+            @Override
+            protected BonDAO.RedemptionResult doInBackground() throws Exception {
+                return BonDAO.redimerBon(code, magasin.id, userId);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    BonDAO.RedemptionResult result = get();
+                    afficherResultat(result.succes, result.message,
+                            result.succes ? String.format("Rs %,.2f", result.valeur) : null);
+                    if (result.succes) {
+                        txtCode.setText("");
+                    }
+                } catch (Exception ex) {
+                    afficherResultat(false, "Erreur : " + ex.getMessage(), null);
+                }
                 txtCode.requestFocusInWindow();
-            },
-            err -> System.err.println("Erreur inattendue redemption: " + err)
-        );
+            }
+        };
+        worker.execute();
     }
 
     private void afficherResultat(boolean succes, String message, String valeur) {
         resultPanel.removeAll();
         resultPanel.setLayout(new BoxLayout(resultPanel, BoxLayout.Y_AXIS));
 
+        Color bgColor = succes ? new Color(220, 252, 231) : new Color(254, 226, 226);
         Color fgColor = succes ? SUCCESS : RED_PRIMARY;
+        String iconStr = succes ? "\u2705" : "\u274C";
 
-        JLabel iconLbl = new JLabel(succes ? "✅" : "❌");
+        // Icône grande
+        JLabel iconLbl = new JLabel(iconStr);
         iconLbl.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
         iconLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
 
+        // Statut
         JLabel statusLbl = new JLabel(succes ? "BON VALIDÉ" : "REJETÉ");
         statusLbl.setFont(new Font("Georgia", Font.BOLD, 22));
         statusLbl.setForeground(fgColor);
         statusLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
 
+        // Message
         JLabel msgLbl = new JLabel(message);
-        msgLbl.setFont(new Font("Trebuchet MS", Font.PLAIN, 14));
+        msgLbl.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         msgLbl.setForeground(TEXT_P);
         msgLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
 
@@ -242,128 +270,16 @@ public class RedemptionPanel extends JPanel {
             resultPanel.add(valLbl);
         }
 
+        // Horodatage
         JLabel timeLbl = new JLabel(new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
                 .format(new java.util.Date()));
-        timeLbl.setFont(new Font("Trebuchet MS", Font.PLAIN, 11));
+        timeLbl.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         timeLbl.setForeground(TEXT_M);
         timeLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
         resultPanel.add(Box.createVerticalStrut(8));
         resultPanel.add(timeLbl);
+
         resultPanel.add(Box.createVerticalGlue());
-
-        resultPanel.revalidate();
-        resultPanel.repaint();
-    }
-
-    private void afficherResultatDB(BonDAO.RedemptionResult r) {
-        BonDAO.RedemptionResult.ErrorType type =
-                r.errorType != null ? r.errorType
-                        : (r.succes ? BonDAO.RedemptionResult.ErrorType.SUCCESS
-                                    : BonDAO.RedemptionResult.ErrorType.UNKNOWN);
-
-        Color  bannerColor;
-        String iconStr;
-        String statusLabel;
-
-        switch (type) {
-            case SUCCESS -> {
-                bannerColor = SUCCESS;
-                iconStr     = "✅";
-                statusLabel = "BON VALIDÉ";
-            }
-            case EXPIRED -> {
-                bannerColor = new Color(217, 119, 6);
-                iconStr     = "⏰";
-                statusLabel = "BON EXPIRÉ";
-            }
-            case ALREADY_USED -> {
-                bannerColor = new Color(153, 27, 27);
-                iconStr     = "🚫";
-                statusLabel = "BON DÉJÀ UTILISÉ";
-            }
-            case CONNECTION_ERROR -> {
-                bannerColor = new Color(194, 65, 12);
-                iconStr     = "📡";
-                statusLabel = "CONNEXION INDISPONIBLE";
-            }
-            case LOCK_TIMEOUT -> {
-                bannerColor = new Color(161, 98, 7);
-                iconStr     = "⏱";
-                statusLabel = "TRAITEMENT EN COURS";
-            }
-            case INVALID_CODE -> {
-                bannerColor = RED_PRIMARY;
-                iconStr     = "❌";
-                statusLabel = "CODE INVALIDE";
-            }
-            case CANCELLED -> {
-                bannerColor = new Color(75, 85, 99);
-                iconStr     = "🚫";
-                statusLabel = "BON ANNULÉ";
-            }
-            default -> {
-                bannerColor = RED_PRIMARY;
-                iconStr     = "❌";
-                statusLabel = "REJETÉ";
-            }
-        }
-
-        resultPanel.removeAll();
-        resultPanel.setLayout(new BorderLayout(0, 0));
-
-        JPanel banner = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
-        banner.setBackground(bannerColor);
-
-        JLabel iconLbl = new JLabel(iconStr);
-        iconLbl.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 28));
-
-        JLabel statusLbl = new JLabel(statusLabel);
-        statusLbl.setFont(new Font("Georgia", Font.BOLD, 20));
-        statusLbl.setForeground(Color.WHITE);
-
-        banner.add(iconLbl);
-        banner.add(statusLbl);
-        resultPanel.add(banner, BorderLayout.NORTH);
-
-        JPanel content = new JPanel();
-        content.setOpaque(false);
-        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
-        content.setBorder(BorderFactory.createEmptyBorder(12, 20, 12, 20));
-
-        JLabel msgLbl = new JLabel("<html><div style='text-align:center;'>"
-                + (r.message != null ? r.message : "") + "</div></html>");
-        msgLbl.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
-        msgLbl.setForeground(TEXT_P);
-        msgLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
-        content.add(Box.createVerticalStrut(6));
-        content.add(msgLbl);
-
-        if (type == BonDAO.RedemptionResult.ErrorType.SUCCESS) {
-            content.add(Box.createVerticalStrut(10));
-
-            JLabel valLbl = new JLabel(String.format("Valeur : Rs %,.2f", r.valeur));
-            valLbl.setFont(new Font("Georgia", Font.BOLD, 22));
-            valLbl.setForeground(SUCCESS);
-            valLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
-            content.add(valLbl);
-
-            content.add(Box.createVerticalStrut(5));
-            JLabel noteLbl = new JLabel("Bon à usage unique — non fractionnable");
-            noteLbl.setFont(new Font("Trebuchet MS", Font.ITALIC, 11));
-            noteLbl.setForeground(TEXT_M);
-            noteLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
-            content.add(noteLbl);
-        }
-
-        content.add(Box.createVerticalStrut(8));
-        JLabel timeLbl = new JLabel(new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
-                .format(new java.util.Date()));
-        timeLbl.setFont(new Font("Trebuchet MS", Font.PLAIN, 11));
-        timeLbl.setForeground(TEXT_M);
-        timeLbl.setAlignmentX(Component.CENTER_ALIGNMENT);
-        content.add(timeLbl);
-
-        resultPanel.add(content, BorderLayout.CENTER);
         resultPanel.revalidate();
         resultPanel.repaint();
     }
