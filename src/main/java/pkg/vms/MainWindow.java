@@ -6,10 +6,14 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 import pkg.vms.DAO.AuthDAO;
+import pkg.vms.DAO.StatistiquesDAO;
 import pkg.vms.view.*;
 
 /**
@@ -52,6 +56,9 @@ public class MainWindow {
     private boolean collapsed = false;
     private Button  activeBtn;
 
+    // Badges notification sur les items nav (clé = label de la page)
+    private final java.util.Map<String, Label> navBadges = new java.util.HashMap<>();
+
     // Nœuds qui disparaissent en mode collapsed
     private Label   sidebarNavLabel;
     private Label   sidebarSubtitle;
@@ -89,12 +96,30 @@ public class MainWindow {
             stage.getIcons().add(new Image(getClass().getResourceAsStream("/vms.ico")));
         } catch (Exception ignored) {}
 
+        // ── Raccourcis clavier globaux ────────────────────────────────────
+        scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.D, KeyCombination.CONTROL_DOWN),
+            () -> navigate("Dashboard"));
+        scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.M, KeyCombination.CONTROL_DOWN),
+            () -> navigate("Demandes"));
+        scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.L, KeyCombination.CONTROL_DOWN),
+            () -> navigate("Clients"));
+        scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.V, KeyCombination.CONTROL_DOWN),
+            () -> navigate("Validation"));
+        scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.K, KeyCombination.CONTROL_DOWN),
+            () -> showCommandPalette());
+
         stage.setScene(scene);
         stage.setMinWidth(1050);
         stage.setMinHeight(680);
         stage.show();
 
         navigate("Dashboard");
+        loadNavBadges(); // charge les badges de notification
     }
 
     // ── Topbar ───────────────────────────────────────────────────────────────
@@ -127,7 +152,15 @@ public class MainWindow {
         HBox userBox = new HBox(10, avatar, userInfo);
         userBox.setAlignment(Pos.CENTER);
 
-        bar.getChildren().addAll(topbarTitle, spacer, userBox);
+        // Hint Ctrl+K dans la topbar (clickable)
+        Label ctrlK = new Label("⌘K  Recherche rapide");
+        ctrlK.setStyle(
+            "-fx-font-size:11;-fx-text-fill:#94a3b8;-fx-background-color:#f1f5f9;"
+            + "-fx-border-color:#e2e8f0;-fx-border-width:1;-fx-border-radius:6;"
+            + "-fx-background-radius:6;-fx-padding:5 12;-fx-cursor:hand;");
+        ctrlK.setOnMouseClicked(e -> showCommandPalette());
+
+        bar.getChildren().addAll(topbarTitle, spacer, ctrlK, userBox);
         return bar;
     }
 
@@ -441,5 +474,138 @@ public class MainWindow {
         Region r = new Region();
         VBox.setVgrow(r, Priority.ALWAYS);
         return r;
+    }
+
+    // ── Badges de notification ────────────────────────────────────────────────
+
+    /** Charge les compteurs de notification depuis la BD et met à jour les badges. */
+    private void loadNavBadges() {
+        javafx.concurrent.Task<java.util.Map<String, Integer>> task = new javafx.concurrent.Task<>() {
+            @Override
+            protected java.util.Map<String, Integer> call() throws Exception {
+                java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+                try {
+                    // Demandes en attente de paiement
+                    var rows = StatistiquesDAO.getStatsByStatut();
+                    for (Object[] r : rows) {
+                        String s   = String.valueOf(r[0]);
+                        int    cnt = ((Number) r[1]).intValue();
+                        if ("EN_ATTENTE_PAIEMENT".equals(s)) counts.merge("Demandes",  cnt, Integer::sum);
+                        if ("PAYE".equals(s))                counts.merge("Validation", cnt, Integer::sum);
+                    }
+                } catch (Exception ignored) {}
+                return counts;
+            }
+        };
+        task.setOnSucceeded(e -> {
+            var counts = task.getValue();
+            counts.forEach((page, cnt) -> {
+                if (cnt > 0) showNavBadge(page, cnt);
+            });
+        });
+        new Thread(task).start();
+    }
+
+    /** Affiche un badge rouge sur le bouton de navigation correspondant. */
+    private void showNavBadge(String page, int count) {
+        allNavButtons()
+            .filter(b -> b.getUserData() instanceof String[] d && d[1].equals(page))
+            .findFirst()
+            .ifPresent(btn -> {
+                Label badge = new Label(count > 9 ? "9+" : String.valueOf(count));
+                badge.setStyle(
+                    "-fx-background-color:#dc2626;-fx-text-fill:white;"
+                    + "-fx-font-size:9;-fx-font-weight:bold;"
+                    + "-fx-background-radius:10;-fx-padding:1 5 1 5;"
+                    + "-fx-min-width:16;-fx-alignment:center;");
+                navBadges.put(page, badge);
+
+                // Wrapper : StackPane pour superposer le badge
+                StackPane wrap = new StackPane(btn, badge);
+                StackPane.setAlignment(badge, Pos.CENTER_RIGHT);
+                StackPane.setMargin(badge, new Insets(0, 8, 0, 0));
+                wrap.setMaxWidth(Double.MAX_VALUE);
+
+                // Remplacer le bouton par le wrapper dans la VBox nav
+                sidebar.getChildren().stream()
+                    .filter(n -> n instanceof VBox)
+                    .map(n -> (VBox) n)
+                    .forEach(vb -> {
+                        int idx = vb.getChildren().indexOf(btn);
+                        if (idx >= 0) vb.getChildren().set(idx, wrap);
+                    });
+            });
+    }
+
+    // ── Ctrl+K — Palette de commande ─────────────────────────────────────────
+
+    private void showCommandPalette() {
+        javafx.stage.Stage dlgStage = new javafx.stage.Stage();
+        dlgStage.initOwner(stage);
+        dlgStage.initStyle(javafx.stage.StageStyle.UNDECORATED);
+        dlgStage.initModality(javafx.stage.Modality.WINDOW_MODAL);
+
+        // Barre de recherche + résultats
+        TextField tfSearch = new TextField();
+        tfSearch.setPromptText("Naviguer vers… (ex: Clients, Dashboard)");
+        tfSearch.setStyle("-fx-font-size:14;-fx-padding:12 16;-fx-border-color:transparent;"
+            + "-fx-background-color:white;-fx-background-radius:0;");
+
+        VBox results = new VBox(0);
+        results.setStyle("-fx-background-color:white;");
+
+        // Remplir la liste avec toutes les pages nav accessibles
+        java.util.List<String[]> pages = new java.util.ArrayList<>();
+        for (String[] item : NAV) {
+            boolean adminOnly = !item[2].isEmpty();
+            boolean isAdmin   = "Administrateur".equals(session.role);
+            if (!adminOnly || isAdmin) pages.add(item);
+        }
+
+        java.util.function.Consumer<String> filter = (q) -> {
+            results.getChildren().clear();
+            pages.stream()
+                .filter(p -> q.isBlank() || p[1].toLowerCase().contains(q.toLowerCase()))
+                .forEach(p -> {
+                    Label row = new Label("  " + p[0] + "   " + p[1]);
+                    row.setMaxWidth(Double.MAX_VALUE);
+                    row.setPadding(new Insets(11, 16, 11, 16));
+                    row.setStyle("-fx-font-size:13;-fx-text-fill:#1e293b;-fx-cursor:hand;");
+                    row.setOnMouseEntered(e ->
+                        row.setStyle("-fx-font-size:13;-fx-text-fill:#dc2626;"
+                            + "-fx-background-color:#fef2f2;-fx-cursor:hand;"));
+                    row.setOnMouseExited(e ->
+                        row.setStyle("-fx-font-size:13;-fx-text-fill:#1e293b;-fx-cursor:hand;"));
+                    row.setOnMouseClicked(e -> {
+                        dlgStage.close();
+                        navigate(p[1]);
+                    });
+                    results.getChildren().add(row);
+                    results.getChildren().add(new Separator());
+                });
+        };
+        filter.accept("");
+        tfSearch.textProperty().addListener((o, ov, nv) -> filter.accept(nv));
+
+        // Fermer sur Echap
+        VBox root = new VBox(0);
+        root.setStyle(
+            "-fx-background-color:white;-fx-border-color:#e2e8f0;-fx-border-radius:12;"
+            + "-fx-background-radius:12;"
+            + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.25),24,0,0,8);");
+        root.setMaxWidth(560);
+        root.getChildren().addAll(tfSearch, new Separator(), results);
+
+        javafx.scene.Scene dlgScene = new javafx.scene.Scene(
+            new StackPane(root), 560, 380);
+        dlgScene.setFill(javafx.scene.paint.Color.TRANSPARENT);
+        dlgScene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.ESCAPE), dlgStage::close);
+
+        dlgStage.setScene(dlgScene);
+        dlgStage.setX(stage.getX() + (stage.getWidth()  - 560) / 2);
+        dlgStage.setY(stage.getY() + (stage.getHeight() - 380) / 2);
+        dlgStage.show();
+        tfSearch.requestFocus();
     }
 }
