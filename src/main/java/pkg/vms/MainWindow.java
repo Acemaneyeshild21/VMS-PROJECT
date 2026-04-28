@@ -328,35 +328,32 @@ public class MainWindow {
         btnLogout.setVisible(!collapsed);
         btnLogout.setManaged(!collapsed);
 
-        // Mettre à jour les boutons nav
+        // Mettre à jour les boutons nav (y compris ceux enveloppés dans un StackPane par showNavBadge)
         sidebar.getChildren().stream()
-            .filter(n -> n instanceof VBox vbox && vbox.getChildren().stream()
-                .anyMatch(c -> c instanceof Button b && b.getUserData() instanceof String[]))
+            .filter(n -> n instanceof VBox)
+            .map(n -> (VBox) n)
+            .filter(vb -> navButtonsIn(vb).findAny().isPresent())
             .findFirst()
-            .ifPresent(navSection -> {
-                ((VBox) navSection).getChildren().stream()
-                    .filter(n -> n instanceof Button b && b.getUserData() instanceof String[])
-                    .map(n -> (Button) n)
-                    .forEach(btn -> {
-                        String[] data = (String[]) btn.getUserData();
-                        String icon  = data[0];
-                        String label = data[1];
-                        if (collapsed) {
-                            btn.setText(icon);
-                            btn.setAlignment(Pos.CENTER);
-                            btn.setPadding(new Insets(13, 0, 13, 0));
-                            btn.setMaxWidth(W_COLLAPSED);
-                            // Tooltip pour le mode icon-only
-                            btn.setTooltip(new Tooltip(label));
-                        } else {
-                            btn.setText(icon + "   " + label);
-                            btn.setAlignment(Pos.CENTER_LEFT);
-                            btn.setPadding(new Insets(12, 24, 12, 20));
-                            btn.setMaxWidth(Double.MAX_VALUE);
-                            btn.setTooltip(null);
-                        }
-                    });
-            });
+            .ifPresent(navSection ->
+                navButtonsIn(navSection).forEach(btn -> {
+                    String[] data = (String[]) btn.getUserData();
+                    String icon  = data[0];
+                    String label = data[1];
+                    if (collapsed) {
+                        btn.setText(icon);
+                        btn.setAlignment(Pos.CENTER);
+                        btn.setPadding(new Insets(13, 0, 13, 0));
+                        btn.setMaxWidth(W_COLLAPSED);
+                        btn.setTooltip(new Tooltip(label));
+                    } else {
+                        btn.setText(icon + "   " + label);
+                        btn.setAlignment(Pos.CENTER_LEFT);
+                        btn.setPadding(new Insets(12, 24, 12, 20));
+                        btn.setMaxWidth(Double.MAX_VALUE);
+                        btn.setTooltip(null);
+                    }
+                })
+            );
     }
 
     // ── Navigation ───────────────────────────────────────────────────────────
@@ -392,12 +389,32 @@ public class MainWindow {
         out.play();
     }
 
+    /**
+     * Extrait tous les boutons nav de la sidebar, qu'ils soient directs (Button)
+     * ou enveloppés dans un StackPane par {@link #showNavBadge}.
+     */
     private java.util.stream.Stream<Button> allNavButtons() {
         return sidebar.getChildren().stream()
             .filter(n -> n instanceof VBox)
-            .flatMap(n -> ((VBox) n).getChildren().stream())
-            .filter(n -> n instanceof Button b && b.getUserData() instanceof String[])
-            .map(n -> (Button) n);
+            .flatMap(n -> navButtonsIn((VBox) n));
+    }
+
+    /**
+     * Extrait les boutons nav d'une VBox nav :
+     * - Button direct avec userData String[]
+     * - Button dans un StackPane (wrappé par un badge)
+     */
+    private java.util.stream.Stream<Button> navButtonsIn(VBox section) {
+        return section.getChildren().stream()
+            .flatMap(n -> {
+                if (n instanceof Button b && b.getUserData() instanceof String[])
+                    return java.util.stream.Stream.of(b);
+                if (n instanceof StackPane sp)
+                    return sp.getChildren().stream()
+                        .filter(c -> c instanceof Button b2 && b2.getUserData() instanceof String[])
+                        .map(c -> (Button) c);
+                return java.util.stream.Stream.empty();
+            });
     }
 
     private String emojiLabel(String page) {

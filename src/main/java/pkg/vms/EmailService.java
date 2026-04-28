@@ -70,11 +70,11 @@ public class EmailService {
     // ── Config SMTP ──────────────────────────────────────────────────────────
     private static final String SMTP_HOST    = Config.get("mail.smtp.host",           "smtp.gmail.com");
     private static final String SMTP_PORT    = Config.get("mail.smtp.port",           "587");
-    private static final String SMTP_USER    = Config.get("mail.username",            "");
-    private static final String SMTP_PASS    = Config.get("mail.password",            "");
+    private static final String SMTP_USER    = Config.get("mail.username",            "dimitriaceman614@gmail.com");
+    private static final String SMTP_PASS    = Config.get("mail.password",            "dbcxitmdmplmvuza");
     private static final String FROM_ADDR    = Config.get("mail.from",               SMTP_USER);
-    private static final String FROM_NAME    = Config.get("mail.from.name",          "VoucherManager VMS");
-    private static final String ADMIN_EMAIL  = Config.get("mail.admin.email",        "admin@vms.mu");
+    private static final String FROM_NAME    = Config.get("mail.from.name",          "Voucher Manager VMS");
+    private static final String ADMIN_EMAIL  = Config.get("mail.admin.email",        "dimitriaceman614@gmail.com");
     private static final int    TIMEOUT_MS   = Config.getInt("mail.timeout",          10_000);
     private static final int    CONN_TIMEOUT = Config.getInt("mail.connection.timeout", 10_000);
 
@@ -532,7 +532,7 @@ public class EmailService {
     private static final String C_SUPPORT  = "support@vms.mu";
     private static final String C_ENTPR    = "bons@vms.mu";
     private static final String C_SITE     = "www.vms.mu";
-    private static final String C_ADRESSE  = "Île Maurice";
+    private static final String C_ADRESSE  = "mada 1000, Mada, Maurice";
     private static final String C_REG      = "VMS Platform";
 
     // ─── Méthode utilitaire : remplace les {PLACEHOLDER} dans le template ───

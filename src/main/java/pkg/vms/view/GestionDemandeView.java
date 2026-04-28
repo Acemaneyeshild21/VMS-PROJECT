@@ -34,8 +34,9 @@ public class GestionDemandeView {
     public Region build() {
         VBox root = new VBox(0);
         root.setStyle("-fx-background-color:#f1f5f9;");
-        root.getChildren().addAll(buildHeader(), buildContent());
-        VBox.setVgrow(buildContent(), Priority.ALWAYS);
+        VBox content = buildContent(); // une seule fois — évite double init + double loadData()
+        root.getChildren().addAll(buildHeader(), content);
+        // VBox.setVgrow déjà appliqué à l'intérieur de buildContent()
         return root;
     }
 
