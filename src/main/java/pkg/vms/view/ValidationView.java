@@ -198,17 +198,8 @@ public class ValidationView {
         c.setCellFactory(col -> new TableCell<>() {
             @Override protected void updateItem(String v, boolean empty) {
                 super.updateItem(v, empty);
-                if (empty || v == null) { setText(null); setStyle(""); return; }
-                setText(v);
-                String bg = switch (v) {
-                    case "ENVOYE"  -> "#dcfce7";
-                    case "APPROUVE","GENERE" -> "#dbeafe";
-                    case "PAYE"    -> "#fef3c7";
-                    case "REJETE","ANNULE" -> "#fee2e2";
-                    default        -> "#f1f5f9";
-                };
-                setStyle("-fx-background-color:" + bg + ";-fx-background-radius:4;"
-                       + "-fx-alignment:CENTER;-fx-font-weight:bold;-fx-font-size:11;");
+                setText(null); setStyle("");
+                setGraphic(empty || v == null ? null : pkg.vms.VmsUI.badgeCell(v));
             }
         });
         return c;

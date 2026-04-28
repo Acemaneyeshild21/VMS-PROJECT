@@ -194,22 +194,14 @@ public class GestionBonsView {
 
     private TableColumn<String[], String> colStatut(int idx) {
         TableColumn<String[], String> c = new TableColumn<>("Statut");
-        c.setPrefWidth(110);
+        c.setPrefWidth(120);
         c.setCellValueFactory(p -> new SimpleStringProperty(
             p.getValue().length > idx ? p.getValue()[idx] : ""));
         c.setCellFactory(col -> new TableCell<>() {
             @Override protected void updateItem(String v, boolean empty) {
                 super.updateItem(v, empty);
-                if (empty || v == null) { setText(null); setStyle(""); return; }
-                setText(v);
-                String bg = switch (v) {
-                    case "ENVOYE"  -> "#dcfce7";
-                    case "GENERE"  -> "#dbeafe";
-                    case "ARCHIVE" -> "#f1f5f9";
-                    default        -> "#fef3c7";
-                };
-                setStyle("-fx-background-color:" + bg + ";-fx-background-radius:4;"
-                       + "-fx-alignment:CENTER;-fx-font-weight:bold;-fx-font-size:11;");
+                setText(null); setStyle("");
+                setGraphic(empty || v == null ? null : pkg.vms.VmsUI.badgeCell(v));
             }
         });
         return c;
