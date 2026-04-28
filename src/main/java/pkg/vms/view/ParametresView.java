@@ -732,16 +732,13 @@ public class ParametresView {
 
     private Button primaryBtn(String t) {
         Button b = new Button(t);
-        b.setStyle("-fx-background-color:#dc2626;-fx-text-fill:white;-fx-font-size:13;"
-                 + "-fx-font-weight:bold;-fx-padding:9 18;-fx-background-radius:8;-fx-cursor:hand;");
+        b.getStyleClass().add("btn-primary");
         return b;
     }
 
     private Button outlineBtn(String t) {
         Button b = new Button(t);
-        b.setStyle("-fx-background-color:white;-fx-text-fill:#374151;-fx-font-size:13;"
-                 + "-fx-padding:9 18;-fx-background-radius:8;-fx-border-color:#d1d5db;"
-                 + "-fx-border-radius:8;-fx-cursor:hand;");
+        b.getStyleClass().add("btn-outline");
         return b;
     }
 

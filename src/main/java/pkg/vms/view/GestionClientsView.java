@@ -120,9 +120,9 @@ public class GestionClientsView {
         cActions.setPrefWidth(220);
         cActions.setCellFactory(col -> new TableCell<>() {
             final HBox btns = new HBox(6,
-                actionBtn("👁 Fiche",     "#7c3aed"),
-                actionBtn("✏ Modifier",  "#2563eb"),
-                actionBtn("🗑 Supprimer","#dc2626")
+                actionBtn("👁 Fiche",      "btn-purple"),
+                actionBtn("✏ Modifier",   "btn-info"),
+                actionBtn("🗑 Supprimer", "btn-danger")
             );
             {
                 ((Button)btns.getChildren().get(0)).setOnAction(e -> {
@@ -239,39 +239,33 @@ public class GestionClientsView {
         return c;
     }
 
-    private Button actionBtn(String t, String color) {
+    private Button actionBtn(String t, String cssClass) {
         Button b = new Button(t);
-        b.setStyle("-fx-font-size:11;-fx-padding:4 8;-fx-background-color:" + color + ";"
-                 + "-fx-text-fill:white;-fx-background-radius:6;-fx-cursor:hand;");
+        b.getStyleClass().addAll("btn-action", cssClass);
         return b;
     }
 
     private TextField field(String val) {
         TextField tf = new TextField(val);
         tf.setPrefWidth(260);
-        tf.setStyle("-fx-font-size:13;-fx-padding:8 12;-fx-border-color:#d1d5db;"
-                  + "-fx-border-radius:8;-fx-background-radius:8;");
-        return tf;
+        return tf; // style géré par vms.css
     }
 
     private Label lbl(String t) {
         Label l = new Label(t);
-        l.setStyle("-fx-font-size:13;-fx-font-weight:bold;-fx-text-fill:#374151;");
+        l.getStyleClass().add("label-field");
         return l;
     }
 
     private Button primaryBtn(String t) {
         Button b = new Button(t);
-        b.setStyle("-fx-background-color:#dc2626;-fx-text-fill:white;-fx-font-size:13;"
-                 + "-fx-font-weight:bold;-fx-padding:9 18;-fx-background-radius:8;-fx-cursor:hand;");
+        b.getStyleClass().add("btn-primary");
         return b;
     }
 
     private Button outlineBtn(String t) {
         Button b = new Button(t);
-        b.setStyle("-fx-background-color:white;-fx-text-fill:#374151;-fx-font-size:13;"
-                 + "-fx-padding:9 18;-fx-background-radius:8;-fx-border-color:#d1d5db;"
-                 + "-fx-border-radius:8;-fx-cursor:hand;");
+        b.getStyleClass().add("btn-outline");
         return b;
     }
 

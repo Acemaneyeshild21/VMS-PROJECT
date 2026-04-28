@@ -24,11 +24,19 @@ public class LoginView {
     public LoginView(Stage stage) { this.stage = stage; }
 
     public void show() {
+        VBox formPane = buildForm();
         HBox root = new HBox();
-        root.getChildren().addAll(buildBrand(), buildForm());
-        HBox.setHgrow(buildForm(), Priority.ALWAYS);
+        root.getChildren().addAll(buildBrand(), formPane);
+        HBox.setHgrow(formPane, Priority.ALWAYS);
 
         Scene scene = new Scene(root, 980, 620);
+
+        // ── CSS global ────────────────────────────────────────────────────
+        try {
+            String css = getClass().getResource("/vms.css").toExternalForm();
+            scene.getStylesheets().add(css);
+        } catch (Exception ignored) {}
+
         stage.setTitle("VoucherManager VMS — Connexion");
         stage.setScene(scene);
         stage.setResizable(false);
@@ -124,8 +132,8 @@ public class LoginView {
 
         btnLogin = new Button("Se connecter");
         btnLogin.setMaxWidth(Double.MAX_VALUE);
-        btnLogin.setStyle("-fx-background-color:#dc2626;-fx-text-fill:white;-fx-font-size:14;"
-                + "-fx-font-weight:bold;-fx-padding:12 24;-fx-background-radius:8;-fx-cursor:hand;");
+        btnLogin.getStyleClass().addAll("btn-primary");
+        btnLogin.setStyle("-fx-font-size:14;-fx-padding:13 24;");
 
         btnLogin.setOnAction(e -> doLogin());
         tfPassword.setOnAction(e -> doLogin());
@@ -187,8 +195,7 @@ public class LoginView {
     }
 
     private void styleField(Control f) {
-        f.setStyle("-fx-font-size:13;-fx-padding:10 14;-fx-border-color:#d1d5db;"
-                + "-fx-border-radius:8;-fx-background-radius:8;-fx-background-color:#f9fafb;");
+        // Le CSS global (vms.css) gère le style de base ; on ajoute juste la taille max
         f.setMaxWidth(Double.MAX_VALUE);
     }
 }

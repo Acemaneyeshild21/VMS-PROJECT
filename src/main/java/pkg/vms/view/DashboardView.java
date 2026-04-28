@@ -5,156 +5,255 @@ import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import pkg.vms.DAO.AuthDAO;
-import pkg.vms.DAO.VoucherDAO;
 import pkg.vms.controller.StatistiquesController;
 
 /**
- * Vue Dashboard — KPIs + activité récente.
+ * Vue Dashboard — KPIs + activité récente + actions rapides.
+ * Design moderne : cartes avec barre de couleur, table audit stylisée.
  */
 public class DashboardView {
 
-    private final AuthDAO.UserSession session;
-    private final StatistiquesController ctrl = new StatistiquesController();
+    private final AuthDAO.UserSession      session;
+    private final StatistiquesController   ctrl = new StatistiquesController();
 
-    // KPI labels (mis à jour après chargement)
-    private Label kpiDemandes  = new Label("—");
-    private Label kpiMontant   = new Label("—");
-    private Label kipiBonsAct  = new Label("—");
-    private Label kpiTaux      = new Label("—");
+    // KPI labels (mis à jour après chargement async)
+    private final Label kpiDemandes = new Label("—");
+    private final Label kpiMontant  = new Label("—");
+    private final Label kpiBons     = new Label("—");
+    private final Label kpiTaux     = new Label("—");
 
-    private TableView<String[]> tblAudit = new TableView<>();
+    @SuppressWarnings("unchecked")
+    private final TableView<String[]> tblAudit = new TableView<>();
 
     public DashboardView(AuthDAO.UserSession session) { this.session = session; }
 
     public Region build() {
         ScrollPane scroll = new ScrollPane(buildContent());
         scroll.setFitToWidth(true);
-        scroll.setStyle("-fx-background-color:transparent;-fx-background:transparent;");
+        scroll.setFitToHeight(false);
         return scroll;
     }
 
     private VBox buildContent() {
-        VBox root = new VBox(24);
-        root.setPadding(new Insets(32));
+        VBox root = new VBox(28);
+        root.setPadding(new Insets(32, 36, 36, 36));
         root.setStyle("-fx-background-color:#f1f5f9;");
 
-        // Header
-        root.getChildren().add(buildHeader());
-
-        // KPI cards
-        HBox kpiRow = new HBox(16,
-            kpiCard("📋 Demandes",   kpiDemandes,  "Total créées",       "#2563eb"),
-            kpiCard("💰 Montant",    kpiMontant,   "Rs — Valeur totale", "#16a34a"),
-            kpiCard("🎟 Bons actifs",kipiBonsAct,  "En circulation",     "#d97706"),
-            kpiCard("📈 Validation", kpiTaux,      "Taux d'approbation", "#7c3aed")
+        root.getChildren().addAll(
+            buildPageHeader(),
+            buildKpiRow(),
+            buildBottomRow()
         );
-        kpiRow.setFillHeight(true);
-        root.getChildren().add(kpiRow);
 
-        // Activité récente
-        root.getChildren().add(buildAuditSection());
-
-        // Quick actions
-        root.getChildren().add(buildQuickActions());
-
-        // Load data
         loadStats();
         return root;
     }
 
-    private HBox buildHeader() {
+    // ── En-tête de page ──────────────────────────────────────────────────────
+
+    private HBox buildPageHeader() {
         HBox h = new HBox();
         h.setAlignment(Pos.CENTER_LEFT);
 
         VBox text = new VBox(4);
         Label title = new Label("Tableau de bord");
         title.setStyle("-fx-font-size:24;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
-        Label sub = new Label("Bienvenue, " + session.username + " — " + session.role);
-        sub.setStyle("-fx-font-size:13;-fx-text-fill:#64748b;");
+
+        Label sub = new Label("Bienvenue, " + session.username
+                + "  ·  " + java.time.LocalDate.now()
+                    .format(java.time.format.DateTimeFormatter.ofPattern("dd MMMM yyyy",
+                        java.util.Locale.FRENCH)));
+        sub.setStyle("-fx-font-size:12;-fx-text-fill:#64748b;");
         text.getChildren().addAll(title, sub);
 
-        h.getChildren().add(text);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        // Badge de rôle
+        Label badge = new Label(session.role);
+        badge.setStyle(
+            "-fx-background-color:" + roleColor(session.role) + "22;"
+            + "-fx-text-fill:"      + roleColor(session.role) + ";"
+            + "-fx-font-size:11;-fx-font-weight:bold;"
+            + "-fx-padding:4 12;-fx-background-radius:20;");
+
+        h.getChildren().addAll(text, spacer, badge);
         return h;
     }
 
-    @SuppressWarnings("unchecked")
-    private VBox buildAuditSection() {
-        VBox card = card("Activité récente");
+    // ── Ligne KPIs ───────────────────────────────────────────────────────────
 
-        tblAudit.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        tblAudit.setPrefHeight(260);
-        tblAudit.setStyle("-fx-font-size:12;");
-        tblAudit.setPlaceholder(new Label("Chargement…"));
-
-        tblAudit.getColumns().addAll(
-            col("Action", 0, 150),
-            col("Entité", 1, 120),
-            col("Utilisateur", 2, 120),
-            col("Contexte", 3, 300)
+    private HBox buildKpiRow() {
+        HBox row = new HBox(16,
+            kpiCard(kpiDemandes, "Demandes",      "Total créées",        "#2563eb"),
+            kpiCard(kpiMontant,  "Montant total", "Rs — Valeur émise",   "#16a34a"),
+            kpiCard(kpiBons,     "Bons actifs",   "En circulation",      "#d97706"),
+            kpiCard(kpiTaux,     "Taux valid.",   "Bons rédemptés / émis","#7c3aed")
         );
+        row.setFillHeight(true);
+        return row;
+    }
 
-        card.getChildren().add(tblAudit);
+    private VBox kpiCard(Label valLbl, String title, String desc, String color) {
+        VBox card = new VBox(0);
+        card.setStyle(
+            "-fx-background-color:white;-fx-background-radius:12;"
+            + "-fx-border-radius:12;-fx-border-color:#f1f5f9;-fx-border-width:1;"
+            + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.055),8,0,0,2);");
+        HBox.setHgrow(card, Priority.ALWAYS);
+        card.setMaxWidth(Double.MAX_VALUE);
+
+        // Barre de couleur en haut
+        Region bar = new Region();
+        bar.setPrefHeight(4);
+        bar.setMaxWidth(Double.MAX_VALUE);
+        bar.setStyle("-fx-background-color:" + color + ";"
+                   + "-fx-background-radius:12 12 0 0;");
+
+        // Contenu
+        VBox body = new VBox(6);
+        body.setPadding(new Insets(16, 20, 18, 20));
+
+        Label ttl = new Label(title.toUpperCase());
+        ttl.setStyle("-fx-font-size:10;-fx-font-weight:bold;-fx-text-fill:#94a3b8;"
+                   + "-fx-letter-spacing:0.08em;");
+
+        valLbl.setStyle("-fx-font-size:30;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
+
+        Label dsc = new Label(desc);
+        dsc.setStyle("-fx-font-size:11;-fx-text-fill:#94a3b8;");
+
+        // Indicateur coloré
+        HBox indicator = new HBox(6);
+        indicator.setAlignment(Pos.CENTER_LEFT);
+        Region dot = new Region();
+        dot.setStyle("-fx-background-color:" + color + ";-fx-background-radius:4;");
+        dot.setPrefSize(8, 8);
+        Label indLbl = new Label("Mis à jour");
+        indLbl.setStyle("-fx-font-size:10;-fx-text-fill:" + color + ";");
+        indicator.getChildren().addAll(dot, indLbl);
+
+        body.getChildren().addAll(ttl, valLbl, dsc, indicator);
+        card.getChildren().addAll(bar, body);
         return card;
     }
 
-    private HBox buildQuickActions() {
-        HBox h = new HBox(12);
-        h.getChildren().addAll(
-            actionCard("📋", "Nouvelle demande",    "Créer une demande de bons", "#2563eb"),
-            actionCard("✅", "Valider un paiement", "Changer le statut",         "#16a34a"),
-            actionCard("📊", "Exporter rapport",    "Excel ODBC",                "#7c3aed")
-        );
-        return h;
+    // ── Ligne inférieure : audit + actions ───────────────────────────────────
+
+    private HBox buildBottomRow() {
+        HBox row = new HBox(20);
+        row.setFillHeight(true);
+
+        VBox auditCard = buildAuditCard();
+        HBox.setHgrow(auditCard, Priority.ALWAYS);
+
+        VBox actionsCard = buildActionsCard();
+        actionsCard.setPrefWidth(300);
+        actionsCard.setMinWidth(260);
+        actionsCard.setMaxWidth(300);
+
+        row.getChildren().addAll(auditCard, actionsCard);
+        return row;
     }
 
-    private VBox actionCard(String icon, String title, String desc, String color) {
-        VBox c = new VBox(8);
-        c.setPadding(new Insets(20));
-        c.setPrefWidth(240);
-        c.setStyle("-fx-background-color:white;-fx-background-radius:12;"
-                 + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.06),8,0,0,2);-fx-cursor:hand;");
-
-        Label ico = new Label(icon);
-        ico.setStyle("-fx-font-size:22;");
-
-        Label t = new Label(title);
-        t.setStyle("-fx-font-size:14;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
-
-        Label d = new Label(desc);
-        d.setStyle("-fx-font-size:12;-fx-text-fill:#64748b;");
-
-        c.getChildren().addAll(ico, t, d);
-
-        c.setOnMouseEntered(e -> c.setStyle(
-            "-fx-background-color:" + color + ";-fx-background-radius:12;"
-            + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.15),12,0,0,4);-fx-cursor:hand;"));
-        c.setOnMouseExited(e -> c.setStyle(
+    @SuppressWarnings("unchecked")
+    private VBox buildAuditCard() {
+        VBox card = new VBox(14);
+        card.setPadding(new Insets(20));
+        card.setStyle(
             "-fx-background-color:white;-fx-background-radius:12;"
-            + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.06),8,0,0,2);-fx-cursor:hand;"));
-        c.setOnMouseEntered(e -> {
-            t.setStyle("-fx-font-size:14;-fx-font-weight:bold;-fx-text-fill:white;");
-            d.setStyle("-fx-font-size:12;-fx-text-fill:rgba(255,255,255,0.8);");
-            c.setStyle("-fx-background-color:" + color + ";-fx-background-radius:12;"
-                    + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.15),12,0,0,4);-fx-cursor:hand;");
-        });
-        c.setOnMouseExited(e -> {
-            t.setStyle("-fx-font-size:14;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
-            d.setStyle("-fx-font-size:12;-fx-text-fill:#64748b;");
-            c.setStyle("-fx-background-color:white;-fx-background-radius:12;"
-                    + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.06),8,0,0,2);-fx-cursor:hand;");
-        });
+            + "-fx-border-radius:12;-fx-border-color:#f1f5f9;-fx-border-width:1;"
+            + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.055),8,0,0,2);");
 
-        return c;
+        HBox header = new HBox();
+        Label t = new Label("Activité récente");
+        t.setStyle("-fx-font-size:15;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
+        Region sp = new Region(); HBox.setHgrow(sp, Priority.ALWAYS);
+        Label sub = new Label("Dernières 50 entrées");
+        sub.setStyle("-fx-font-size:11;-fx-text-fill:#94a3b8;");
+        header.getChildren().addAll(t, sp, sub);
+
+        tblAudit.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        tblAudit.setPrefHeight(260);
+        tblAudit.setPlaceholder(new Label("Chargement de l'activité…"));
+        VBox.setVgrow(tblAudit, Priority.ALWAYS);
+
+        tblAudit.getColumns().addAll(
+            col("Action",      0, 160),
+            col("Entité",      1, 120),
+            col("Utilisateur", 2, 120),
+            col("Détail",      3, 0)    // 0 = croît librement
+        );
+
+        card.getChildren().addAll(header, tblAudit);
+        return card;
     }
 
-    // ── Data loading ─────────────────────────────────────────────────────────
+    private VBox buildActionsCard() {
+        VBox card = new VBox(16);
+        card.setPadding(new Insets(20));
+        card.setStyle(
+            "-fx-background-color:white;-fx-background-radius:12;"
+            + "-fx-border-radius:12;-fx-border-color:#f1f5f9;-fx-border-width:1;"
+            + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.055),8,0,0,2);");
+
+        Label t = new Label("Actions rapides");
+        t.setStyle("-fx-font-size:15;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
+
+        card.getChildren().addAll(
+            t,
+            quickAction("📋", "Nouvelle demande",    "Créer une demande de bons",  "#2563eb"),
+            quickAction("✅", "Valider paiement",    "Changer le statut",          "#16a34a"),
+            quickAction("📊", "Exporter rapport",    "Excel / ODBC",               "#7c3aed"),
+            quickAction("🔍", "Vérifier un bon",     "Contrôle anti-fraude",       "#d97706")
+        );
+        return card;
+    }
+
+    private HBox quickAction(String icon, String title, String desc, String color) {
+        HBox row = new HBox(12);
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(10, 12, 10, 12));
+        row.setStyle(
+            "-fx-background-color:#f8fafc;-fx-background-radius:8;-fx-cursor:hand;");
+        row.setMaxWidth(Double.MAX_VALUE);
+
+        // Icône colorée
+        Label ico = new Label(icon);
+        ico.setStyle(
+            "-fx-font-size:16;-fx-background-color:" + color + "22;"
+            + "-fx-background-radius:8;-fx-padding:6 8;");
+
+        VBox text = new VBox(2);
+        Label ttl = new Label(title);
+        ttl.setStyle("-fx-font-size:13;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
+        Label dsc = new Label(desc);
+        dsc.setStyle("-fx-font-size:11;-fx-text-fill:#64748b;");
+        text.getChildren().addAll(ttl, dsc);
+        HBox.setHgrow(text, Priority.ALWAYS);
+
+        Label arrow = new Label("›");
+        arrow.setStyle("-fx-font-size:16;-fx-text-fill:#94a3b8;");
+
+        row.getChildren().addAll(ico, text, arrow);
+
+        // Hover
+        row.setOnMouseEntered(e ->
+            row.setStyle("-fx-background-color:" + color + "11;-fx-background-radius:8;-fx-cursor:hand;"));
+        row.setOnMouseExited(e ->
+            row.setStyle("-fx-background-color:#f8fafc;-fx-background-radius:8;-fx-cursor:hand;"));
+
+        return row;
+    }
+
+    // ── Chargement ───────────────────────────────────────────────────────────
 
     private void loadStats() {
         ctrl.chargerDonnees(session.role, session.userId,
             data -> {
                 kpiDemandes.setText(String.valueOf(data.totalDemandes));
                 kpiMontant.setText("Rs " + String.format("%,.0f", data.montantTotal));
-                kipiBonsAct.setText(String.valueOf(data.bonsActifs));
+                kpiBons.setText(String.valueOf(data.bonsActifs));
                 kpiTaux.setText(String.format("%.1f%%", data.tauxRedemption));
 
                 tblAudit.getItems().clear();
@@ -164,57 +263,29 @@ public class DashboardView {
                         String.valueOf(row[2]), String.valueOf(row[3])
                     });
                 }
+                tblAudit.setPlaceholder(new Label("Aucune activité récente."));
             },
-            err -> showErr("Erreur chargement stats : " + err)
+            err -> tblAudit.setPlaceholder(new Label("Erreur : " + err))
         );
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-
-    private VBox kpiCard(String title, Label valLbl, String desc, String color) {
-        VBox c = new VBox(8);
-        c.setPadding(new Insets(20));
-        c.setStyle("-fx-background-color:white;-fx-background-radius:12;"
-                 + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.06),8,0,0,2);");
-        HBox.setHgrow(c, Priority.ALWAYS);
-
-        Label ico = new Label("●");
-        ico.setStyle("-fx-font-size:10;-fx-text-fill:" + color + ";");
-
-        Label ttl = new Label(title);
-        ttl.setStyle("-fx-font-size:12;-fx-text-fill:#64748b;");
-
-        valLbl.setStyle("-fx-font-size:28;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
-
-        Label dsc = new Label(desc);
-        dsc.setStyle("-fx-font-size:11;-fx-text-fill:#94a3b8;");
-
-        c.getChildren().addAll(new HBox(6, ico, ttl), valLbl, dsc);
-        return c;
-    }
-
-    private VBox card(String title) {
-        VBox c = new VBox(12);
-        c.setPadding(new Insets(20));
-        c.setStyle("-fx-background-color:white;-fx-background-radius:12;"
-                 + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.06),8,0,0,2);");
-        Label t = new Label(title);
-        t.setStyle("-fx-font-size:15;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
-        c.getChildren().add(t);
-        return c;
-    }
 
     @SuppressWarnings("unchecked")
     private TableColumn<String[], String> col(String title, int idx, double w) {
         TableColumn<String[], String> c = new TableColumn<>(title);
         c.setCellValueFactory(p -> new javafx.beans.property.SimpleStringProperty(
             p.getValue().length > idx ? p.getValue()[idx] : ""));
-        c.setPrefWidth(w);
+        if (w > 0) c.setPrefWidth(w);
         return c;
     }
 
-    private void showErr(String msg) {
-        Alert a = new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK);
-        a.showAndWait();
+    private String roleColor(String role) {
+        return switch (role) {
+            case "Administrateur"       -> "#dc2626";
+            case "Superviseur_Magasin"  -> "#d97706";
+            case "Valideur"             -> "#2563eb";
+            default                     -> "#64748b";
+        };
     }
 }

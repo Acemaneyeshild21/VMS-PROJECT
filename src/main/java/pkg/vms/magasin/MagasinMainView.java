@@ -49,6 +49,11 @@ public class MagasinMainView {
         root.setCenter(buildCenter());
 
         Scene scene = new Scene(root, 920, 680);
+        try {
+            String css = getClass().getResource("/vms.css").toExternalForm();
+            scene.getStylesheets().add(css);
+        } catch (Exception ignored) {}
+
         stage.setTitle("VMS — Magasin · " + session.username);
         stage.setScene(scene);
         stage.setMinWidth(780);

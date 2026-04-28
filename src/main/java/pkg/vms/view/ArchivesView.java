@@ -218,9 +218,7 @@ public class ArchivesView {
 
     private Button outlineBtn(String t) {
         Button b = new Button(t);
-        b.setStyle("-fx-background-color:white;-fx-text-fill:#374151;-fx-font-size:13;"
-                 + "-fx-padding:9 18;-fx-background-radius:8;-fx-border-color:#d1d5db;"
-                 + "-fx-border-radius:8;-fx-cursor:hand;");
+        b.getStyleClass().add("btn-outline");
         return b;
     }
 
