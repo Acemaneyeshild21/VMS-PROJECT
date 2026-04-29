@@ -175,7 +175,16 @@ public class ValidationView {
             String next = cbNext.getValue();
             ctrl.changerStatut(id, next, session.userId,
                 () -> { showInfo("Statut de " + ref + " → " + next); loadData(); },
-                err -> showErr("Erreur : " + err));
+                err -> {
+                    if (err != null && err.contains("SEPARATION_TACHES")) {
+                        showErr("⚠ Séparation des tâches\n\n" +
+                                "Vous avez déjà validé le paiement de cette demande.\n" +
+                                "L'approbation doit être effectuée par un utilisateur différent " +
+                                "(rôle : Approbateur) afin de garantir le contrôle interne.");
+                    } else {
+                        showErr("Erreur : " + err);
+                    }
+                });
         });
     }
 
