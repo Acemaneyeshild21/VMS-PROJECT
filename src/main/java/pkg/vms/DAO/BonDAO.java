@@ -128,7 +128,7 @@ public class BonDAO {
      * Marque toutes les erreurs email non résolues d'une demande comme résolues.
      */
     public static void resolveEmailErrors(int demandeId) throws SQLException {
-        String sql = "UPDATE email_errors SET resolu = TRUE WHERE demande_id = ? AND NOT resolu";
+        String sql = "UPDATE email_errors SET resolved = TRUE, resolved_at = NOW() WHERE demande_id = ? AND resolved = FALSE";
         try (Connection conn = DBconnect.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, demandeId);
