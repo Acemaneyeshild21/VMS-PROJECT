@@ -291,25 +291,42 @@ public class ParametresView {
         TableColumn<UserDAO.UserProfile, String> cAct   = colUser("ID", u -> String.valueOf(u.userId), 50);
 
         TableColumn<UserDAO.UserProfile, String> cActions = new TableColumn<>("Actions");
-        cActions.setPrefWidth(120);
+        cActions.setPrefWidth(240);
         cActions.setCellFactory(col -> new TableCell<>() {
             final ComboBox<String> cbRole = new ComboBox<>();
-            final Button btn = new Button("Changer rôle");
-            { btn.setStyle("-fx-font-size:11;-fx-padding:4 8;-fx-background-color:#2563eb;"
-                         + "-fx-text-fill:white;-fx-background-radius:6;-fx-cursor:hand;");
-              btn.setOnAction(e -> {
-                  UserDAO.UserProfile u = getTableView().getItems().get(getIndex());
-                  String newRole = cbRole.getValue();
-                  if (newRole == null) return;
-                  ctrl.changerRoleUtilisateur(u.userId, newRole,
-                      () -> { showInfo("Rôle mis à jour."); refreshUsers(userRows); },
-                      err -> showErr(err));
-              });
+            final Button btnRole = new Button("Changer rôle");
+            final Button btnDel  = new Button("🗑 Supprimer");
+            {
+                btnRole.setStyle("-fx-font-size:11;-fx-padding:4 8;-fx-background-color:#2563eb;"
+                             + "-fx-text-fill:white;-fx-background-radius:6;-fx-cursor:hand;");
+                btnRole.setOnAction(e -> {
+                    UserDAO.UserProfile u = getTableView().getItems().get(getIndex());
+                    String newRole = cbRole.getValue();
+                    if (newRole == null) return;
+                    ctrl.changerRoleUtilisateur(u.userId, newRole,
+                        () -> { showInfo("Rôle mis à jour."); refreshUsers(userRows); },
+                        err -> showErr(err));
+                });
+                btnDel.setStyle("-fx-font-size:11;-fx-padding:4 8;-fx-background-color:#dc2626;"
+                             + "-fx-text-fill:white;-fx-background-radius:6;-fx-cursor:hand;");
+                btnDel.setOnAction(e -> {
+                    UserDAO.UserProfile u = getTableView().getItems().get(getIndex());
+                    Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                        "Supprimer l'utilisateur « " + u.username + " » ?",
+                        ButtonType.YES, ButtonType.NO);
+                    confirm.setTitle("Confirmer la suppression");
+                    confirm.showAndWait().ifPresent(btn -> {
+                        if (btn != ButtonType.YES) return;
+                        ctrl.supprimerUtilisateur(u.userId,
+                            () -> { showInfo("Utilisateur supprimé."); refreshUsers(userRows); },
+                            err -> showErr("Erreur : " + err));
+                    });
+                });
             }
             @Override protected void updateItem(String v, boolean empty) {
                 super.updateItem(v, empty);
                 if (empty) { setGraphic(null); return; }
-                setGraphic(new HBox(6, cbRole, btn));
+                setGraphic(new HBox(6, cbRole, btnRole, btnDel));
                 ctrl.chargerRolesDisponibles(roles -> cbRole.setItems(FXCollections.observableArrayList(roles)),
                     err -> {});
             }
@@ -471,9 +488,36 @@ public class ParametresView {
         tbl.setPrefHeight(220);
         tbl.setStyle("-fx-font-size:12;");
 
-        TableColumn<MagasinDAO.Magasin, String> cNom = colMag("Nom magasin", m -> m.nomMagasin, 220);
-        TableColumn<MagasinDAO.Magasin, String> cAdr = colMag("Adresse",     m -> m.adresse,    240);
-        tbl.getColumns().addAll(cNom, cAdr);
+        TableColumn<MagasinDAO.Magasin, String> cNom = colMag("Nom magasin", m -> m.nomMagasin, 200);
+        TableColumn<MagasinDAO.Magasin, String> cAdr = colMag("Adresse",     m -> m.adresse,    210);
+
+        TableColumn<MagasinDAO.Magasin, String> cDelMag = new TableColumn<>("Action");
+        cDelMag.setPrefWidth(110);
+        cDelMag.setCellFactory(col -> new TableCell<>() {
+            final Button btn = new Button("🗑 Supprimer");
+            { btn.setStyle("-fx-font-size:11;-fx-padding:4 8;-fx-background-color:#dc2626;"
+                         + "-fx-text-fill:white;-fx-background-radius:6;-fx-cursor:hand;");
+              btn.setOnAction(e -> {
+                  MagasinDAO.Magasin m = getTableView().getItems().get(getIndex());
+                  Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
+                      "Supprimer le point de vente « " + m.nomMagasin + " » ?",
+                      ButtonType.YES, ButtonType.NO);
+                  confirm.setTitle("Confirmer la suppression");
+                  confirm.showAndWait().ifPresent(btn2 -> {
+                      if (btn2 != ButtonType.YES) return;
+                      ctrl.supprimerMagasin(m.magasinId,
+                          () -> { showInfo("Magasin supprimé."); refreshMagasins(magRows); },
+                          err -> showErr("Erreur : " + err));
+                  });
+              });
+            }
+            @Override protected void updateItem(String v, boolean empty) {
+                super.updateItem(v, empty);
+                setGraphic(empty ? null : btn);
+            }
+        });
+
+        tbl.getColumns().addAll(cNom, cAdr, cDelMag);
 
         Button btnRefresh = outlineBtn("↻ Actualiser");
         btnRefresh.setOnAction(e -> refreshMagasins(magRows));

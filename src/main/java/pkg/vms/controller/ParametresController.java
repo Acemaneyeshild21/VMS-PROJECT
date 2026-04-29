@@ -82,6 +82,18 @@ public class ParametresController {
         new Thread(task).start();
     }
 
+    public void supprimerUtilisateur(int userId, Runnable onSuccess, Consumer<String> onError) {
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
+                UserDAO.deleteUser(userId);
+                return null;
+            }
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
+    }
+
     public void changerRoleUtilisateur(int uid, String newRole, Runnable onSuccess, Consumer<String> onError) {
         Task<Void> task = new Task<>() {
             @Override protected Void call() throws Exception {
@@ -219,6 +231,18 @@ public class ParametresController {
             }
         };
         task.setOnSucceeded(e -> onSuccess.accept(task.getValue()));
+        task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
+        new Thread(task).start();
+    }
+
+    public void supprimerMagasin(int magasinId, Runnable onSuccess, Consumer<String> onError) {
+        Task<Void> task = new Task<>() {
+            @Override protected Void call() throws Exception {
+                MagasinDAO.deleteMagasin(magasinId);
+                return null;
+            }
+        };
+        task.setOnSucceeded(e -> onSuccess.run());
         task.setOnFailed(e -> onError.accept(task.getException().getMessage()));
         new Thread(task).start();
     }

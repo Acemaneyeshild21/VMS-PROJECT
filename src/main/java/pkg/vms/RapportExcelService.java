@@ -334,7 +334,7 @@ public class RapportExcelService {
 
         String sql = """
             SELECT b.bon_id, b.code_unique, b.valeur, b.statut,
-                   b.demande_id, b.date_generation, b.date_expiration,
+                   b.demande_id, b.date_emission, b.date_expiration,
                    r.date_redemption, m.nom_magasin
             FROM bon b
             LEFT JOIN redemption r ON r.bon_id = b.bon_id
@@ -357,7 +357,7 @@ public class RapportExcelService {
                 cell(r, 2, curStyle).setCellValue(rs.getDouble("valeur"));
                 cell(r, 3, statutStyle(wb, s, rs.getString("statut"))).setCellValue(str(rs.getString("statut")));
                 cell(r, 4, numStyle).setCellValue(rs.getInt("demande_id"));
-                var dg = rs.getTimestamp("date_generation");
+                var dg = rs.getTimestamp("date_emission");
                 cell(r, 5, rowStyle).setCellValue(dg != null ? sdf.format(dg) : "");
                 var de = rs.getTimestamp("date_expiration");
                 cell(r, 6, rowStyle).setCellValue(de != null ? sdf.format(de) : "");
@@ -391,13 +391,13 @@ public class RapportExcelService {
         });
 
         String sql = """
-            SELECT c.clientid, c.name, c.email, c.telephone,
+            SELECT c.clientid, c.name, c.email, c.contact_number,
                    COUNT(d.demande_id) AS nb_demandes,
                    COALESCE(SUM(d.montant_total), 0) AS montant_total,
                    c.date_creation, c.actif
             FROM client c
             LEFT JOIN demande d ON d.clientid = c.clientid
-            GROUP BY c.clientid, c.name, c.email, c.telephone, c.date_creation, c.actif
+            GROUP BY c.clientid, c.name, c.email, c.contact_number, c.date_creation, c.actif
             ORDER BY nb_demandes DESC, c.name
             """;
 
@@ -414,7 +414,7 @@ public class RapportExcelService {
                 cell(r, 0, numStyle).setCellValue(rs.getInt("clientid"));
                 cell(r, 1, rowStyle).setCellValue(str(rs.getString("name")));
                 cell(r, 2, rowStyle).setCellValue(str(rs.getString("email")));
-                cell(r, 3, rowStyle).setCellValue(str(rs.getString("telephone")));
+                cell(r, 3, rowStyle).setCellValue(str(rs.getString("contact_number")));
                 cell(r, 4, numStyle).setCellValue(rs.getInt("nb_demandes"));
                 cell(r, 5, curStyle).setCellValue(rs.getDouble("montant_total"));
                 var dc = rs.getTimestamp("date_creation");
