@@ -110,14 +110,15 @@ public class BonDAO {
      * Ne lève pas d'exception : l'échec de log ne doit pas masquer l'erreur d'origine.
      */
     public static void logEmailError(int demandeId, String erreur) {
-        String sql = "INSERT INTO email_errors (demande_id, tentative, erreur) " +
-                     "VALUES (?, (SELECT COALESCE(MAX(tentative), 0) + 1 " +
-                     "           FROM email_errors WHERE demande_id = ?), ?)";
+        // Récupère demande_ref et email client pour respecter les contraintes NOT NULL de email_errors
+        String sql = "INSERT INTO email_errors (demande_id, demande_ref, to_email, email_type, derniere_erreur) " +
+                     "SELECT d.demande_id, d.reference, COALESCE(c.email, ''), 'VOUCHER', ? " +
+                     "FROM demande d LEFT JOIN client c ON d.clientid = c.clientid " +
+                     "WHERE d.demande_id = ?";
         try (Connection conn = DBconnect.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, demandeId);
+            ps.setString(1, erreur != null ? erreur : "Erreur inconnue");
             ps.setInt(2, demandeId);
-            ps.setString(3, erreur != null ? erreur : "Erreur inconnue");
             ps.executeUpdate();
         } catch (SQLException e) {
             System.err.println("Impossible de logger l'erreur email : " + e.getMessage());
