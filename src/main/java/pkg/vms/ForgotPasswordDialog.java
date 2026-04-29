@@ -94,25 +94,24 @@ public class ForgotPasswordDialog {
     }
 
     private void sendOTP(String email, String nom, int userId, Button btnSend, Label lblErr) {
+        // Génération du code + envoi email — tout en arrière-plan (ne jamais bloquer le fil FX)
         Task<String> task = new Task<>() {
             @Override protected String call() throws Exception {
-                return PasswordResetDAO.createResetCode(userId, "app");
+                String code    = PasswordResetDAO.createResetCode(userId, "app");
+                String sendErr = pkg.vms.EmailService.envoyerCodeReset(email, nom, code);
+                if (sendErr != null) {
+                    // L'email n'a pas pu être envoyé — on remonte l'erreur
+                    throw new RuntimeException("Échec d'envoi de l'e-mail : " + sendErr);
+                }
+                return code; // code en clair uniquement pour passer à l'étape suivante (jamais loggué)
             }
         };
-        task.setOnSucceeded(e -> {
-            String code = task.getValue();
-            // Envoyer l'email
-            String sendErr = pkg.vms.EmailService.envoyerCodeReset(email, nom, code);
-            if (sendErr != null) {
-                // Si l'email échoue (ex : SIMULATION), on montre le code en dev
-                System.out.println("[ForgotPassword] OTP pour " + email + " : " + code);
-            }
-            showStep2();
-        });
+        task.setOnSucceeded(e -> showStep2());
         task.setOnFailed(e -> {
             btnSend.setDisable(false);
             btnSend.setText("Envoyer le code");
-            lblErr.setText("Erreur envoi OTP : " + task.getException().getMessage());
+            Throwable cause = task.getException();
+            lblErr.setText(cause != null ? cause.getMessage() : "Erreur lors de l'envoi du code.");
         });
         new Thread(task).start();
     }

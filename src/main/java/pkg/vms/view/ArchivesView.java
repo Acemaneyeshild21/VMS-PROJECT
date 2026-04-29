@@ -1,8 +1,6 @@
 package pkg.vms.view;
 
 import javafx.beans.property.SimpleStringProperty;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import javafx.geometry.*;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -25,10 +23,10 @@ public class ArchivesView {
     private final BonController         bCtrl = new BonController();
     private final ParametresController  pCtrl = new ParametresController();
 
-    private final ObservableList<String[]> rows = FXCollections.observableArrayList();
-    private TableView<String[]>            table;
-    private Label                          lblCount;
-    private TextField                      tfSearch;
+    private TableView<String[]>       table;
+    private pkg.vms.Pager<String[]>   pager;
+    private Label                     lblCount;
+    private TextField                 tfSearch;
 
     public ArchivesView(AuthDAO.UserSession session) { this.session = session; }
 
@@ -119,7 +117,8 @@ public class ArchivesView {
                     + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.06),8,0,0,2);");
         VBox.setVgrow(card, Priority.ALWAYS);
 
-        table = new TableView<>(rows);
+        table = new TableView<>();
+        pager = new pkg.vms.Pager<>(table);
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         table.setStyle("-fx-font-size:13;");
         VBox.setVgrow(table, Priority.ALWAYS);
@@ -135,7 +134,7 @@ public class ArchivesView {
             colStatut(5)
         );
 
-        card.getChildren().add(table);
+        card.getChildren().addAll(table, pager.getBar());
         return card;
     }
 
@@ -149,7 +148,7 @@ public class ArchivesView {
                 .filter(r -> r[5] != null && (r[5].equals("ARCHIVE")
                           || r[5].equals("REJETE") || r[5].equals("ANNULE")))
                 .toList();
-            rows.setAll(archives);
+            pager.setData(archives);
             lblCount.setText(archives.size() + " entrée(s) archivée(s)");
         }, err -> showErr("Erreur chargement : " + err));
     }
@@ -165,7 +164,7 @@ public class ArchivesView {
                           || (r[2] != null && r[2].toLowerCase().contains(ql))
                           || (r[7] != null && r[7].toLowerCase().contains(ql)))
                 .toList();
-            rows.setAll(f);
+            pager.setData(f);
             lblCount.setText(f.size() + " résultat(s)");
         }, err -> showErr("Erreur : " + err));
     }
@@ -201,16 +200,8 @@ public class ArchivesView {
         c.setCellFactory(col -> new TableCell<>() {
             @Override protected void updateItem(String v, boolean empty) {
                 super.updateItem(v, empty);
-                if (empty || v == null) { setText(null); setStyle(""); return; }
-                setText(v);
-                String bg = switch (v) {
-                    case "ARCHIVE" -> "#f1f5f9";
-                    case "REJETE"  -> "#fee2e2";
-                    case "ANNULE"  -> "#fef3c7";
-                    default        -> "#f8fafc";
-                };
-                setStyle("-fx-background-color:" + bg + ";-fx-background-radius:4;"
-                       + "-fx-alignment:CENTER;-fx-font-weight:bold;-fx-font-size:11;");
+                setText(null); setStyle("");
+                setGraphic(empty || v == null ? null : pkg.vms.VmsUI.badgeCell(v));
             }
         });
         return c;

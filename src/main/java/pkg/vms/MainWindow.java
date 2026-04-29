@@ -114,6 +114,7 @@ public class MainWindow {
             () -> showCommandPalette());
 
         stage.setScene(scene);
+        stage.setResizable(true);   // LoginView met setResizable(false) — on le réactive ici
         stage.setMinWidth(1050);
         stage.setMinHeight(680);
         stage.show();
