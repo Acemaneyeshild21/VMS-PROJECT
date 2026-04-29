@@ -13,8 +13,10 @@ import pkg.vms.controller.StatistiquesController;
  */
 public class DashboardView {
 
-    private final AuthDAO.UserSession      session;
-    private final StatistiquesController   ctrl = new StatistiquesController();
+    private final AuthDAO.UserSession          session;
+    private final StatistiquesController       ctrl    = new StatistiquesController();
+    /** Callback de navigation vers une page de l'application (ex : "Demandes"). */
+    private final java.util.function.Consumer<String> navigate;
 
     // KPI labels (mis à jour après chargement async)
     private final Label kpiDemandes      = new Label("—");
@@ -31,7 +33,11 @@ public class DashboardView {
     @SuppressWarnings("unchecked")
     private final TableView<String[]> tblAudit = new TableView<>();
 
-    public DashboardView(AuthDAO.UserSession session) { this.session = session; }
+    public DashboardView(AuthDAO.UserSession session,
+                         java.util.function.Consumer<String> navigate) {
+        this.session  = session;
+        this.navigate = navigate;
+    }
 
     public Region build() {
         ScrollPane scroll = new ScrollPane(buildContent());
@@ -201,23 +207,25 @@ public class DashboardView {
 
         card.getChildren().addAll(
             t,
-            quickAction("📋", "Nouvelle demande",    "Créer une demande de bons",  "#2563eb"),
-            quickAction("✅", "Valider paiement",    "Changer le statut",          "#16a34a"),
-            quickAction("📊", "Exporter rapport",    "Excel / ODBC",               "#7c3aed"),
-            quickAction("🔍", "Vérifier un bon",     "Contrôle anti-fraude",       "#d97706")
+            quickAction("📋", "Nouvelle demande",    "Créer une demande de bons",  "#2563eb",
+                        () -> navigate.accept("Demandes")),
+            quickAction("✅", "Valider paiement",    "Changer le statut",          "#16a34a",
+                        () -> navigate.accept("Validation")),
+            quickAction("📊", "Exporter rapport",    "Excel / ODBC",               "#7c3aed",
+                        () -> navigate.accept("Statistiques")),
+            quickAction("🔍", "Vérifier un bon",     "Contrôle anti-fraude",       "#d97706",
+                        () -> navigate.accept("Rédemption"))
         );
         return card;
     }
 
-    private HBox quickAction(String icon, String title, String desc, String color) {
+    private HBox quickAction(String icon, String title, String desc, String color, Runnable action) {
         HBox row = new HBox(12);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(10, 12, 10, 12));
-        row.setStyle(
-            "-fx-background-color:#f8fafc;-fx-background-radius:8;-fx-cursor:hand;");
+        row.setStyle("-fx-background-color:#f8fafc;-fx-background-radius:8;-fx-cursor:hand;");
         row.setMaxWidth(Double.MAX_VALUE);
 
-        // Icône colorée
         Label ico = new Label(icon);
         ico.setStyle(
             "-fx-font-size:16;-fx-background-color:" + color + "22;"
@@ -236,11 +244,12 @@ public class DashboardView {
 
         row.getChildren().addAll(ico, text, arrow);
 
-        // Hover
+        // Hover + clic
         row.setOnMouseEntered(e ->
-            row.setStyle("-fx-background-color:" + color + "11;-fx-background-radius:8;-fx-cursor:hand;"));
+            row.setStyle("-fx-background-color:" + color + "22;-fx-background-radius:8;-fx-cursor:hand;"));
         row.setOnMouseExited(e ->
             row.setStyle("-fx-background-color:#f8fafc;-fx-background-radius:8;-fx-cursor:hand;"));
+        row.setOnMouseClicked(e -> action.run());
 
         return row;
     }

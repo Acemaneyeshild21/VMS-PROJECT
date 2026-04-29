@@ -426,7 +426,7 @@ public class MainWindow {
 
     private Region loadView(String page) {
         return switch (page) {
-            case "Dashboard"    -> new DashboardView(session).build();
+            case "Dashboard"    -> new DashboardView(session, this::navigate).build();
             case "Demandes"     -> new GestionDemandeView(session).build();
             case "Validation"   -> new ValidationView(session).build();
             case "Bons"         -> new GestionBonsView(session).build();
@@ -435,7 +435,7 @@ public class MainWindow {
             case "Rédemption"   -> new RedemptionView(session).build();
             case "Archives"     -> new ArchivesView(session).build();
             case "Paramètres"   -> new ParametresView(session).build();
-            default             -> new DashboardView(session).build();
+            default             -> new DashboardView(session, this::navigate).build();
         };
     }
 

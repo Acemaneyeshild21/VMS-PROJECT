@@ -34,9 +34,12 @@ public class GestionDemandeView {
     public Region build() {
         VBox root = new VBox(0);
         root.setStyle("-fx-background-color:#f1f5f9;");
-        VBox content = buildContent(); // une seule fois — évite double init + double loadData()
-        root.getChildren().addAll(buildHeader(), content);
-        // VBox.setVgrow déjà appliqué à l'intérieur de buildContent()
+        // IMPORTANT : buildHeader() DOIT être appelé en premier — il initialise lblCount.
+        // buildContent() appelle loadData() qui fait lblCount.setText(…) ; si lblCount est
+        // encore null (buildHeader() pas encore appelé) → NullPointerException → vue vide.
+        HBox header  = buildHeader();
+        VBox content = buildContent();
+        root.getChildren().addAll(header, content);
         return root;
     }
 
