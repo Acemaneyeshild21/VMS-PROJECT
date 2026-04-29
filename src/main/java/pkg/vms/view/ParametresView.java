@@ -208,6 +208,11 @@ public class ParametresView {
         });
 
         btnTest.setOnAction(e -> ctrl.testerConnexionEmail(
+            tfServer.getText().trim(),
+            parseIntSafe(tfPort.getText(), 587),
+            tfUser.getText().trim(),
+            pfPwd.getText(),
+            cbTls.isSelected(),
             ok -> showInfo(ok ? "✓ Connexion SMTP réussie." : "✗ Connexion SMTP échouée."),
             err -> showErr("Erreur test email : " + err)));
 

@@ -146,6 +146,11 @@ public class ParametresController {
         pkg.vms.EmailService.testConnectionAsync(onSuccess, onError);
     }
 
+    public void testerConnexionEmail(String host, int port, String user, String pass, boolean tls,
+                                      Consumer<Boolean> onSuccess, Consumer<String> onError) {
+        pkg.vms.EmailService.testConnectionAsync(host, port, user, pass, tls, onSuccess, onError);
+    }
+
     // ── Email config ─────────────────────────────────────────────────────────
 
     public void chargerConfigEmail(Consumer<SettingsDAO.EmailSettings> onSuccess, Consumer<String> onError) {

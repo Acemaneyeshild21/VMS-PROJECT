@@ -376,6 +376,40 @@ public class EmailService {
         });
     }
 
+    /**
+     * Teste une connexion SMTP avec des paramètres fournis dynamiquement
+     * (utilisé par le formulaire Paramètres pour tester les valeurs saisies).
+     */
+    public static void testConnectionAsync(String host, int port, String user, String pass, boolean tls,
+                                           Consumer<Boolean> onResult, Consumer<String> onError) {
+        EMAIL_EXECUTOR.submit(() -> {
+            try {
+                if (pass == null || pass.isBlank())
+                    throw new Exception("Mot de passe SMTP vide — renseignez le champ mot de passe.");
+                Properties props = new Properties();
+                props.put("mail.smtp.auth",              "true");
+                props.put("mail.smtp.starttls.enable",   String.valueOf(tls));
+                props.put("mail.smtp.starttls.required", String.valueOf(tls));
+                props.put("mail.smtp.host",              host);
+                props.put("mail.smtp.port",              String.valueOf(port));
+                props.put("mail.smtp.ssl.trust",         host);
+                props.put("mail.smtp.timeout",           String.valueOf(TIMEOUT_MS));
+                props.put("mail.smtp.connectiontimeout", String.valueOf(CONN_TIMEOUT));
+                Session sess = Session.getInstance(props, new Authenticator() {
+                    @Override protected PasswordAuthentication getPasswordAuthentication() {
+                        return new PasswordAuthentication(user, pass);
+                    }
+                });
+                try (Transport transport = sess.getTransport("smtp")) {
+                    transport.connect(host, user, pass);
+                }
+                SwingUtilities.invokeLater(() -> onResult.accept(true));
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> onError.accept(ex.getMessage()));
+            }
+        });
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     //  Notification simple (best-effort, sans callback)
     // ─────────────────────────────────────────────────────────────────────────
