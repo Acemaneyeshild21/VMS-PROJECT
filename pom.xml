@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>pkg</groupId>
+    <artifactId>VMS</artifactId>
+    <version>1.0.0</version>
+    <name>Voucher Managing System</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <junit.version>5.10.2</junit.version>
+        <javafx.version>21.0.1</javafx.version>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!--  JavaFX — classes + natives Windows (obligatoire pour fat JAR) -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <!--
+            Classifiers -win : intègrent les DLL natives Windows dans le fat JAR.
+            Sans eux, JavaFX ne trouve pas ses bibliothèques natives au lancement
+            de l'EXE généré par jpackage.
+        -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-base</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-media</artifactId>
+            <version>${javafx.version}</version>
+            <classifier>win</classifier>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!--  Base de données                                               -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.3</version>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!--  QR Code                                                       -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>3.5.3</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>3.5.3</version>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!--  PDF                                                           -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.itextpdf</groupId>
+            <artifactId>itextpdf</artifactId>
+            <version>5.5.13.4</version>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!--  Email SMTP                                                    -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.sun.mail</groupId>
+            <artifactId>jakarta.mail</artifactId>
+            <version>2.0.1</version>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!--  Tests                                                         -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!--  Pool de connexions                                            -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>com.zaxxer</groupId>
+            <artifactId>HikariCP</artifactId>
+            <version>5.1.0</version>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!--  Sécurité                                                      -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.mindrot</groupId>
+            <artifactId>jbcrypt</artifactId>
+            <version>0.4</version>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!--  Excel                                                         -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!--  Logging                                                       -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.12</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.12</version>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <!--  Icônes                                                        -->
+        <!-- ══════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-swing</artifactId>
+            <version>12.3.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.kordamp.ikonli</groupId>
+            <artifactId>ikonli-fontawesome5-pack</artifactId>
+            <version>12.3.1</version>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+
+            <!-- ══════════════════════════════════════════════════════════ -->
+            <!--  Compilateur                                               -->
+            <!-- ══════════════════════════════════════════════════════════ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>21</release>
+                </configuration>
+            </plugin>
+
+            <!-- ══════════════════════════════════════════════════════════ -->
+            <!--  Fat JAR — toutes les dépendances dans un seul JAR        -->
+            <!-- ══════════════════════════════════════════════════════════ -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>all</shadedClassifierName>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>pkg.vms.Launcher</mainClass>
+                                </transformer>
+                                <!-- Merge les fichiers de services (requis par POI, Jakarta Mail) -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/MANIFEST.MF</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- ══════════════════════════════════════════════════════════ -->
+            <!--  JavaFX Run (IntelliJ / développement uniquement)         -->
+            <!-- ══════════════════════════════════════════════════════════ -->
+            <plugin>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>0.0.8</version>
+                <configuration>
+                    <mainClass>pkg.vms.Launcher</mainClass>
+                </configuration>
+            </plugin>
+
+            <!-- ══════════════════════════════════════════════════════════ -->
+            <!--  jpackage — Installeur Windows .EXE                       -->
+            <!--  Commande : mvn jpackage:jpackage                         -->
+            <!--  Prérequis : WiX Toolset v3.x installé                   -->
+            <!-- ══════════════════════════════════════════════════════════ -->
+            <plugin>
+                <groupId>com.github.akman</groupId>
+                <artifactId>jpackage-maven-plugin</artifactId>
+                <version>0.1.5</version>
+                <configuration>
+                    <!-- Identité de l'application -->
+                    <name>VoucherManager VMS</name>
+                    <appversion>1.0.0</appversion>
+                    <vendor>MCCI Business School</vendor>
+                    <icon>${project.basedir}/src/main/resources/vms.ico</icon>
+
+                    <!--
+                        APP_IMAGE = image portable (dossier exe + runtime).
+                        Inno Setup transformera ensuite ce dossier en installeur
+                        professionnel avec wizard 7 étapes.
+                    -->
+                    <type>APP_IMAGE</type>
+
+                    <!-- JAR à packager (fat JAR généré par maven-shade) -->
+                    <input>${project.build.directory}</input>
+                    <mainjar>${project.artifactId}-${project.version}-all.jar</mainjar>
+                    <mainclass>pkg.vms.Launcher</mainclass>
+
+                    <!-- Dossier de sortie de l'image -->
+                    <dest>${project.build.directory}/jpackage-image</dest>
+
+                    <!--
+                        Modules JDK inclus dans le runtime embarqué (virgule-séparé).
+                        java.se  = socle complet Java SE (sql, logging, desktop, naming…)
+                        jdk.crypto.ec / cryptoki = SSL/TLS (SMTP + PostgreSQL)
+                    -->
+                    <addmodules>java.se,jdk.crypto.ec,jdk.crypto.cryptoki,jdk.unsupported</addmodules>
+
+                    <!--
+                        Options JVM : chaîne unique espace-séparée (format requis par akman 0.1.5).
+                        Nécessaires pour JavaFX + encodage UTF-8 (accents mauriciens).
+                    -->
+                    <javaoptions>-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 --enable-native-access=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.desktop/sun.awt=ALL-UNNAMED --add-opens=java.desktop/java.awt=ALL-UNNAMED</javaoptions>
+                </configuration>
+            </plugin>
+
+        </plugins>
+    </build>
+
+</project>
