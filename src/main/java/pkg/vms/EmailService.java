@@ -71,7 +71,7 @@ public class EmailService {
     private static final String SMTP_HOST    = Config.get("mail.smtp.host",           "smtp.gmail.com");
     private static final String SMTP_PORT    = Config.get("mail.smtp.port",           "587");
     private static final String SMTP_USER    = Config.get("mail.username",            "dimitriaceman614@gmail.com");
-    private static final String SMTP_PASS    = Config.get("mail.password",            "fwzxtlysyxqwhhfe");
+    private static final String SMTP_PASS    = Config.get("mail.password",            "dbcxitmdmplmvuza");
     private static final String FROM_ADDR    = Config.get("mail.from",               SMTP_USER);
     private static final String FROM_NAME    = Config.get("mail.from.name",          "Voucher Manager VMS");
     private static final String ADMIN_EMAIL  = Config.get("mail.admin.email",        "dimitriaceman614@gmail.com");

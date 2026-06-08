@@ -1,0 +1,629 @@
+package pkg.vms;
+
+import javafx.animation.*;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.image.Image;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+import javafx.util.Duration;
+import pkg.vms.DAO.AuthDAO;
+import pkg.vms.DAO.StatistiquesDAO;
+import pkg.vms.view.*;
+
+/**
+ * Fenêtre principale VMS — sidebar repliable + topbar + zone de contenu.
+ *
+ * <p>La sidebar peut être réduite en mode « icon-only » (60 px) via le bouton
+ * toggle en haut à gauche. Une animation fluide (200 ms) accompagne la transition.</p>
+ */
+public class MainWindow {
+
+    // ── Palette ──────────────────────────────────────────────────────────────
+    private static final String C_SIDEBAR = "#0f172a";
+    private static final String C_TEXT_S  = "#94a3b8";
+    private static final String C_SURFACE = "#f1f5f9";
+
+    // ── Dimensions sidebar ───────────────────────────────────────────────────
+    private static final double W_EXPANDED  = 228;
+    private static final double W_COLLAPSED = 62;
+
+    // ── Navigation : [emoji, label, rôle requis] ────────────────────────────
+    private static final String[][] NAV = {
+        {"⬛", "Dashboard",    ""},
+        {"📋", "Demandes",     ""},
+        {"✅", "Validation",   ""},
+        {"🎟", "Bons",         ""},
+        {"👥", "Clients",      "Administrateur"},
+        {"📊", "Statistiques", "Administrateur"},
+        {"🛒", "Rédemption",   ""},
+        {"📁", "Archives",     ""},
+        {"⚙",  "Paramètres",  "Administrateur"},
+    };
+
+    private final Stage               stage;
+    private final AuthDAO.UserSession  session;
+    private final StackPane            contentArea  = new StackPane();
+    private final Label                topbarTitle  = new Label("Dashboard");
+
+    // Sidebar state
+    private VBox    sidebar;
+    private boolean collapsed = false;
+    private Button  activeBtn;
+
+    // Badges notification sur les items nav (clé = label de la page)
+    private final java.util.Map<String, Label> navBadges = new java.util.HashMap<>();
+
+    // Nœuds qui disparaissent en mode collapsed
+    private Label   sidebarNavLabel;
+    private Label   sidebarSubtitle;
+    private Label   sidebarUser;
+    private Label   sidebarRole;
+    private Button  btnLogout;
+
+    public MainWindow(Stage stage, AuthDAO.UserSession session) {
+        this.stage   = stage;
+        this.session = session;
+    }
+
+    // ── Entrée ───────────────────────────────────────────────────────────────
+
+    public void show() {
+        sidebar = buildSidebar();
+
+        BorderPane rightPane = new BorderPane();
+        rightPane.setTop(buildTopbar());
+        rightPane.setCenter(contentArea);
+        contentArea.setStyle("-fx-background-color:" + C_SURFACE + ";");
+
+        BorderPane root = new BorderPane();
+        root.setLeft(sidebar);
+        root.setCenter(rightPane);
+
+        Scene scene = new Scene(root, 1340, 840);
+        try {
+            scene.getStylesheets().add(getClass().getResource("/vms.css").toExternalForm());
+        } catch (Exception ignored) {}
+
+        stage.setTitle("VoucherManager VMS — " + session.username);
+        // Favicon
+        try {
+            stage.getIcons().add(new Image(getClass().getResourceAsStream("/vms.ico")));
+        } catch (Exception ignored) {}
+
+        // ── Raccourcis clavier globaux ────────────────────────────────────
+        scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.D, KeyCombination.CONTROL_DOWN),
+            () -> navigate("Dashboard"));
+        scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.M, KeyCombination.CONTROL_DOWN),
+            () -> navigate("Demandes"));
+        scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.L, KeyCombination.CONTROL_DOWN),
+            () -> navigate("Clients"));
+        scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.V, KeyCombination.CONTROL_DOWN),
+            () -> navigate("Validation"));
+        scene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.K, KeyCombination.CONTROL_DOWN),
+            () -> showCommandPalette());
+
+        stage.setScene(scene);
+        stage.setResizable(true);   // LoginView met setResizable(false) — on le réactive ici
+        stage.setMinWidth(1050);
+        stage.setMinHeight(680);
+        stage.show();
+
+        navigate("Dashboard");
+        loadNavBadges(); // charge les badges de notification
+    }
+
+    // ── Topbar ───────────────────────────────────────────────────────────────
+
+    private HBox buildTopbar() {
+        HBox bar = new HBox();
+        bar.setAlignment(Pos.CENTER_LEFT);
+        bar.getStyleClass().add("topbar");
+
+        topbarTitle.setStyle("-fx-font-size:18;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        String initial = session.username.substring(0, 1).toUpperCase();
+        Label avatar = new Label(initial);
+        avatar.setStyle(
+            "-fx-background-color:#dc2626;-fx-text-fill:white;-fx-font-weight:bold;"
+            + "-fx-font-size:13;-fx-background-radius:20;-fx-alignment:center;"
+            + "-fx-min-width:36;-fx-min-height:36;-fx-max-width:36;-fx-max-height:36;");
+
+        VBox userInfo = new VBox(1);
+        Label lUser = new Label(session.username);
+        lUser.setStyle("-fx-font-size:13;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
+        Label lRole = new Label(session.role);
+        lRole.setStyle("-fx-font-size:11;-fx-text-fill:#64748b;");
+        userInfo.getChildren().addAll(lUser, lRole);
+        userInfo.setAlignment(Pos.CENTER_LEFT);
+
+        HBox userBox = new HBox(10, avatar, userInfo);
+        userBox.setAlignment(Pos.CENTER);
+
+        // Hint Ctrl+K dans la topbar (clickable)
+        Label ctrlK = new Label("⌘K  Recherche rapide");
+        ctrlK.setStyle(
+            "-fx-font-size:11;-fx-text-fill:#94a3b8;-fx-background-color:#f1f5f9;"
+            + "-fx-border-color:#e2e8f0;-fx-border-width:1;-fx-border-radius:6;"
+            + "-fx-background-radius:6;-fx-padding:5 12;-fx-cursor:hand;");
+        ctrlK.setOnMouseClicked(e -> showCommandPalette());
+
+        bar.getChildren().addAll(topbarTitle, spacer, ctrlK, userBox);
+        return bar;
+    }
+
+    // ── Sidebar ──────────────────────────────────────────────────────────────
+
+    private VBox buildSidebar() {
+        VBox sb = new VBox(0);
+        sb.setPrefWidth(W_EXPANDED);
+        sb.setMinWidth(W_EXPANDED);
+        sb.setMaxWidth(W_EXPANDED);
+        sb.setStyle("-fx-background-color:" + C_SIDEBAR + ";");
+
+        sb.getChildren().addAll(
+            buildSidebarHeader(),
+            buildNavSection(),
+            spacerRegion(),
+            buildUserFooter()
+        );
+        return sb;
+    }
+
+    /** Haut de la sidebar : logo + bouton toggle. */
+    private HBox buildSidebarHeader() {
+        HBox header = new HBox();
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setPadding(new Insets(18, 12, 16, 20));
+        header.setStyle("-fx-border-color:#1e293b;-fx-border-width:0 0 1 0;");
+        header.setMinHeight(64);
+
+        // Logo
+        Label dot   = new Label("●");
+        dot.setStyle("-fx-font-size:9;-fx-text-fill:#dc2626;");
+        Label lLogo = new Label("VMS");
+        lLogo.setStyle("-fx-font-size:20;-fx-font-weight:bold;-fx-text-fill:white;");
+
+        sidebarSubtitle = new Label("VoucherManager");
+        sidebarSubtitle.setStyle("-fx-font-size:9;-fx-text-fill:" + C_TEXT_S + ";");
+        sidebarSubtitle.setManaged(true);
+        sidebarSubtitle.setVisible(true);
+
+        VBox brandBox = new VBox(2, new HBox(6, dot, lLogo), sidebarSubtitle);
+        brandBox.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(brandBox, Priority.ALWAYS);
+
+        // Bouton toggle ‹ / ›
+        Button btnToggle = new Button("‹");
+        btnToggle.setStyle(
+            "-fx-background-color:#1e293b;-fx-text-fill:#94a3b8;-fx-font-size:14;"
+            + "-fx-font-weight:bold;-fx-padding:4 8;-fx-background-radius:6;"
+            + "-fx-cursor:hand;-fx-border-width:0;");
+        btnToggle.setOnMouseEntered(e ->
+            btnToggle.setStyle("-fx-background-color:#334155;-fx-text-fill:white;"
+                + "-fx-font-size:14;-fx-font-weight:bold;-fx-padding:4 8;"
+                + "-fx-background-radius:6;-fx-cursor:hand;-fx-border-width:0;"));
+        btnToggle.setOnMouseExited(e ->
+            btnToggle.setStyle("-fx-background-color:#1e293b;-fx-text-fill:#94a3b8;"
+                + "-fx-font-size:14;-fx-font-weight:bold;-fx-padding:4 8;"
+                + "-fx-background-radius:6;-fx-cursor:hand;-fx-border-width:0;"));
+        btnToggle.setOnAction(e -> toggleSidebar(btnToggle));
+
+        header.getChildren().addAll(brandBox, btnToggle);
+        return header;
+    }
+
+    private VBox buildNavSection() {
+        VBox section = new VBox(0);
+
+        sidebarNavLabel = new Label("NAVIGATION");
+        sidebarNavLabel.setStyle("-fx-font-size:10;-fx-text-fill:#475569;-fx-font-weight:bold;"
+                + "-fx-padding:16 24 6 24;");
+        section.getChildren().add(sidebarNavLabel);
+
+        for (String[] item : NAV) {
+            String icon  = item[0];
+            String label = item[1];
+            String role  = item[2];
+            boolean adminOnly = !role.isEmpty();
+            boolean isAdmin   = "Administrateur".equals(session.role);
+            if (adminOnly && !isAdmin) continue;
+
+            Button btn = navButton(icon, label);
+            btn.setOnAction(e -> navigate(label));
+            btn.setUserData(new String[]{icon, label}); // mémorise icon + label
+            section.getChildren().add(btn);
+        }
+        return section;
+    }
+
+    private VBox buildUserFooter() {
+        VBox footer = new VBox(6);
+        footer.setPadding(new Insets(14, 20, 22, 20));
+        footer.setStyle("-fx-border-color:#1e293b;-fx-border-width:1 0 0 0;");
+
+        String initial = session.username.substring(0, 1).toUpperCase();
+        Label avatar = new Label(initial);
+        avatar.setStyle(
+            "-fx-background-color:#dc2626;-fx-text-fill:white;-fx-font-weight:bold;"
+            + "-fx-font-size:12;-fx-background-radius:16;-fx-alignment:center;"
+            + "-fx-min-width:30;-fx-min-height:30;-fx-max-width:30;-fx-max-height:30;");
+
+        sidebarUser = new Label(session.username);
+        sidebarUser.setStyle("-fx-font-size:12;-fx-font-weight:bold;-fx-text-fill:white;");
+        sidebarRole = new Label(session.role);
+        sidebarRole.setStyle("-fx-font-size:10;-fx-text-fill:" + C_TEXT_S + ";");
+
+        VBox nameBox = new VBox(1, sidebarUser, sidebarRole);
+        nameBox.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(nameBox, Priority.ALWAYS);
+
+        HBox userRow = new HBox(10, avatar, nameBox);
+        userRow.setAlignment(Pos.CENTER_LEFT);
+
+        Separator sep = new Separator();
+        sep.setStyle("-fx-background-color:#1e293b;");
+        sep.setManaged(true); sep.setVisible(true);
+
+        btnLogout = new Button("↩  Déconnexion");
+        btnLogout.setMaxWidth(Double.MAX_VALUE);
+        btnLogout.setAlignment(Pos.CENTER_LEFT);
+        btnLogout.setStyle("-fx-background-color:transparent;-fx-text-fill:#ef4444;"
+            + "-fx-font-size:12;-fx-padding:6 0;-fx-cursor:hand;-fx-border-width:0;");
+        btnLogout.setOnAction(e -> logout());
+        btnLogout.setOnMouseEntered(e -> btnLogout.setStyle(
+            "-fx-background-color:#1e293b;-fx-text-fill:#fca5a5;-fx-font-size:12;"
+            + "-fx-padding:6 8;-fx-cursor:hand;-fx-border-width:0;-fx-background-radius:6;"));
+        btnLogout.setOnMouseExited(e -> btnLogout.setStyle(
+            "-fx-background-color:transparent;-fx-text-fill:#ef4444;-fx-font-size:12;"
+            + "-fx-padding:6 0;-fx-cursor:hand;-fx-border-width:0;"));
+
+        footer.getChildren().addAll(userRow, sep, btnLogout);
+        return footer;
+    }
+
+    // ── Toggle sidebar ───────────────────────────────────────────────────────
+
+    private void toggleSidebar(Button btnToggle) {
+        collapsed = !collapsed;
+
+        // Animation de la largeur
+        double targetW = collapsed ? W_COLLAPSED : W_EXPANDED;
+        Timeline anim = new Timeline(
+            new KeyFrame(Duration.ZERO,
+                new KeyValue(sidebar.prefWidthProperty(), sidebar.getPrefWidth())),
+            new KeyFrame(Duration.millis(200),
+                new KeyValue(sidebar.prefWidthProperty(), targetW, Interpolator.EASE_BOTH))
+        );
+        anim.setOnFinished(e -> {
+            sidebar.setMinWidth(targetW);
+            sidebar.setMaxWidth(targetW);
+        });
+        anim.play();
+
+        // Direction du bouton
+        btnToggle.setText(collapsed ? "›" : "‹");
+
+        // Masquer / afficher les nœuds textuels
+        sidebarSubtitle.setVisible(!collapsed);
+        sidebarSubtitle.setManaged(!collapsed);
+        sidebarNavLabel.setVisible(!collapsed);
+        sidebarNavLabel.setManaged(!collapsed);
+        sidebarUser.setVisible(!collapsed);
+        sidebarUser.setManaged(!collapsed);
+        sidebarRole.setVisible(!collapsed);
+        sidebarRole.setManaged(!collapsed);
+        btnLogout.setVisible(!collapsed);
+        btnLogout.setManaged(!collapsed);
+
+        // Mettre à jour les boutons nav (y compris ceux enveloppés dans un StackPane par showNavBadge)
+        sidebar.getChildren().stream()
+            .filter(n -> n instanceof VBox)
+            .map(n -> (VBox) n)
+            .filter(vb -> navButtonsIn(vb).findAny().isPresent())
+            .findFirst()
+            .ifPresent(navSection ->
+                navButtonsIn(navSection).forEach(btn -> {
+                    String[] data = (String[]) btn.getUserData();
+                    String icon  = data[0];
+                    String label = data[1];
+                    if (collapsed) {
+                        btn.setText(icon);
+                        btn.setAlignment(Pos.CENTER);
+                        btn.setPadding(new Insets(13, 0, 13, 0));
+                        btn.setMaxWidth(W_COLLAPSED);
+                        btn.setTooltip(new Tooltip(label));
+                    } else {
+                        btn.setText(icon + "   " + label);
+                        btn.setAlignment(Pos.CENTER_LEFT);
+                        btn.setPadding(new Insets(12, 24, 12, 20));
+                        btn.setMaxWidth(Double.MAX_VALUE);
+                        btn.setTooltip(null);
+                    }
+                })
+            );
+    }
+
+    // ── Navigation ───────────────────────────────────────────────────────────
+
+    private void navigate(String page) {
+        topbarTitle.setText(emojiLabel(page));
+
+        // Reset tous les nav buttons
+        allNavButtons().forEach(b -> {
+            b.getStyleClass().remove("nav-item-active");
+            if (!b.getStyleClass().contains("nav-item")) b.getStyleClass().add("nav-item");
+        });
+
+        // Active le bouton correspondant
+        allNavButtons()
+            .filter(b -> b.getUserData() instanceof String[] d && d[1].equals(page))
+            .findFirst()
+            .ifPresent(b -> {
+                activeBtn = b;
+                b.getStyleClass().remove("nav-item");
+                b.getStyleClass().add("nav-item-active");
+            });
+
+        // ── Transition fade out → charger → fade in ────────────────────────
+        FadeTransition out = new FadeTransition(Duration.millis(70), contentArea);
+        out.setFromValue(1.0); out.setToValue(0.0);
+        out.setOnFinished(e -> {
+            contentArea.getChildren().setAll(loadView(page));
+            FadeTransition in = new FadeTransition(Duration.millis(160), contentArea);
+            in.setFromValue(0.0); in.setToValue(1.0);
+            in.play();
+        });
+        out.play();
+    }
+
+    /**
+     * Extrait tous les boutons nav de la sidebar, qu'ils soient directs (Button)
+     * ou enveloppés dans un StackPane par {@link #showNavBadge}.
+     */
+    private java.util.stream.Stream<Button> allNavButtons() {
+        return sidebar.getChildren().stream()
+            .filter(n -> n instanceof VBox)
+            .flatMap(n -> navButtonsIn((VBox) n));
+    }
+
+    /**
+     * Extrait les boutons nav d'une VBox nav :
+     * - Button direct avec userData String[]
+     * - Button dans un StackPane (wrappé par un badge)
+     */
+    private java.util.stream.Stream<Button> navButtonsIn(VBox section) {
+        return section.getChildren().stream()
+            .flatMap(n -> {
+                if (n instanceof Button b && b.getUserData() instanceof String[])
+                    return java.util.stream.Stream.of(b);
+                if (n instanceof StackPane sp)
+                    return sp.getChildren().stream()
+                        .filter(c -> c instanceof Button b2 && b2.getUserData() instanceof String[])
+                        .map(c -> (Button) c);
+                return java.util.stream.Stream.empty();
+            });
+    }
+
+    private String emojiLabel(String page) {
+        for (String[] item : NAV)
+            if (item[1].equals(page)) return item[0] + "  " + page;
+        return page;
+    }
+
+    private Region loadView(String page) {
+        return switch (page) {
+            case "Dashboard"    -> new DashboardView(session, this::navigate).build();
+            case "Demandes"     -> new GestionDemandeView(session).build();
+            case "Validation"   -> new ValidationView(session).build();
+            case "Bons"         -> new GestionBonsView(session).build();
+            case "Clients"      -> new GestionClientsView(session).build();
+            case "Statistiques" -> new StatistiquesView(session).build();
+            case "Rédemption"   -> new RedemptionView(session).build();
+            case "Archives"     -> new ArchivesView(session).build();
+            case "Paramètres"   -> new ParametresView(session).build();
+            default             -> new DashboardView(session, this::navigate).build();
+        };
+    }
+
+    // ── Logout ───────────────────────────────────────────────────────────────
+
+    private void logout() {
+        // Dialog custom plus sobre qu'une Alert système
+        Dialog<ButtonType> dlg = new Dialog<>();
+        dlg.setTitle("Déconnexion");
+
+        ButtonType btnOui = new ButtonType("Déconnecter", javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+        ButtonType btnNon = new ButtonType("Annuler",     javafx.scene.control.ButtonBar.ButtonData.CANCEL_CLOSE);
+        dlg.getDialogPane().getButtonTypes().addAll(btnOui, btnNon);
+
+        VBox content = new VBox(12);
+        content.setPadding(new Insets(20, 24, 8, 24));
+        Label ico  = new Label("↩");
+        ico.setStyle("-fx-font-size:32;-fx-text-fill:#dc2626;");
+        Label msg  = new Label("Voulez-vous vous déconnecter ?");
+        msg.setStyle("-fx-font-size:14;-fx-font-weight:bold;-fx-text-fill:#1e293b;");
+        Label sub  = new Label("Vous serez redirigé vers l'écran de connexion.");
+        sub.setStyle("-fx-font-size:12;-fx-text-fill:#64748b;");
+        content.getChildren().addAll(ico, msg, sub);
+        content.setAlignment(Pos.CENTER_LEFT);
+
+        dlg.getDialogPane().setContent(content);
+        dlg.getDialogPane().setHeader(null);
+
+        // Style le bouton Déconnecter en rouge
+        javafx.application.Platform.runLater(() -> {
+            var okBtn = dlg.getDialogPane().lookupButton(btnOui);
+            if (okBtn != null) okBtn.setStyle(
+                "-fx-background-color:#dc2626;-fx-text-fill:white;-fx-font-weight:bold;"
+                + "-fx-background-radius:8;-fx-padding:8 16;-fx-cursor:hand;");
+        });
+
+        dlg.showAndWait().ifPresent(r -> {
+            if (r == btnOui) new LoginView(stage).show();
+        });
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private Button navButton(String icon, String label) {
+        Button btn = new Button(icon + "   " + label);
+        btn.setMaxWidth(Double.MAX_VALUE);
+        btn.setAlignment(Pos.CENTER_LEFT);
+        btn.setPadding(new Insets(12, 24, 12, 20));
+        btn.getStyleClass().add("nav-item");
+        return btn;
+    }
+
+    private Region spacerRegion() {
+        Region r = new Region();
+        VBox.setVgrow(r, Priority.ALWAYS);
+        return r;
+    }
+
+    // ── Badges de notification ────────────────────────────────────────────────
+
+    /** Charge les compteurs de notification depuis la BD et met à jour les badges. */
+    private void loadNavBadges() {
+        javafx.concurrent.Task<java.util.Map<String, Integer>> task = new javafx.concurrent.Task<>() {
+            @Override
+            protected java.util.Map<String, Integer> call() throws Exception {
+                java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+                try {
+                    // Demandes en attente de paiement
+                    var rows = StatistiquesDAO.getStatsByStatut();
+                    for (Object[] r : rows) {
+                        String s   = String.valueOf(r[0]);
+                        int    cnt = ((Number) r[1]).intValue();
+                        if ("EN_ATTENTE_PAIEMENT".equals(s)) counts.merge("Demandes",  cnt, Integer::sum);
+                        if ("PAYE".equals(s))                counts.merge("Validation", cnt, Integer::sum);
+                    }
+                } catch (Exception ignored) {}
+                return counts;
+            }
+        };
+        task.setOnSucceeded(e -> {
+            var counts = task.getValue();
+            counts.forEach((page, cnt) -> {
+                if (cnt > 0) showNavBadge(page, cnt);
+            });
+        });
+        new Thread(task).start();
+    }
+
+    /** Affiche un badge rouge sur le bouton de navigation correspondant. */
+    private void showNavBadge(String page, int count) {
+        allNavButtons()
+            .filter(b -> b.getUserData() instanceof String[] d && d[1].equals(page))
+            .findFirst()
+            .ifPresent(btn -> {
+                Label badge = new Label(count > 9 ? "9+" : String.valueOf(count));
+                badge.setStyle(
+                    "-fx-background-color:#dc2626;-fx-text-fill:white;"
+                    + "-fx-font-size:9;-fx-font-weight:bold;"
+                    + "-fx-background-radius:10;-fx-padding:1 5 1 5;"
+                    + "-fx-min-width:16;-fx-alignment:center;");
+                navBadges.put(page, badge);
+
+                // Wrapper : StackPane pour superposer le badge
+                StackPane wrap = new StackPane(btn, badge);
+                StackPane.setAlignment(badge, Pos.CENTER_RIGHT);
+                StackPane.setMargin(badge, new Insets(0, 8, 0, 0));
+                wrap.setMaxWidth(Double.MAX_VALUE);
+
+                // Remplacer le bouton par le wrapper dans la VBox nav
+                sidebar.getChildren().stream()
+                    .filter(n -> n instanceof VBox)
+                    .map(n -> (VBox) n)
+                    .forEach(vb -> {
+                        int idx = vb.getChildren().indexOf(btn);
+                        if (idx >= 0) vb.getChildren().set(idx, wrap);
+                    });
+            });
+    }
+
+    // ── Ctrl+K — Palette de commande ─────────────────────────────────────────
+
+    private void showCommandPalette() {
+        javafx.stage.Stage dlgStage = new javafx.stage.Stage();
+        dlgStage.initOwner(stage);
+        dlgStage.initStyle(javafx.stage.StageStyle.UNDECORATED);
+        dlgStage.initModality(javafx.stage.Modality.WINDOW_MODAL);
+
+        // Barre de recherche + résultats
+        TextField tfSearch = new TextField();
+        tfSearch.setPromptText("Naviguer vers… (ex: Clients, Dashboard)");
+        tfSearch.setStyle("-fx-font-size:14;-fx-padding:12 16;-fx-border-color:transparent;"
+            + "-fx-background-color:white;-fx-background-radius:0;");
+
+        VBox results = new VBox(0);
+        results.setStyle("-fx-background-color:white;");
+
+        // Remplir la liste avec toutes les pages nav accessibles
+        java.util.List<String[]> pages = new java.util.ArrayList<>();
+        for (String[] item : NAV) {
+            boolean adminOnly = !item[2].isEmpty();
+            boolean isAdmin   = "Administrateur".equals(session.role);
+            if (!adminOnly || isAdmin) pages.add(item);
+        }
+
+        java.util.function.Consumer<String> filter = (q) -> {
+            results.getChildren().clear();
+            pages.stream()
+                .filter(p -> q.isBlank() || p[1].toLowerCase().contains(q.toLowerCase()))
+                .forEach(p -> {
+                    Label row = new Label("  " + p[0] + "   " + p[1]);
+                    row.setMaxWidth(Double.MAX_VALUE);
+                    row.setPadding(new Insets(11, 16, 11, 16));
+                    row.setStyle("-fx-font-size:13;-fx-text-fill:#1e293b;-fx-cursor:hand;");
+                    row.setOnMouseEntered(e ->
+                        row.setStyle("-fx-font-size:13;-fx-text-fill:#dc2626;"
+                            + "-fx-background-color:#fef2f2;-fx-cursor:hand;"));
+                    row.setOnMouseExited(e ->
+                        row.setStyle("-fx-font-size:13;-fx-text-fill:#1e293b;-fx-cursor:hand;"));
+                    row.setOnMouseClicked(e -> {
+                        dlgStage.close();
+                        navigate(p[1]);
+                    });
+                    results.getChildren().add(row);
+                    results.getChildren().add(new Separator());
+                });
+        };
+        filter.accept("");
+        tfSearch.textProperty().addListener((o, ov, nv) -> filter.accept(nv));
+
+        // Fermer sur Echap
+        VBox root = new VBox(0);
+        root.setStyle(
+            "-fx-background-color:white;-fx-border-color:#e2e8f0;-fx-border-radius:12;"
+            + "-fx-background-radius:12;"
+            + "-fx-effect:dropshadow(gaussian,rgba(0,0,0,0.25),24,0,0,8);");
+        root.setMaxWidth(560);
+        root.getChildren().addAll(tfSearch, new Separator(), results);
+
+        javafx.scene.Scene dlgScene = new javafx.scene.Scene(
+            new StackPane(root), 560, 380);
+        dlgScene.setFill(javafx.scene.paint.Color.TRANSPARENT);
+        dlgScene.getAccelerators().put(
+            new KeyCodeCombination(KeyCode.ESCAPE), dlgStage::close);
+
+        dlgStage.setScene(dlgScene);
+        dlgStage.setX(stage.getX() + (stage.getWidth()  - 560) / 2);
+        dlgStage.setY(stage.getY() + (stage.getHeight() - 380) / 2);
+        dlgStage.show();
+        tfSearch.requestFocus();
+    }
+}
